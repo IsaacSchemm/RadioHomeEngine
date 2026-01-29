@@ -33,36 +33,29 @@ module Abcde =
     }
 
     let ripAsync scope = task {
-        if DiscDrives.ripping then
-            Console.Error.WriteLine("Rip in progress; not starting new rip")
-        else
-            DiscDrives.ripping <- true
+        try
+            let! dirs = LyrionCLI.General.getMediaDirsAsync()
 
-            try
-                let! dirs = LyrionCLI.General.getMediaDirsAsync()
+            let dir =
+                dirs
+                |> Seq.tryHead
+                |> Option.defaultWith (fun () -> failwith "No media_dir found to rip to")
 
-                let dir =
-                    dirs
-                    |> Seq.tryHead
-                    |> Option.defaultWith (fun () -> failwith "No media_dir found to rip to")
+            for device in DiscDrives.getDevices scope do
+                let! info = Icedax.getInfoAsync device
 
-                for device in DiscDrives.getDevices scope do
-                    let! info = Icedax.getInfoAsync device
+                let trackString = String.concat " " [for t in info.disc.tracks do string t.position]
 
-                    let trackString = String.concat " " [for t in info.disc.tracks do string t.position]
+                let proc =
+                    new ProcessStartInfo(
+                        "abcde",
+                        $"-a move,embedalbumart,clean -d {device} -o flac -f -N {trackString}",
+                        WorkingDirectory = dir)
+                    |> Process.Start
 
-                    let proc =
-                        new ProcessStartInfo(
-                            "abcde",
-                            $"-a move,embedalbumart,clean -d {device} -o flac -f -N {trackString}",
-                            WorkingDirectory = dir)
-                        |> Process.Start
+                do! proc.WaitForExitAsync()
 
-                    do! proc.WaitForExitAsync()
-
-                do! LyrionCLI.General.rescanAsync()
-            with ex ->
-                Console.Error.WriteLine(ex)
-
-            DiscDrives.ripping <- false
+            do! LyrionCLI.General.rescanAsync()
+        with ex ->
+            Console.Error.WriteLine(ex)
     }

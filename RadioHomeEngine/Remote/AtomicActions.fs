@@ -27,9 +27,17 @@ module AtomicActions =
         ("09", Forecast, "Weather")
     ]
 
+    let rippingFlag = new SemaphoreSlim(1, 1)
+
     let beginRipAsync scope = ignore (task {
-        do! DataCD.ripAsync scope
-        do! Abcde.ripAsync scope
+        do! rippingFlag.WaitAsync()
+
+        try
+            do! DataCD.ripAsync scope
+            do! Abcde.ripAsync scope
+        finally
+            ignore (rippingFlag.Release())
+
         do! DiscDrives.ejectAsync scope
     })
 
