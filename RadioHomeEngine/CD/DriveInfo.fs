@@ -5,6 +5,8 @@ type TrackInfo = {
     position: int
 }
 
+// TODO: unify audio and data disc types
+
 type AudioDiscInfo = {
     discid: string option
     titles: string list

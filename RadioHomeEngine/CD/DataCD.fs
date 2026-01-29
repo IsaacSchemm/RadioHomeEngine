@@ -5,24 +5,22 @@ open System.Diagnostics
 open System.IO
 open System.Runtime.Caching
 open System.Threading
-open System.Threading.Tasks
 
 module DataCD =
     let extensions = set [
-        //".aac"
-        //".aif"
-        //".aiff"
-        //".flac"
+        ".aac"
+        ".aif"
+        ".aiff"
+        ".flac"
         ".mp3"
-        //".m4a"
-        //".oga"
-        //".ogg"
-        //".wav"
-        //".wma"
+        ".m4a"
+        ".oga"
+        ".ogg"
+        ".wav"
+        ".wma"
     ]
 
     type ITemporaryMount =
-        inherit IAsyncDisposable
         inherit IDisposable
 
         abstract member Device: string with get
@@ -35,28 +33,18 @@ module DataCD =
 
         ignore (Directory.CreateDirectory(dir))
 
-        use proc = Process.Start("mount", $"\"{device}\" \"{dir}\"")
+        use proc = Process.Start("mount", $"-o ro \"{device}\" \"{dir}\"")
         do! proc.WaitForExitAsync()
-
-        let rec unmountAsync (attempts: int) = task {
-            try
-                use proc = Process.Start("umount", $"\"{dir}\"")
-                do! proc.WaitForExitAsync()
-
-                printfn "umount process quit with exit code %d" proc.ExitCode
-                if proc.ExitCode <> 0 then
-                    if attempts > 1 then
-                        do! unmountAsync (attempts - 1)
-            with ex ->
-                Console.Error.WriteLine(ex)
-        }
 
         return {
             new ITemporaryMount with
                 member _.Device = device
                 member _.MountPoint = dir
-                member _.Dispose () = ignore (unmountAsync 3)
-                member _.DisposeAsync () = ValueTask (unmountAsync 3)
+                member _.Dispose () =
+                    use proc = Process.Start("umount", $"\"{dir}\"")
+                    proc.WaitForExit()
+
+                    Directory.Delete(dir, recursive = false)
         }
     }
 
@@ -81,46 +69,69 @@ module DataCD =
     }
 
     module FileCache =
+        type ICachedFile =
+            abstract member Path: string
+            inherit IDisposable
+
         let cache = MemoryCache.Default
         let flag = new SemaphoreSlim(1, 1)
 
         let getKey device file =
             sprintf "FileCache:%s:%s:%d" device file.name file.size
 
-        let getAsync device file = task {
+        let storeAsTempFileAsync device file = task {
             let key = getKey device file
 
             match cache.Get(key) with
-            | :? (byte array) as data ->
-                return data
+            | :? ICachedFile as cf ->
+                return cf
             | _ ->
                 do! flag.WaitAsync()
 
                 try
                     use! mount = establishTemporaryMountPointAsync device
 
-                    let path = Path.Combine(
+                    let sourceFile = Path.Combine(
                         mount.MountPoint,
                         file.name)
 
-                    let! data = File.ReadAllBytesAsync(path)
+                    let extension = Path.GetExtension(file.name)
 
-                    let policy = new CacheItemPolicy(SlidingExpiration = TimeSpan.FromDays(1))
-                    cache.Add(key, data, policy) |> ignore
+                    let tempFile = Path.Combine(
+                        Path.GetTempPath(),
+                        $"{Guid.NewGuid()}{extension}")
 
-                    return data
+                    do! (task {
+                        use fsIn = new FileStream(sourceFile, FileMode.Open, FileAccess.Read)
+                        use fsOut = new FileStream(tempFile, FileMode.Create, FileAccess.Write)
+
+                        do! fsIn.CopyToAsync(fsOut)
+                    })
+
+                    let cachedFile = {
+                        new ICachedFile with
+                            member _.Path = tempFile
+                            member _.Dispose () =
+                                if File.Exists(tempFile)
+                                then File.Delete(tempFile)
+                    }
+
+                    let policy = new CacheItemPolicy(
+                        SlidingExpiration = TimeSpan.FromDays(1),
+                        RemovedCallback = fun args -> ())
+
+                    cache.Add(key, cachedFile, policy) |> ignore
+
+                    // TODO: clean up these files on application exit
+
+                    return cachedFile
                 finally
                     flag.Release() |> ignore
         }
 
     let storeAsync device file = task {
-        let! data = FileCache.getAsync device file
-        ignore data
-    }
-
-    let getStreamAsync device file = task {
-        let! data = FileCache.getAsync device file
-        return new MemoryStream(data, writable = false)
+        let! file = FileCache.storeAsTempFileAsync device file
+        return file.Path
     }
 
     let ripAsync scope = task {
