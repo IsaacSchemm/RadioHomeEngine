@@ -110,16 +110,7 @@
             <fieldset>
                 <legend>CD-ROM</legend>
 
-                @if (drive.DataDiscs.IsEmpty)
-                {
-                    <p>
-                        <form asp-action="MountCD">
-                            <input type="hidden" name="device" value="@drive.device" />
-                            <button type="submit">Mount</button>
-                        </form>
-                    </p>
-                }
-                else
+                @if (!drive.DataDiscs.IsEmpty)
                 {
                     foreach (var disc in drive.DataDiscs)
                     {
@@ -136,13 +127,6 @@
                             </tbody>
                         </table>
                     }
-
-                    <p>
-                        <form asp-action="UnmountCD">
-                            <input type="hidden" name="device" value="@drive.device" />
-                            <button type="submit">Unmount</button>
-                        </form>
-                    </p>
                 }
             </fieldset>
         }

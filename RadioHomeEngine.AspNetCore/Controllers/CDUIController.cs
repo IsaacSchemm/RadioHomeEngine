@@ -23,20 +23,6 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> MountCD(string device)
-        {
-            await DataCD.mountDeviceAsync(device);
-            return RedirectToAction(nameof(Index));
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> UnmountCD(string device)
-        {
-            await DataCD.unmountDeviceAsync(device);
-            return RedirectToAction(nameof(Index));
-        }
-
-        [HttpPost]
         public async Task PlayCD(string device, string mac)
         {
             await AtomicActions.performActionAsync(

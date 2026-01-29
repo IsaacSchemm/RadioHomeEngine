@@ -113,12 +113,9 @@ module AtomicActions =
             for info in drives do
                 match info.disc with
                 | DataDisc dataDisc ->
-                    let! mountPoint = DataCD.mountDeviceAsync info.device
-                    match mountPoint with
-                    | None -> ()
-                    | Some dir ->
-                        for file in dataDisc.files do
-                            do! Playlist.addItemAsync player $"file://{dir}/{file}" $"{file}"
+                    for index, file in dataDisc.files |> Seq.indexed do
+                        do! DataCD.storeAsync info.device file
+                        do! Playlist.addItemAsync player $"http://{address}:{Config.port}/CD/PlayFileFromCache?device={Uri.EscapeDataString(info.device)}&index={index}" file.name
                 | AudioDisc audioDisc
                 | HybridDisc audioDisc ->
                     for track in audioDisc.tracks do

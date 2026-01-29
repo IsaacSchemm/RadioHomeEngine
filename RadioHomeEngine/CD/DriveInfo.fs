@@ -12,8 +12,13 @@ type AudioDiscInfo = {
     tracks: TrackInfo list
 }
 
+type DataDiscFileInfo = {
+    name: string
+    size: int64
+}
+
 type DataDiscInfo = {
-    files: string list
+    files: DataDiscFileInfo list
 }
 
 type DiscInfo =
