@@ -8,8 +8,10 @@ Functionality available from the web interface (port 5000):
 
 * Audio CD playback
     * Album and track names (from CD-Text or MusicBrainz)
-    * Play a disc (all tracks, or all audio files) on a device connected to LMS
+    * Play a disc on a device connected to LMS
+        * MP3s and other audio files are copied to `/tmp` for playback and deleted when the disc is removed
     * Rip the disc to LMS's media folder using `abcde`
+        * Files on data CDs are copied to a separate directory
 * SiriusXM
     * List channels (live streams only; Xtra channels not supported)
     * Play a channel on a device connected to LMS
