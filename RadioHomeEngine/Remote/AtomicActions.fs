@@ -105,8 +105,9 @@ module AtomicActions =
             let! drives = Discovery.getDriveInfoAsync scope
 
             for info in drives do
-                for file in info.disc.data.files do
-                    do! DataCD.storeAsync info.device file :> Task
+                for dataDisc in info.disc.data do
+                    for file in dataDisc.files do
+                        do! DataCD.storeAsync info.device file :> Task
 
             do! Players.setDisplayAsync player "Please wait" "Finishing up..." (TimeSpan.FromMilliseconds(1))
 
@@ -115,16 +116,18 @@ module AtomicActions =
             let! address = Network.getAddressAsync ()
 
             for info in drives do
-                for track in info.disc.audio.tracks do
-                    let title =
-                        match track.title with
-                        | "" -> $"Track {track.position}"
-                        | x -> x
-                    do! Playlist.addItemAsync player $"http://{address}:{Config.port}/CD/PlayTrack?device={Uri.EscapeDataString(info.device)}&track={track.position}" title
+                for audioDisc in info.disc.audio do
+                    for track in audioDisc.tracks do
+                        let title =
+                            match track.title with
+                            | "" -> $"Track {track.position}"
+                            | x -> x
+                        do! Playlist.addItemAsync player $"http://{address}:{Config.port}/CD/PlayTrack?device={Uri.EscapeDataString(info.device)}&track={track.position}" title
 
-                for file in info.disc.data.files do
-                    let! path = DataCD.storeAsync info.device file
-                    do! Playlist.addItemAsync player $"file://{path}" file.name
+                for dataDisc in info.disc.data do
+                    for file in dataDisc.files do
+                        let! path = DataCD.storeAsync info.device file
+                        do! Playlist.addItemAsync player $"file://{path}" file.name
 
             do! Playlist.playAsync player
 
@@ -180,7 +183,8 @@ module AtomicActions =
             let! drives = Discovery.getDriveInfoAsync scope
             let disc =
                 drives
-                |> Seq.map (fun dr -> dr.disc)
+                |> Seq.map (fun drive -> drive.disc)
+                |> Seq.collect (fun disc -> disc.audio)
                 |> Seq.tryHead
 
             match disc with
@@ -188,11 +192,11 @@ module AtomicActions =
                 do! Players.setDisplayAsync player "CD" "No disc found" (TimeSpan.FromSeconds(10))
             | Some disc ->
                 let title =
-                    match disc.audio.titles with
+                    match disc.titles with
                     | [] -> "Unknown album"
                     | x -> String.concat ", " x
                 let artist =
-                    match disc.audio.artists with
+                    match disc.artists with
                     | [] -> "Unknown artist"
                     | x -> String.concat ", " x
                 do! Players.setDisplayAsync player artist title (TimeSpan.FromSeconds(10))

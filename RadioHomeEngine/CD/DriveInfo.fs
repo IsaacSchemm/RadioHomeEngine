@@ -22,8 +22,8 @@ type DataDiscInfo = {
 }
 
 type DiscInfo = {
-    audio: AudioDiscInfo
-    data: DataDiscInfo
+    audio: AudioDiscInfo list
+    data: DataDiscInfo list
 }
 
 type DriveInfo = {

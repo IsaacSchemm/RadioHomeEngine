@@ -37,49 +37,49 @@ module Discovery =
 
         let! files = DataCD.scanDeviceAsync device
 
+        let dataDisc = { files = files }
+
         let! audioDisc = task {
-            let! icedax =
-                if files = []
-                then Icedax.getInfoAsync device
-                else Task.FromResult({|
-                    disc = {
-                        discid = None
-                        titles = []
-                        artists = []
-                        tracks = []
-                    }
-                    hasdata = true
-                |})
-
-            if icedax.disc.tracks = [] then
-                printfn $"[Discovery] [{device}] No tracks found on disc"
-                return icedax.disc
-
+            if files <> [] then
+                return None
             else
-                printfn $"[Discovery] [{device}] Preparing to query MusicBrainz..."
+                let! icedax = Icedax.getInfoAsync device
 
-                let! candidate =
-                    asyncGetDiscIds device icedax.disc
-                    |> AsyncSeq.distinctUntilChanged
-                    |> AsyncSeq.mapAsync asyncQueryMusicBrainz
-                    |> AsyncSeq.choose id
-                    |> AsyncSeq.tryFirst
+                if icedax.disc.tracks = [] then
+                    printfn $"[Discovery] [{device}] No tracks found on disc"
+                    return Some icedax.disc
 
-                match candidate with
-                | Some newDisc ->
-                    printfn $"[Discovery] [{device}] Using title {newDisc.titles} from MusicBrainz"
-                    return newDisc
-                | None ->
-                    printfn $"[Discovery] [{device}] Not found on MusicBrainz"
-                    printfn $"[Discovery] [{device}] Using title {icedax.disc.titles} from icedax"
-                    return icedax.disc
+                else
+                    printfn $"[Discovery] [{device}] Preparing to query MusicBrainz..."
+
+                    let! candidate =
+                        asyncGetDiscIds device icedax.disc
+                        |> AsyncSeq.distinctUntilChanged
+                        |> AsyncSeq.mapAsync asyncQueryMusicBrainz
+                        |> AsyncSeq.choose id
+                        |> AsyncSeq.tryFirst
+
+                    match candidate with
+                    | Some newDisc ->
+                        printfn $"[Discovery] [{device}] Using title {newDisc.titles} from MusicBrainz"
+                        return Some newDisc
+                    | None ->
+                        printfn $"[Discovery] [{device}] Not found on MusicBrainz"
+                        printfn $"[Discovery] [{device}] Using title {icedax.disc.titles} from icedax"
+                        return Some icedax.disc
         }
 
         return {
             device = device
             disc = {
-                audio = audioDisc
-                data = { files = files }
+                audio = [
+                    match audioDisc with
+                    | Some a when a.tracks <> [] -> a
+                    | _ -> ()
+                ]
+                data = [
+                    if dataDisc.files <> [] then dataDisc
+                ]
             }
         }
     }

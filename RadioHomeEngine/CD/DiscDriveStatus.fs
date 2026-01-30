@@ -50,9 +50,6 @@ module DiscDriveStatus =
                 ignore (flag.Release())
         }
 
-        let get device =
-            Map.tryFind device map
-
     let private deserializeAs (_: 'T) (json: string) =
         JsonSerializer.Deserialize<'T>(json)
 
@@ -71,38 +68,44 @@ module DiscDriveStatus =
 
         let data = json |> deserializeAs {|
             ID_CDROM_MEDIA = Some ""
+            ID_CDROM_MEDIA_TRACK_COUNT_AUDIO = Some ""
+            ID_CDROM_MEDIA_TRACK_COUNT_DATA = Some ""
         |}
 
         return {|
             inserted = data.ID_CDROM_MEDIA = Some "1"
+            audioTracks =
+                match data.ID_CDROM_MEDIA_TRACK_COUNT_AUDIO with
+                | Some (Int32 i) -> i
+                | _ -> 0
+            dataTracks =
+                match data.ID_CDROM_MEDIA_TRACK_COUNT_DATA with
+                | Some (Int32 i) -> i
+                | _ -> 0
         |}
     }
 
-    let mutable private current = Map.empty
-
-    let refreshAllAsync () = task {
+    let mountAllAsync () = task {
         let devices = DiscDrives.getAll ()
-        let removed = Map.keys current |> Seq.except devices
 
         for device in devices do
             let! newStatus = getStatusAsync device
-            if Map.tryFind device current <> Some newStatus then
-                current <- current |> Map.add device newStatus
-                if newStatus.inserted then
-                    do! MountPoints.mountAsync device
-                else
-                    do! MountPoints.unmountAsync device
+
+            if newStatus.inserted && newStatus.audioTracks = 0 && newStatus.dataTracks > 0 then
+                do! MountPoints.mountAsync device
+            else
+                do! MountPoints.unmountAsync device
+
+        let removed = Map.keys MountPoints.map |> Seq.except devices
 
         for device in removed do
-            current <- current |> Map.remove device
             do! MountPoints.unmountAsync device
     }
 
     let getMountPoint device =
-        MountPoints.get device
+        Map.tryFind device MountPoints.map
 
-    let removeAllAsync () = task {
-        for device in Map.keys current do
-            current <- current |> Map.remove device
+    let unmountAllAsync () = task {
+        for device in Map.keys MountPoints.map do
             do! MountPoints.unmountAsync device
     }

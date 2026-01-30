@@ -43,7 +43,7 @@
     {
         <h1>CD Drive @drive.device</h1>
 
-        var empty = drive.disc.audio.tracks.IsEmpty && drive.disc.data.files.IsEmpty;
+        var empty = drive.disc.audio.IsEmpty && drive.disc.data.IsEmpty;
 
         if (!empty)
         {
@@ -65,14 +65,14 @@
             </fieldset>
         }
 
-        if (!drive.disc.audio.tracks.IsEmpty)
+        foreach (var audioDisc in drive.disc.audio)
         {
             <p>
-                @foreach (var title in drive.disc.audio.titles)
+                @foreach (var title in audioDisc.titles)
                 {
                     <div style="font-size: 150%">@title</div>
                 }
-                @foreach (var artist in drive.disc.audio.artists)
+                @foreach (var artist in audioDisc.artists)
                 {
                     <div>@artist</div>
                 }
@@ -87,7 +87,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var track in drive.disc.audio.tracks)
+                    @foreach (var track in audioDisc.tracks)
                     {
                         <tr>
                             <td>
@@ -107,7 +107,7 @@
             </table>
         }
 
-        if (!drive.disc.data.files.IsEmpty)
+        foreach (var dataDisc in drive.disc.data)
         {
             <fieldset>
                 <legend>CD-ROM</legend>
@@ -120,7 +120,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var file in drive.disc.data.files)
+                        @foreach (var file in dataDisc.files)
                         {
                             <tr>
                                 <td align="left">

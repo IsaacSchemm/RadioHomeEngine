@@ -53,11 +53,11 @@ type DiscDriveChangeDetectionService() =
 
         while udevAvailable && not cancellationToken.IsCancellationRequested do
             try
-                do! DiscDriveStatus.refreshAllAsync ()
+                do! DiscDriveStatus.mountAllAsync ()
                 do! waitForMediaChangeAsync cancellationToken
             with ex ->
                 Console.Error.WriteLine(ex)
                 do! Task.Delay(TimeSpan.FromHours(1), cancellationToken)
 
-        do! DiscDriveStatus.removeAllAsync ()
+        do! DiscDriveStatus.unmountAllAsync ()
     }
