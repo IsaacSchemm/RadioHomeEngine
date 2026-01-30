@@ -2,11 +2,12 @@
 
 open System
 open System.Diagnostics
+open System.IO
+open System.Text.Json
 open System.Text.RegularExpressions
+open System.Threading
 open System.Threading.Tasks
 open Microsoft.Extensions.Hosting
-open System.Threading
-open System.Text.Json
 
 type DiscDriveChangeDetectionService() =
     inherit BackgroundService()
@@ -58,5 +59,5 @@ type DiscDriveChangeDetectionService() =
                 Console.Error.WriteLine(ex)
                 do! Task.Delay(TimeSpan.FromHours(1), cancellationToken)
 
-        DiscDriveStatus.removeAll ()
+        do! DiscDriveStatus.removeAllAsync ()
     }

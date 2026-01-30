@@ -35,9 +35,22 @@ module Discovery =
     let getDriveInfoForDeviceAsync device = task {
         printfn $"[Discovery] [{device}] Scanning drive {device}..."
 
-        let! icedax = Icedax.getInfoAsync device
+        let! files = DataCD.scanDeviceAsync device
 
         let! audioDisc = task {
+            let! icedax =
+                if files = []
+                then Icedax.getInfoAsync device
+                else Task.FromResult({|
+                    disc = {
+                        discid = None
+                        titles = []
+                        artists = []
+                        tracks = []
+                    }
+                    hasdata = true
+                |})
+
             if icedax.disc.tracks = [] then
                 printfn $"[Discovery] [{device}] No tracks found on disc"
                 return icedax.disc
@@ -61,11 +74,6 @@ module Discovery =
                     printfn $"[Discovery] [{device}] Using title {icedax.disc.titles} from icedax"
                     return icedax.disc
         }
-
-        let! files =
-            if icedax.hasdata
-            then DataCD.scanDeviceAsync device
-            else Task.FromResult([])
 
         return {
             device = device
