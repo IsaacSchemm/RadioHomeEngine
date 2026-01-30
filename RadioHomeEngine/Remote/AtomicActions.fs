@@ -102,29 +102,27 @@ module AtomicActions =
 
             do! Players.setDisplayAsync player "Please wait" "Searching for tracks and files..." (TimeSpan.FromSeconds(999))
 
-            let! drives = Discovery.autoMountAsync scope
-
-            do! Players.setDisplayAsync player "Please wait" "Finishing up..." (TimeSpan.FromMilliseconds(1))
+            let! drives = Discovery.getDriveInfoAsync scope
 
             do! Playlist.clearAsync player
 
             let! address = Network.getAddressAsync ()
 
             for info in drives do
-                match info.disc with
-                | DataDisc dataDisc ->
-                    for file in dataDisc.files do
-                        let! path = DataCD.storeAsync info.device file
-                        do! Playlist.addItemAsync player $"file://{path}" file.name
-                | AudioDisc audioDisc
-                | HybridDisc audioDisc ->
-                    for track in audioDisc.tracks do
-                        let title =
-                            match track.title with
-                            | "" -> $"Track {track.position}"
-                            | x -> x
-                        do! Playlist.addItemAsync player $"http://{address}:{Config.port}/CD/PlayTrack?device={Uri.EscapeDataString(info.device)}&track={track.position}" title
-                | NoDisc -> ()
+                for track in info.disc.audio.tracks do
+                    let title =
+                        match track.title with
+                        | "" -> $"Track {track.position}"
+                        | x -> x
+                    do! Playlist.addItemAsync player $"http://{address}:{Config.port}/CD/PlayTrack?device={Uri.EscapeDataString(info.device)}&track={track.position}" title
+
+                for file in info.disc.data.files do
+                    do! Players.setDisplayAsync player "Please wait" $"Reading file {file.name}..." (TimeSpan.FromSeconds(999))
+
+                    let! path = DataCD.storeAsync info.device file
+                    do! Playlist.addItemAsync player $"file://{path}" file.name
+
+            do! Players.setDisplayAsync player "Please wait" "Finishing up..." (TimeSpan.FromMilliseconds(1))
 
             do! Playlist.playAsync player
 
@@ -181,26 +179,21 @@ module AtomicActions =
             let disc =
                 drives
                 |> Seq.map (fun dr -> dr.disc)
-                |> Seq.except [NoDisc]
                 |> Seq.tryHead
-                |> Option.defaultValue NoDisc
 
             match disc with
-            | NoDisc ->
+            | None ->
                 do! Players.setDisplayAsync player "CD" "No disc found" (TimeSpan.FromSeconds(10))
-            | AudioDisc audioDisc
-            | HybridDisc audioDisc ->
+            | Some disc ->
                 let title =
-                    match audioDisc.titles with
+                    match disc.audio.titles with
                     | [] -> "Unknown album"
                     | x -> String.concat ", " x
                 let artist =
-                    match audioDisc.artists with
+                    match disc.audio.artists with
                     | [] -> "Unknown artist"
                     | x -> String.concat ", " x
                 do! Players.setDisplayAsync player artist title (TimeSpan.FromSeconds(10))
-            | DataDisc dataDisc ->
-                do! Players.setDisplayAsync player "CD" $"{List.length dataDisc.files} file(s) found" (TimeSpan.FromSeconds(10))
 
         | _ -> ()
     }

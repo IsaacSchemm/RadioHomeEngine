@@ -1,6 +1,7 @@
 ﻿namespace RadioHomeEngine
 
 open System
+open System.Threading.Tasks
 open FSharp.Control
 
 module Discovery =
@@ -31,81 +32,56 @@ module Discovery =
             return None
     }
 
-    let asyncGetDriveInfo device = async {
+    let getDriveInfoForDeviceAsync device = task {
         printfn $"[Discovery] [{device}] Scanning drive {device}..."
 
-        let! scanResults = Icedax.getInfoAsync device |> Async.AwaitTask
+        let! icedax = Icedax.getInfoAsync device
 
-        let disc = scanResults.disc
+        let! audioDisc = task {
+            if icedax.disc.tracks = [] then
+                printfn $"[Discovery] [{device}] No tracks found on disc"
+                return icedax.disc
 
-        if disc.tracks = [] && scanResults.hasdata then
-            let! files = DataCD.scanDeviceAsync device |> Async.AwaitTask
+            else
+                printfn $"[Discovery] [{device}] Preparing to query MusicBrainz..."
 
-            return {
-                device = device
-                disc = DataDisc {
-                    files = files
-                }
-            }
+                let! candidate =
+                    asyncGetDiscIds device icedax.disc
+                    |> AsyncSeq.distinctUntilChanged
+                    |> AsyncSeq.mapAsync asyncQueryMusicBrainz
+                    |> AsyncSeq.choose id
+                    |> AsyncSeq.tryFirst
 
-        else if disc.tracks = [] then
-            printfn $"[Discovery] [{device}] No tracks found on disc"
-            return {
-                device = device
-                disc = NoDisc
-            }
-
-        else
-            printfn $"[Discovery] [{device}] Preparing to query MusicBrainz..."
-
-            let! candidate =
-                asyncGetDiscIds device disc
-                |> AsyncSeq.distinctUntilChanged
-                |> AsyncSeq.mapAsync asyncQueryMusicBrainz
-                |> AsyncSeq.choose id
-                |> AsyncSeq.tryFirst
-
-            let disc =
                 match candidate with
                 | Some newDisc ->
                     printfn $"[Discovery] [{device}] Using title {newDisc.titles} from MusicBrainz"
-                    newDisc
+                    return newDisc
                 | None ->
                     printfn $"[Discovery] [{device}] Not found on MusicBrainz"
-                    printfn $"[Discovery] [{device}] Using title {disc.titles} from icedax"
-                    scanResults.disc
+                    printfn $"[Discovery] [{device}] Using title {icedax.disc.titles} from icedax"
+                    return icedax.disc
+        }
 
-            return {
-                device = device
-                disc =
-                    if scanResults.hasdata
-                    then HybridDisc disc
-                    else AudioDisc disc
+        let! files =
+            if icedax.hasdata
+            then DataCD.scanDeviceAsync device
+            else Task.FromResult([])
+
+        return {
+            device = device
+            disc = {
+                audio = audioDisc
+                data = { files = files }
             }
-    }
-
-    [<Obsolete>]
-    let asyncAutoMount device = async {
-        return! asyncGetDriveInfo device
+        }
     }
 
     let getDriveInfoAsync scope = task {
         let! array =
             scope
             |> DiscDrives.getDevices
-            |> Seq.map asyncGetDriveInfo
-            |> Async.Parallel
-
-        return Array.toList array
-    }
-
-    [<Obsolete>]
-    let autoMountAsync scope = task {
-        let! array =
-            scope
-            |> DiscDrives.getDevices
-            |> Seq.map asyncAutoMount
-            |> Async.Parallel
+            |> Seq.map getDriveInfoForDeviceAsync
+            |> Task.WhenAll
 
         return Array.toList array
     }

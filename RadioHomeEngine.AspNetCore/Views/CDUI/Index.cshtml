@@ -43,7 +43,9 @@
     {
         <h1>CD Drive @drive.device</h1>
 
-        if (!drive.disc.IsNoDisc)
+        var empty = drive.disc.audio.tracks.IsEmpty && drive.disc.data.files.IsEmpty;
+
+        if (!empty)
         {
             <fieldset>
                 <legend>Play on</legend>
@@ -63,14 +65,14 @@
             </fieldset>
         }
 
-        foreach (var disc in drive.AudioDiscs)
+        if (!drive.disc.audio.tracks.IsEmpty)
         {
             <p>
-                @foreach (var title in disc.titles)
+                @foreach (var title in drive.disc.audio.titles)
                 {
                     <div style="font-size: 150%">@title</div>
                 }
-                @foreach (var artist in disc.artists)
+                @foreach (var artist in drive.disc.audio.artists)
                 {
                     <div>@artist</div>
                 }
@@ -85,7 +87,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var track in disc.tracks)
+                    @foreach (var track in drive.disc.audio.tracks)
                     {
                         <tr>
                             <td>
@@ -105,33 +107,36 @@
             </table>
         }
 
-        if (drive.HasData)
+        if (!drive.disc.data.files.IsEmpty)
         {
             <fieldset>
                 <legend>CD-ROM</legend>
 
-                @if (!drive.DataDiscs.IsEmpty)
-                {
-                    foreach (var disc in drive.DataDiscs)
-                    {
-                        <table class="trackTable">
-                            <tbody>
-                                @foreach (var file in disc.files)
-                                {
-                                    <tr>
-                                        <td align="left">
-                                            @file
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    }
-                }
+                <table class="trackTable">
+                    <thead>
+                        <tr>
+                            <th scope="col" align="left">Name</th>
+                            <th scope="col" align="left">Size (bytes)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var file in drive.disc.data.files)
+                        {
+                            <tr>
+                                <td align="left">
+                                    @file.name
+                                </td>
+                                <td align="left">
+                                    @file.size
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </fieldset>
         }
 
-        if (!drive.disc.IsNoDisc)
+        if (!empty)
         {
             <p>
                 <form asp-action="RipCD" target="myframe">

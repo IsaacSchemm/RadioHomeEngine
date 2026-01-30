@@ -5,7 +5,6 @@ open System.Diagnostics
 open System.IO
 open System.Text
 open System.Text.RegularExpressions
-open System.Threading
 open System.Threading.Tasks
 
 module Icedax =

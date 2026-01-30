@@ -70,7 +70,7 @@ module DataCD =
     module FileCache =
         type TemporaryFile = {
             device: string
-            fileInfo: DataDiscFileInfo
+            fileInfo: DiscFileInfo
             path: string
         }
 
@@ -154,14 +154,14 @@ module DataCD =
             |> Seq.tryHead
             |> Option.defaultWith (fun () -> failwith "No media_dir found to rip to")
 
+        let destDir = Path.Combine(
+            mediaDir,
+            "CD-ROM")
+
         for device in DiscDrives.getDevices scope do
             try
                 use! mount = establishTemporaryMountPointAsync device
                 let srcDir = mount.MountPoint
-
-                let destDir = Path.Combine(
-                    mediaDir,
-                    $"""CD-ROM {DateTimeOffset.UtcNow.ToString("yyyy-MM-dd hh:mm:ss")}""")
 
                 ignore (Directory.CreateDirectory(destDir))
 
