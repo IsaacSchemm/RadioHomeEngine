@@ -3,8 +3,6 @@
 open System
 open System.Diagnostics
 open System.IO
-open System.Threading
-open System.Threading.Tasks
 
 module DataCD =
     let extensions = set [

@@ -2,7 +2,6 @@
 
 open System
 open System.Diagnostics
-open System.IO
 open System.Text.Json
 open System.Text.RegularExpressions
 open System.Threading
@@ -46,12 +45,7 @@ type DiscDriveChangeDetectionService() =
     }
 
     override _.ExecuteAsync(cancellationToken) = task {
-        let udevAvailable =
-            use proc = Process.Start("which", "udevadm")
-            proc.WaitForExit()
-            proc.ExitCode = 0
-
-        while udevAvailable && not cancellationToken.IsCancellationRequested do
+        while not cancellationToken.IsCancellationRequested do
             try
                 do! DiscDriveStatus.mountAllAsync ()
                 do! waitForMediaChangeAsync cancellationToken
