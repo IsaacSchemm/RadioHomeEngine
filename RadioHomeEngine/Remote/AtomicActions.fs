@@ -104,6 +104,12 @@ module AtomicActions =
 
             let! drives = Discovery.getDriveInfoAsync scope
 
+            for info in drives do
+                for file in info.disc.data.files do
+                    do! DataCD.storeAsync info.device file :> Task
+
+            do! Players.setDisplayAsync player "Please wait" "Finishing up..." (TimeSpan.FromMilliseconds(1))
+
             do! Playlist.clearAsync player
 
             let! address = Network.getAddressAsync ()
@@ -117,12 +123,8 @@ module AtomicActions =
                     do! Playlist.addItemAsync player $"http://{address}:{Config.port}/CD/PlayTrack?device={Uri.EscapeDataString(info.device)}&track={track.position}" title
 
                 for file in info.disc.data.files do
-                    do! Players.setDisplayAsync player "Please wait" $"Reading file {file.name}..." (TimeSpan.FromSeconds(999))
-
                     let! path = DataCD.storeAsync info.device file
                     do! Playlist.addItemAsync player $"file://{path}" file.name
-
-            do! Players.setDisplayAsync player "Please wait" "Finishing up..." (TimeSpan.FromMilliseconds(1))
 
             do! Playlist.playAsync player
 
