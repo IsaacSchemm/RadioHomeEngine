@@ -8,6 +8,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddHostedService<LyrionCLIService>();
 builder.Services.AddHostedService<WeatherService>();
 builder.Services.AddHostedService<LyrionPlayerDetectionService>();
+builder.Services.AddHostedService<DiscDriveChangeDetectionService>();
 
 var app = builder.Build();
 

@@ -3,7 +3,6 @@
 open System
 open System.Diagnostics
 open System.IO
-open System.Runtime.Caching
 open System.Threading
 
 module DataCD =
@@ -69,69 +68,82 @@ module DataCD =
     }
 
     module FileCache =
-        type ICachedFile =
-            abstract member Path: string
-            inherit IDisposable
-
-        let cache = MemoryCache.Default
-        let flag = new SemaphoreSlim(1, 1)
-
-        let getKey device file =
-            sprintf "FileCache:%s:%s:%d" device file.name file.size
-
-        let storeAsTempFileAsync device file = task {
-            let key = getKey device file
-
-            match cache.Get(key) with
-            | :? ICachedFile as cf ->
-                return cf
-            | _ ->
-                do! flag.WaitAsync()
-
-                try
-                    use! mount = establishTemporaryMountPointAsync device
-
-                    let sourceFile = Path.Combine(
-                        mount.MountPoint,
-                        file.name)
-
-                    let extension = Path.GetExtension(file.name)
-
-                    let tempFile = Path.Combine(
-                        Path.GetTempPath(),
-                        $"{Guid.NewGuid()}{extension}")
-
-                    do! (task {
-                        use fsIn = new FileStream(sourceFile, FileMode.Open, FileAccess.Read)
-                        use fsOut = new FileStream(tempFile, FileMode.Create, FileAccess.Write)
-
-                        do! fsIn.CopyToAsync(fsOut)
-                    })
-
-                    let cachedFile = {
-                        new ICachedFile with
-                            member _.Path = tempFile
-                            member _.Dispose () =
-                                if File.Exists(tempFile)
-                                then File.Delete(tempFile)
-                    }
-
-                    let policy = new CacheItemPolicy(
-                        SlidingExpiration = TimeSpan.FromDays(1),
-                        RemovedCallback = fun args -> ())
-
-                    cache.Add(key, cachedFile, policy) |> ignore
-
-                    // TODO: clean up these files on application exit
-
-                    return cachedFile
-                finally
-                    flag.Release() |> ignore
+        type TemporaryFile = {
+            device: string
+            fileInfo: DataDiscFileInfo
+            path: string
         }
 
+        let temporaryFiles = new ResizeArray<TemporaryFile>()
+        let flag = new SemaphoreSlim(1, 1)
+
+        let storeAsync device fileInfo = task {
+            try
+                do! flag.WaitAsync()
+
+                let found =
+                    temporaryFiles
+                    |> Seq.where (fun f -> f.device = device && f.fileInfo = fileInfo)
+                    |> Seq.tryHead
+
+                match found with
+                | Some knownFile ->
+                    printfn "[DataCD] Using cached audio file %s" knownFile.path
+                    return knownFile.path
+                | _ ->
+                    printfn "[DataCD] Caching audio file %s" fileInfo.name
+
+                    use! mount = establishTemporaryMountPointAsync device
+
+                    let extension = Path.GetExtension(fileInfo.name)
+
+                    let copyFrom = Path.Combine(
+                        Path.GetTempPath(),
+                        $"S-{Guid.NewGuid()}{extension}")
+
+                    let _ = File.CreateSymbolicLink(
+                        copyFrom,
+                        Path.Combine(
+                            mount.MountPoint,
+                            fileInfo.name))
+
+                    let copyTo = Path.Combine(
+                        Path.GetTempPath(),
+                        $"T-{Guid.NewGuid()}{extension}")
+
+                    use proc = Process.Start("cp", $"-L -v \"{copyFrom}\" \"{copyTo}\"")
+                    do! proc.WaitForExitAsync()
+
+                    File.Delete(copyFrom)
+
+                    temporaryFiles.Add({ device = device; fileInfo = fileInfo; path = copyTo })
+
+                    return copyTo
+            finally
+                flag.Release() |> ignore
+        }
+
+        let removeByDevice device =
+            flag.Wait()
+
+            try
+                let invalidated =
+                    temporaryFiles
+                    |> Seq.where (fun f -> f.device = device)
+                    |> Seq.toList
+
+                for file in invalidated do
+                    printfn "[DataCD] Deleting temporary file: %s" file.path
+                    let _ = temporaryFiles.Remove(file)
+                    File.Delete(file.path)
+            finally
+                flag.Release() |> ignore
+
+        DiscDriveStatus.statusChanged |> Event.add (fun args -> if not args.inserted then removeByDevice args.device)
+        DiscDriveStatus.deviceRemoved |> Event.add (fun args -> removeByDevice args.device)
+
     let storeAsync device file = task {
-        let! file = FileCache.storeAsTempFileAsync device file
-        return file.Path
+        return! FileCache.storeAsync device file
     }
 
     let ripAsync scope = task {
@@ -149,7 +161,7 @@ module DataCD =
 
                 let destDir = Path.Combine(
                     mediaDir,
-                    $"CD-ROM {DateTimeOffset.UtcNow.ToUnixTimeSeconds()}")
+                    $"""CD-ROM {DateTimeOffset.UtcNow.ToString("yyyy-MM-dd hh:mm:ss")}""")
 
                 ignore (Directory.CreateDirectory(destDir))
 

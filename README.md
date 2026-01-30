@@ -51,6 +51,7 @@ Their SiriusXM username and password are stored in `username.txt` and `password.
 
 * `ip`
 * `ffmpeg`
+* `udevadm`
 * `eject`
 * `icedax`
 * `abcde`
