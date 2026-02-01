@@ -100,23 +100,16 @@ module AtomicActions =
         | PlayCD scope ->
             do! Players.simulateButtonAsync player "stop"
 
-            do! Players.setDisplayAsync player "Please wait" "Searching for tracks and files..." (TimeSpan.FromSeconds(999))
-
-            let! drives = Discovery.getDriveInfoAsync scope
-
-            for info in drives do
-                for dataDisc in info.disc.data do
-                    for file in dataDisc.files do
-                        do! DataCD.storeAsync info.device file :> Task
-
-            do! Players.setDisplayAsync player "Please wait" "Finishing up..." (TimeSpan.FromMilliseconds(1))
-
             do! Playlist.clearAsync player
 
             let! address = Network.getAddressAsync ()
 
+            let drives = Discovery.getDriveInfo scope
+
             for info in drives do
-                for audioDisc in info.disc.audio do
+                match info.disc.audio with
+                | None -> ()
+                | Some audioDisc ->
                     for track in audioDisc.tracks do
                         let title =
                             match track.title with
@@ -124,9 +117,11 @@ module AtomicActions =
                             | x -> x
                         do! Playlist.addItemAsync player $"http://{address}:{Config.port}/CD/PlayTrack?device={Uri.EscapeDataString(info.device)}&track={track.position}" title
 
-                for dataDisc in info.disc.data do
+                match info.disc.data with
+                | None -> ()
+                | Some dataDisc ->
                     for file in dataDisc.files do
-                        let! path = DataCD.storeAsync info.device file
+                        let path = DataCD.tryGetPath info.device file
                         do! Playlist.addItemAsync player $"file://{path}" file.name
 
             do! Playlist.playAsync player
@@ -180,11 +175,12 @@ module AtomicActions =
         | PlayCD scope ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10))
 
-            let! drives = Discovery.getDriveInfoAsync scope
+            let drives = Discovery.getDriveInfo scope
+
             let disc =
                 drives
                 |> Seq.map (fun drive -> drive.disc)
-                |> Seq.collect (fun disc -> disc.audio)
+                |> Seq.choose (fun disc -> disc.audio)
                 |> Seq.tryHead
 
             match disc with

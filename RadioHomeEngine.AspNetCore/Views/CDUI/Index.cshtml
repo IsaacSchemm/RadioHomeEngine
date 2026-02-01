@@ -43,7 +43,7 @@
     {
         <h1>CD Drive @drive.device</h1>
 
-        var empty = drive.disc.audio.IsEmpty && drive.disc.data.IsEmpty;
+        var empty = drive.disc.AudioDiscs.IsEmpty && drive.disc.DataDiscs.IsEmpty;
 
         if (!empty)
         {
@@ -65,7 +65,7 @@
             </fieldset>
         }
 
-        foreach (var audioDisc in drive.disc.audio)
+        foreach (var audioDisc in drive.disc.AudioDiscs)
         {
             <p>
                 @foreach (var title in audioDisc.titles)
@@ -107,7 +107,7 @@
             </table>
         }
 
-        foreach (var dataDisc in drive.disc.data)
+        foreach (var dataDisc in drive.disc.DataDiscs)
         {
             <fieldset>
                 <legend>CD-ROM</legend>

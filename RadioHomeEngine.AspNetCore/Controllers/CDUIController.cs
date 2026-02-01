@@ -5,19 +5,12 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 {
     public class CDUIController : Controller
     {
-        public async Task<IActionResult> Index()
+        public IActionResult Index()
         {
-            var drives = await Discovery.getDriveInfoAsync(DiscDriveScope.AllDrives);
-
             return View(new CDsModel
             {
-                CDs = [.. drives],
-                Players = [
-                    .. PlayerConnections.GetAll().Select(conn => new CDsModel.Player {
-                        MacAddress = conn.MacAddress,
-                        Name = conn.Name
-                    })
-                ]
+                CDs = Discovery.getDriveInfo(DiscDriveScope.AllDrives),
+                Players = PlayerConnections.GetAll()
             });
         }
 

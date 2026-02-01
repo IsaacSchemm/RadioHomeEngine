@@ -18,34 +18,24 @@ module DataCD =
         ".wma"
     ]
 
-    let scanDeviceAsync device = task {
-        try
-            return [
-                match DiscDriveStatus.getMountPoint device with
-                | Some dir ->
-                    printfn "[DataCD] Scanning %s" dir
-                    for file in Directory.EnumerateFiles(dir, "*.*", new EnumerationOptions(RecurseSubdirectories = true)) do
-                        let fi = new FileInfo(file)
+    let tryGetDataDiscInfo device =
+        DiscDriveStatus.tryGetMountPoint device
+        |> Option.map (fun dir -> {
+            files = [
+                for file in Directory.EnumerateFiles(dir, "*.*", new EnumerationOptions(RecurseSubdirectories = true)) do
+                    let fi = new FileInfo(file)
 
-                        if Set.contains (fi.Extension.ToLowerInvariant()) extensions then
-                            yield {
-                                name = file.Substring(dir.Length).TrimStart(Path.DirectorySeparatorChar)
-                                size = fi.Length
-                            }
-                | None ->
-                    printfn "[DataCD] %s is not mounted" device
+                    if Set.contains (fi.Extension.ToLowerInvariant()) extensions then
+                        yield {
+                            name = file.Substring(dir.Length).TrimStart(Path.DirectorySeparatorChar)
+                            size = fi.Length
+                        }
             ]
-        with ex ->
-            Console.Error.WriteLine(ex)
-            return []
-    }
+        })
 
-    let storeAsync device file = task {
-        let dir = Option.get (DiscDriveStatus.getMountPoint device)
-        return Path.Combine(
-            dir,
-            file.name)
-    }
+    let tryGetPath device file =
+        DiscDriveStatus.tryGetMountPoint device
+        |> Option.map (fun dir -> Path.Combine(dir, file.name))
 
     let ripAsync scope = task {
         let! dirs = LyrionCLI.General.getMediaDirsAsync()
@@ -61,7 +51,7 @@ module DataCD =
 
         for device in DiscDrives.getDevices scope do
             try
-                match DiscDriveStatus.getMountPoint device with
+                match DiscDriveStatus.tryGetMountPoint device with
                 | Some srcDir ->
                     ignore (Directory.CreateDirectory(destDir))
 

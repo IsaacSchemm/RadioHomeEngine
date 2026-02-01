@@ -22,9 +22,11 @@ type DataDiscInfo = {
 }
 
 type DiscInfo = {
-    audio: AudioDiscInfo list
-    data: DataDiscInfo list
-}
+    audio: AudioDiscInfo option
+    data: DataDiscInfo option
+} with
+    member this.AudioDiscs = Option.toList this.audio
+    member this.DataDiscs = Option.toList this.data
 
 type DriveInfo = {
     device: string

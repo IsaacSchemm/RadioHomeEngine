@@ -98,40 +98,47 @@ module DiscDriveStatus =
         |}
     }
 
+    let attachAsync device = task {
+        let! newStatus = getStatusAsync device
+
+        let hasAudio = newStatus.audioTracks > 0
+        let hasData = newStatus.dataTracks > 0
+
+        if hasAudio then
+            do! TrackLists.scanAsync device
+        else
+            do! TrackLists.forgetAsync device
+
+        if hasData && not hasAudio then
+            do! MountPoints.mountAsync device
+        else
+            do! MountPoints.unmountAsync device
+    }
+
+    let detachAsync device = task {
+        do! TrackLists.forgetAsync device
+        do! MountPoints.unmountAsync device
+    }
+
     let attachAllAsync () = task {
         let devices = DiscDrives.getAll ()
 
         for device in devices do
-            let! newStatus = getStatusAsync device
-
-            let hasAudio = newStatus.audioTracks > 0
-            let hasData = newStatus.dataTracks > 0
-
-            if hasAudio then
-                do! TrackLists.scanAsync device
-            else
-                do! TrackLists.forgetAsync device
-
-            if hasData && not hasAudio then
-                do! MountPoints.mountAsync device
-            else
-                do! MountPoints.unmountAsync device
+            do! attachAsync device
 
         let removed = Map.keys MountPoints.map |> Seq.except devices
 
         for device in removed do
-            do! TrackLists.forgetAsync device
-            do! MountPoints.unmountAsync device
+            do! detachAsync device
     }
 
-    let getTrackList device =
+    let tryGetAudioDiscInfo device =
         Map.tryFind device TrackLists.map
 
-    let getMountPoint device =
+    let tryGetMountPoint device =
         Map.tryFind device MountPoints.map
 
     let detachAllAsync () = task {
         for device in Map.keys MountPoints.map do
-            do! TrackLists.forgetAsync device
-            do! MountPoints.unmountAsync device
+            do! detachAsync device
     }
