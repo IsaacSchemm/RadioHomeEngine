@@ -47,11 +47,11 @@ type DiscDriveChangeDetectionService() =
     override _.ExecuteAsync(cancellationToken) = task {
         while not cancellationToken.IsCancellationRequested do
             try
-                do! DiscDriveStatus.mountAllAsync ()
+                do! DiscDriveStatus.attachAllAsync ()
                 do! waitForMediaChangeAsync cancellationToken
             with ex ->
                 Console.Error.WriteLine(ex)
                 do! Task.Delay(TimeSpan.FromHours(1), cancellationToken)
 
-        do! DiscDriveStatus.unmountAllAsync ()
+        do! DiscDriveStatus.detachAllAsync ()
     }
