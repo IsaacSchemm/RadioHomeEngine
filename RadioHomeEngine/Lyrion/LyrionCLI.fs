@@ -73,6 +73,8 @@ module LyrionCLI =
 
         let rescanAsync () = sendCommandAsync ["rescan"]
 
+        let wipecacheAsync () = sendCommandAsync ["wipecache"]
+
         let exitAsync () = sendCommandAsync ["exit"]
 
         let restartServer () = sendCommandAsync ["restartserver"]

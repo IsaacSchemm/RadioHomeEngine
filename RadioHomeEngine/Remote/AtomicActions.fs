@@ -121,8 +121,10 @@ module AtomicActions =
                 | None -> ()
                 | Some dataDisc ->
                     for file in dataDisc.files do
-                        let path = DataCD.tryGetPath info.device file
-                        do! Playlist.addItemAsync player $"file://{path}" file.name
+                        match DataCD.tryGetPath info.device file with
+                        | None -> ()
+                        | Some path ->
+                            do! Playlist.addItemAsync player $"file://{path}" file.name
 
             do! Playlist.playAsync player
 

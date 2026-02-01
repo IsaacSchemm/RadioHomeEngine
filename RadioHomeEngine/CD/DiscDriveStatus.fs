@@ -11,14 +11,18 @@ module DiscDriveStatus =
         let mutable map = Map.empty
         let flag = new SemaphoreSlim(1, 1)
 
+        let sharedTempPath = Path.Combine(
+            Path.GetTempPath(),
+            $"RadioHomeEngine/CD")
+
         let mountAsync device = task {
             do! flag.WaitAsync()
 
             try
                 if Option.isNone (Map.tryFind device map) then
                     let path = Path.Combine(
-                        Path.GetTempPath(),
-                        $"{Guid.NewGuid()}")
+                        sharedTempPath,
+                        $"RadioHomeEngine/CD/{Guid.NewGuid()}")
 
                     ignore (Directory.CreateDirectory(path))
 
@@ -43,6 +47,9 @@ module DiscDriveStatus =
                     do! proc.WaitForExitAsync()
 
                     Directory.Delete(path, recursive = false)
+
+                    // Uncomment this line if MP3s from the CD keep ending up in the library somehow
+                    // do! LyrionCLI.General.wipecacheAsync ()
                 | None -> ()
 
                 map <- Map.remove device map
