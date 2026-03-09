@@ -17,6 +17,7 @@ type AtomicAction =
 | RipCD of DiscDriveScope
 | EjectCD of DiscDriveScope
 | Forecast
+| Stop
 
 module AtomicActions =
     let zeroCodes = [
@@ -25,7 +26,23 @@ module AtomicActions =
         ("02", RipCD AllDrives, "Rip CD")
         ("03", EjectCD AllDrives, "Eject CD")
         ("04", Forecast, "Weather")
+        ("05", Stop, "Stop")
     ]
+
+    let availablePrefixes =
+        [0 .. 9]
+        |> Seq.map (fun n -> $"{n:D2}")
+        |> Seq.except [for (code, _, _) in zeroCodes do code]
+
+    let getPrefixDetails () =
+        PlayerConnections.GetAll()
+        |> Seq.sortBy (fun cp -> cp.Name)
+        |> Seq.zip availablePrefixes
+        |> Seq.map (fun (code, cp) -> {|
+            prefix = code
+            player = cp.Player
+            playerName = cp.Name
+        |})
 
     let targetPlayerPrefix = "09"
 
@@ -79,19 +96,19 @@ module AtomicActions =
                 do! Players.setDisplayAsync player title $"{code}: {name}" (sec 10)
                 do! wait 2
 
+            for pd in getPrefixDetails () do
+                do! Players.setDisplayAsync player title $"{pd.prefix}xx: {pd.playerName}" (sec 10)
+                do! wait 3
+
             do! Players.setDisplayAsync player title "1-999: SiriusXM" (sec 10)
             do! wait 2
 
-            for index, playerConnection in PlayerConnections.GetAll() |> Seq.indexed do
-                do! Players.setDisplayAsync player title $"Prefix {targetPlayerPrefix}{index:D2}: execute on {playerConnection.Name}" (sec 10)
-                do! wait 5
-
             match player with Player id ->
                 do! Players.setDisplayAsync player "Player ID" $"{id}" (sec 10)
-                do! wait 5
+                do! wait 2
 
             let! ip = Network.getAddressAsync ()
-            do! Players.setDisplayAsync player "Server" $"{ip}:{Config.port}" (sec 5)
+            do! Players.setDisplayAsync player "Server" $"{ip}:{Config.port}" (sec 2)
 
         | PlayPause ->
             let! state = Playlist.getModeAsync player
@@ -152,6 +169,9 @@ module AtomicActions =
                 for alert in alerts do
                     alert.info
             ]
+
+        | Stop ->
+            do! Players.simulateButtonAsync player "stop"
     }
 
     let performAlternateActionAsync player atomicAction = task {

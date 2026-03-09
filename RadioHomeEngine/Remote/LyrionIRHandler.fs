@@ -100,13 +100,17 @@ type LyrionIRHandler(player: Player) =
             let mutable entry = prompt.Substring(2)
             let mutable target = player
 
-            while entry.StartsWith(AtomicActions.targetPlayerPrefix) do
-                let index = int (entry.Substring(2, 2))
-                match PlayerConnections.GetAll() |> List.tryItem index with
-                | None -> ()
-                | Some pc ->
-                    target <- pc.Player
-                    entry <- entry.Substring(4)
+            let prefixDetail =
+                AtomicActions.getPrefixDetails ()
+                |> Seq.where (fun pd -> entry.StartsWith(pd.prefix))
+                |> Seq.tryExactlyOne
+
+            match prefixDetail with
+            | None -> ()
+            | Some pd ->
+                if entry.StartsWith(pd.prefix) then
+                    target <- pd.player
+                    entry <- entry.Substring(pd.prefix.Length)
 
             match AtomicActions.tryGetAction entry with
             | None -> ()
