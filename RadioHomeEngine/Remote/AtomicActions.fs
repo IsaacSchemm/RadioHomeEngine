@@ -24,8 +24,10 @@ module AtomicActions =
         ("01", PlayCD AllDrives, "Play CD")
         ("02", RipCD AllDrives, "Rip CD")
         ("03", EjectCD AllDrives, "Eject CD")
-        ("09", Forecast, "Weather")
+        ("04", Forecast, "Weather")
     ]
+
+    let targetPlayerPrefix = "09"
 
     let rippingFlag = new SemaphoreSlim(1, 1)
 
@@ -46,10 +48,10 @@ module AtomicActions =
             for num, action, _ in zeroCodes do
                 if num = entry then
                     action
-        else
-            match entry with
-            | Int32 n -> PlaySiriusXMChannel n
-            | _ -> ()
+
+        match entry with
+        | Int32 n when n > 0 -> PlaySiriusXMChannel n
+        | _ -> ()
     })
 
     let performActionAsync player atomicAction = task {
@@ -79,6 +81,10 @@ module AtomicActions =
 
             do! Players.setDisplayAsync player title "1-999: SiriusXM" (sec 10)
             do! wait 2
+
+            for index, playerConnection in PlayerConnections.GetAll() |> Seq.indexed do
+                do! Players.setDisplayAsync player title $"Prefix {targetPlayerPrefix}{index:D2}: execute on {playerConnection.Name}" (sec 10)
+                do! wait 5
 
             match player with Player id ->
                 do! Players.setDisplayAsync player "Player ID" $"{id}" (sec 10)

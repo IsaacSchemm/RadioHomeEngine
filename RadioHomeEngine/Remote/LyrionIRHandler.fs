@@ -97,12 +97,21 @@ type LyrionIRHandler(player: Player) =
         | Some prompt, Button "knob_push" ->
             do! clearAsync ()
 
-            let entry = prompt.Substring(2)
+            let mutable entry = prompt.Substring(2)
+            let mutable target = player
+
+            while entry.StartsWith(AtomicActions.targetPlayerPrefix) do
+                let index = int (entry.Substring(2, 2))
+                match PlayerConnections.GetAll() |> List.tryItem index with
+                | None -> ()
+                | Some pc ->
+                    target <- pc.Player
+                    entry <- entry.Substring(4)
 
             match AtomicActions.tryGetAction entry with
             | None -> ()
             | Some action ->
-                do! AtomicActions.performActionAsync player action
+                do! AtomicActions.performActionAsync target action
 
         | Some prompt, Atomic Information ->
             do! clearAsync ()
