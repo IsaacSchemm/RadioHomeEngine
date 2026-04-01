@@ -54,7 +54,7 @@ module Weather =
         let! alerts = getAlertsAsync cancellationToken
         return [
             for a in alerts do
-                if not (isAlertKnown a) then
+                if a.expires >= DateTimeOffset.UtcNow && not (isAlertKnown a) then
                     recordAlert a
                     yield a
         ]
