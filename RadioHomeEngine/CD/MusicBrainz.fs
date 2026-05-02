@@ -30,6 +30,9 @@ module MusicBrainz =
                             title = ""
                             position = 0
                         |}]
+                        discs = [{|
+                            id = ""
+                        |}]
                     |}]
                     ``artist-credit`` = [{|
                         name = ""
@@ -48,7 +51,21 @@ module MusicBrainz =
                 ]
                 titles = [release.title]
                 tracks = [
-                    for media in release.media do
+                    let matchingMedia = Seq.tryHead (seq {
+                        for m in release.media do
+                            for d in m.discs do
+                                if d.id = discId then m
+                    })
+
+                    let mediaList =
+                        match matchingMedia with
+                        | Some m ->
+                            [m]
+                        | None ->
+                            Console.Error.WriteLine($"Found media, but not for disc ID {discId}")
+                            release.media
+
+                    for media in mediaList do
                         for track in media.tracks do {
                             title = track.title
                             position = track.position
