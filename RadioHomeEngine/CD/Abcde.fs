@@ -5,11 +5,11 @@ open System.Diagnostics
 open System.Threading.Tasks
 
 module Abcde =
-    let getMusicBrainzDiscIdAsync (device: string) = task {
+    let getMusicBrainzDiscIdAsync (device: DiscDevice) = task {
         let proc =
             new ProcessStartInfo(
                 "abcde-musicbrainz-tool",
-                $"--command id --device {device}",
+                $"--command id --device {DiscDevice.getPath device}",
                 RedirectStandardOutput = true)
             |> Process.Start
 
@@ -49,7 +49,7 @@ module Abcde =
                 let proc =
                     new ProcessStartInfo(
                         "abcde",
-                        $"-a move,embedalbumart,clean -d {device} -o flac -f -N {trackString}",
+                        $"-a move,embedalbumart,clean -d {DiscDevice.getPath device} -o flac -f -N {trackString}",
                         WorkingDirectory = dir)
                     |> Process.Start
 

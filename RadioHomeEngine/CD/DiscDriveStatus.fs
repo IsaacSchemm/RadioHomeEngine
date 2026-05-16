@@ -26,7 +26,7 @@ module DiscDriveStatus =
 
                     ignore (Directory.CreateDirectory(path))
 
-                    use proc = Process.Start("mount", $"-o ro \"{device}\" \"{path}\"")
+                    use proc = Process.Start("mount", $"-o ro \"{DiscDevice.getPath device}\" \"{path}\"")
                     do! proc.WaitForExitAsync()
 
                     if proc.ExitCode <> 0 then
@@ -77,7 +77,7 @@ module DiscDriveStatus =
         use proc =
             new ProcessStartInfo(
                 "udevadm",
-                $"info --json=short \"{device}\"",
+                $"info --json=short \"{DiscDevice.getPath device}\"",
                 RedirectStandardOutput = true)
             |> Process.Start
 

@@ -58,11 +58,11 @@ module Icedax =
 
     let noDiscMessage = "load cdrom please and press enter"
 
-    let getInfoAsync (device: string) = task {
+    let getInfoAsync (device: DiscDevice) = task {
         let proc =
             new ProcessStartInfo(
                 "icedax",
-                $"-J -g -D {device} -S 1 -v toc",
+                $"-J -g -D {DiscDevice.getPath device} -S 1 -v toc",
                 RedirectStandardError = true,
                 WorkingDirectory = "/tmp")
             |> Process.Start
@@ -133,7 +133,7 @@ module Icedax =
     let sectorsPerSecond = 75
     let bytesPerSector = bytesPerSecond / sectorsPerSecond
 
-    let extractWaveAsync (device: string) trackNumber skip = task {
+    let extractWaveAsync device trackNumber skip = task {
         let spanString = $"-t {trackNumber}"
 
         let factor =
@@ -152,7 +152,7 @@ module Icedax =
         let proc =
             new ProcessStartInfo(
                 "icedax",
-                $"-D {device} {spanString} -S 1 -o {factor.sectors} -",
+                $"-D {DiscDevice.getPath device} {spanString} -S 1 -o {factor.sectors} -",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 WorkingDirectory = "/tmp")

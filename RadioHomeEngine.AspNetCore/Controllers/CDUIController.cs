@@ -15,26 +15,29 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         }
 
         [HttpPost]
-        public async Task PlayCD(string device, string mac)
+        public async Task PlayCD(string id, string mac)
         {
             await AtomicActions.performActionAsync(
                 LyrionCLI.Player.NewPlayer(mac),
                 AtomicAction.NewPlayCD(
-                    DiscDriveScope.NewSingleDrive(device)));
+                    DiscDriveScope.NewSingleDrive(
+                        DiscDevice.NewDiscDevice(id))));
         }
 
         [HttpPost]
-        public void RipCD(string device)
+        public void RipCD(string id)
         {
             AtomicActions.beginRipAsync(
-                DiscDriveScope.NewSingleDrive(device));
+                DiscDriveScope.NewSingleDrive(
+                    DiscDevice.NewDiscDevice(id)));
         }
 
         [HttpPost]
-        public async Task EjectCD(string device)
+        public async Task EjectCD(string id)
         {
             await DiscDrives.ejectAsync(
-                DiscDriveScope.NewSingleDrive(device));
+                DiscDriveScope.NewSingleDrive(
+                    DiscDevice.NewDiscDevice(id)));
         }
     }
 }

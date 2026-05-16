@@ -17,6 +17,7 @@
     <Compile Include="Lyrion\LyrionCLIService.fs" />
     <Compile Include="Lyrion\PlayerConnection.fs" />
     <Compile Include="Lyrion\PlayerConnections.fs" />
+    <Compile Include="cd\DiscDevice.fs" />
     <Compile Include="CD\DriveInfo.fs" />
     <Compile Include="CD\DiscDriveScope.fs" />
     <Compile Include="CD\DiscDrives.fs" />

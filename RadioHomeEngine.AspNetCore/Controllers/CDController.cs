@@ -5,9 +5,12 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 {
     public partial class CDController() : Controller
     {
-        public async Task<IActionResult> PlayTrack(string device, int track)
+        public async Task<IActionResult> PlayTrack(string id, int track)
         {
-            if (!DiscDrives.exists(device))
+            var device = DiscDrives.getAll()
+                .FirstOrDefault(device => DiscDeviceModule.getId(device) == id);
+
+            if (device == null)
                 return BadRequest();
 
             int offset = 0;

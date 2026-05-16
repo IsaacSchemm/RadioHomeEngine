@@ -33,16 +33,16 @@ module AudioCD =
     }
 
     let getInfoForDeviceAsync device = task {
-        printfn $"[AudioCD] [{device}] Scanning audio CD {device}..."
+        printfn $"[AudioCD] [{DiscDevice.getPath device}] Scanning audio CD {DiscDevice.getPath device}..."
 
         let! icedax = Icedax.getInfoAsync device
 
         if icedax.disc.tracks = [] then
-            printfn $"[AudioCD] [{device}] No tracks found on disc"
+            printfn $"[AudioCD] [{DiscDevice.getPath device}] No tracks found on disc"
             return icedax.disc
 
         else
-            printfn $"[AudioCD] [{device}] Preparing to query MusicBrainz..."
+            printfn $"[AudioCD] [{DiscDevice.getPath device}] Preparing to query MusicBrainz..."
 
             let! candidate =
                 asyncGetDiscIds device icedax.disc
@@ -53,11 +53,11 @@ module AudioCD =
 
             match candidate with
             | Some newDisc ->
-                printfn $"[AudioCD] [{device}] Using title {newDisc.titles} from MusicBrainz"
+                printfn $"[AudioCD] [{DiscDevice.getPath device}] Using title {newDisc.titles} from MusicBrainz"
                 return newDisc
             | None ->
-                printfn $"[AudioCD] [{device}] Not found on MusicBrainz"
-                printfn $"[AudioCD] [{device}] Using title {icedax.disc.titles} from icedax"
+                printfn $"[AudioCD] [{DiscDevice.getPath device}] Not found on MusicBrainz"
+                printfn $"[AudioCD] [{DiscDevice.getPath device}] Using title {icedax.disc.titles} from icedax"
                 return icedax.disc
     }
 

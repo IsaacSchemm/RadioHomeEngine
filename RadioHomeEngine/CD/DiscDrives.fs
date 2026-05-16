@@ -8,6 +8,7 @@ module DiscDrives =
         seq { 0 .. 9 }
         |> Seq.map (fun n -> $"/dev/sr{n}")
         |> Seq.where File.Exists
+        |> Seq.map DiscDevice
         |> Seq.toList
 
     let exists device =
@@ -18,8 +19,8 @@ module DiscDrives =
         | SingleDrive x -> [if exists x then x]
         | AllDrives -> getAll ()
 
-    let ejectDeviceAsync (device: string) = task {
-        use proc = Process.Start("eject", $"-T {device}")
+    let ejectDeviceAsync (device: DiscDevice) = task {
+        use proc = Process.Start("eject", $"-T {DiscDevice.getPath device}")
         do! proc.WaitForExitAsync()
     }
 

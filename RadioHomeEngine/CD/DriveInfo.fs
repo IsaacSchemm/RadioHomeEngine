@@ -29,6 +29,6 @@ type DiscInfo = {
     member this.DataDiscs = Option.toList this.data
 
 type DriveInfo = {
-    device: string
+    device: DiscDevice
     disc: DiscInfo
 }
