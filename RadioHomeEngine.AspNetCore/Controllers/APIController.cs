@@ -24,10 +24,11 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 yield return new APISXMChannel(
                     channel.channelNumber,
                     channel.name,
-                    [ .. channel.images.images
-                        .Where(i => i.name == "color channel logo (on dark)")
-                        .Where(i => i.width * 1.0 / i.height == 1.25)
-                        .Select(i => i.url)
+                    [
+                        .. channel.images.images
+                            .Where(i => i.name == "color channel logo (on dark)")
+                            .Where(i => i.width * 1.0 / i.height == 1.25)
+                            .Select(i => i.url)
                     ]);
             }
         }
@@ -197,7 +198,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                         DiscDeviceModule.fromId(driveId)),
                     GetPlaylistPosition(playlistAction)));
 
-        [HttpPost("players/{playerId}/interrupt/forecast")]
+        [HttpPost("players/{playerId}/play/forecast")]
         public async Task PlayForecast(string playerId) =>
             await AtomicActions.performActionAsync(
                 LyrionCLI.Player.NewPlayer(playerId),

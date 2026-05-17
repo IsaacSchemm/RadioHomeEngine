@@ -22,15 +22,13 @@ module Speech =
         | _ -> ""
 
     let readAsync (player: Player) (readables: Readable seq) = task {
-        let! path = Playlist.getPathAsync player
-        let! title = Playlist.getTitleAsync player
-
         let! address = Network.getAddressAsync ()
 
-        do! Playlist.insertItemAsync player path title
-
-        for r in Seq.rev readables do
-            do! Playlist.insertItemAsync player $"http://{address}:{Config.port}/Reader/Speech/{r.speech}" r.screen
-
-        do! Players.simulateButtonAsync player "jump_fwd"
+        match List.ofSeq readables with
+        | [] ->
+            do! Playlist.clearAsync player
+        | r :: tail ->
+            do! Playlist.playItemAsync player $"http://{address}:{Config.port}/Reader/Speech/{r.speech}" r.screen
+            for r in tail do
+                do! Playlist.addItemAsync player $"http://{address}:{Config.port}/Reader/Speech/{r.speech}" r.screen
     }
