@@ -41,7 +41,12 @@
 
     @foreach (var drive in Model.CDs)
     {
-        <h1>CD Drive @drive.device</h1>
+        <h1>CD Drive @DiscDeviceModule.getPath(drive.device)</h1>
+
+        if (Ripping.isCurrentlyRipping(drive.device))
+        {
+            <h2>Rip in progress</h2>
+        }
 
         var empty = drive.disc.AudioDiscs.IsEmpty && drive.disc.DataDiscs.IsEmpty;
 

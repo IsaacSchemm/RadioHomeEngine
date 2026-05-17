@@ -61,7 +61,7 @@ module MediaProxy =
             let _ = cache.Add(
                 $"{cacheKey}-{key}",
                 item,
-                new CacheItemPolicy(SlidingExpiration = TimeSpan.FromMinutes(5)))
+                new CacheItemPolicy(SlidingExpiration = TimeSpan.FromMinutes(5.0)))
             ()
 
         let tryRetrieve key =

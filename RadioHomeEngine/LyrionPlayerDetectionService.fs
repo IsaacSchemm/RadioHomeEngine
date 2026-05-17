@@ -49,8 +49,8 @@ type LyrionPlayerDetectionService() =
 
             let waitFor =
                 if PlayerConnections.GetAll() = []
-                then TimeSpan.FromSeconds(15)
-                else TimeSpan.FromMinutes(15)
+                then TimeSpan.FromSeconds(15.0)
+                else TimeSpan.FromMinutes(15.0)
 
             do! Task.Delay(waitFor, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
     }

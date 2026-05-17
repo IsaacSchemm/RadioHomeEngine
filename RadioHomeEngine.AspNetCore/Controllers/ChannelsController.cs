@@ -50,7 +50,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         {
             await AtomicActions.performActionAsync(
                 LyrionCLI.Player.NewPlayer(mac),
-                AtomicAction.NewPlaySiriusXMChannel(num));
+                AtomicAction.NewPlaySiriusXMChannel(num, PlaylistPosition.Now));
         }
 
         [HttpPost]

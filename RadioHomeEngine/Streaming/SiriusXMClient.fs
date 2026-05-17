@@ -46,7 +46,7 @@ module SiriusXMClient =
 
         let notExpiringSoon (cookie: Cookie) =
             cookie.Expires = DateTime.MinValue
-            || cookie.Expires.ToUniversalTime() - TimeSpan.FromMinutes(19) > DateTime.UtcNow
+            || cookie.Expires.ToUniversalTime() - TimeSpan.FromMinutes(19.0) > DateTime.UtcNow
 
         let getCookie (name: string) =
             cookies.GetAllCookies()

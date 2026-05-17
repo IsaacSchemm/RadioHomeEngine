@@ -1,0 +1,146 @@
+﻿@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
+    <title>Remote - Radio Home Engine</title>
+    @await Html.PartialAsync("_Styles")
+    <style>
+            body {
+            }
+
+            .remote-grid-container {
+            }
+
+            .remote-block {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                margin: auto;
+                width: 240px;
+            }
+
+                .remote-block .collapsible-label {
+                    grid-column: 1 / 4;
+                    text-align: center;
+                    line-height: 40px;
+                    margin-top: 1em;
+                }
+
+                .remote-block .player-select {
+                    grid-column: 1 / 4;
+                }
+
+                    .remote-block .player-select label {
+                        display: block;
+                        margin: 1em 0;
+                    }
+
+                .remote-block .siriusxm-label {
+                    grid-column: 1 / 4;
+                    text-align: center;
+                    line-height: 80px;
+                }
+
+                .remote-block button:not(.collapsible-label) {
+                    min-height: 80px;
+                }
+
+                .remote-block[aria-expanded=false] > * {
+                    display: none;
+                }
+    </style>
+</head>
+<body>
+    <div class="remote-grid-container">
+        <div class="remote-grid">
+            <div class="remote-block">
+                <button class="collapsible-label" aria-controls="playerBlock">Player</button>
+            </div>
+            <div id="playerBlock" class="remote-block" aria-expanded="true">
+                <div class="player-select">
+                    <form style="margin-bottom: 0">
+                        @foreach (var player in PlayerConnections.GetAll())
+                        {
+                            <label>
+                                <input name="player" checked="checked" type="radio" value="@player.MacAddress">
+                                @player.Name
+                            </label>
+                        }
+                        @if (PlayerConnections.GetAll().IsEmpty)
+                        {
+                            <label>No players connected</label>
+                        }
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="remote-grid">
+            <div class="remote-block">
+                <button class="collapsible-label" aria-controls="siriusXMBlock">SiriusXM</button>
+            </div>
+            <div id="siriusXMBlock" class="remote-block" aria-expanded="true">
+                <button>1</button> <button>2</button> <button>3</button>
+                <button>4</button> <button>5</button> <button>6</button>
+                <button>7</button> <button>8</button> <button>9</button>
+
+                <div>&nbsp;</div>
+                <button>0</button>
+                <div>&nbsp;</div>
+
+                <div class="siriusxm-label"></div>
+
+                <button>Info</button>
+                <button>Play Next</button>
+                <button>Play Now</button>
+            </div>
+        </div>
+        <div class="remote-grid">
+            <div class="remote-block">
+                <button class="collapsible-label" aria-controls="cdBlock">CD: </button>
+            </div>
+            <div id="cdBlock" class="remote-block" aria-expanded="true">
+                <button>Eject</button> <button>Rip</button> <button>Play</button>
+            </div>
+        </div>
+        <div class="remote-grid">
+            <div class="remote-block">
+                <button class="collapsible-label">Actions</button>
+            </div>
+            <div class="remote-block" aria-expanded="true">
+                <button>Weather</button> <button>Move From Other Player</button>
+            </div>
+        </div>
+        <div class="remote-grid">
+            <div class="remote-block">
+                <button class="collapsible-label">Remote</button>
+            </div>
+            <div class="remote-block" aria-expanded="true">
+                <button>Back</button> <button>Up</button> <button>Play</button>
+                <button>Left</button> <button>OK (Push Knob)</button> <button>Right</button>
+                <button>Stop</button> <button>Down</button> <button>Pause</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+            const headerButtons = document.querySelectorAll("button.collapsible-label");
+            for (const button of headerButtons) {
+                button.addEventListener("click", e => {
+                    e.preventDefault();
+
+                    for (const content of button.ariaControlsElements) {
+                        content.ariaExpanded = content.ariaExpanded === "true"
+                            ? "false"
+                            : "true";
+                    }
+                });
+            }
+    </script>
+</body>
+</html>

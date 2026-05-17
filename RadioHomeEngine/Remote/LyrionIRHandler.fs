@@ -20,7 +20,7 @@ type LyrionIRHandler(player: Player) =
         promptText <- Some text
 
         let promptHeader = "Enter channel or zero code"
-        do! Players.setDisplayAsync player promptHeader text (TimeSpan.FromSeconds(10))
+        do! Players.setDisplayAsync player promptHeader text (TimeSpan.FromSeconds(10.0))
 
         if promptMonitor.IsCompleted then
             promptMonitor <- task {
@@ -50,7 +50,7 @@ type LyrionIRHandler(player: Player) =
 
     let clearAsync () = task {
         promptText <- None
-        do! Players.setDisplayAsync player " " " " (TimeSpan.FromMilliseconds(1))
+        do! Players.setDisplayAsync player " " " " (TimeSpan.FromMilliseconds(1.0))
     }
 
     let mutable lastCode = 0

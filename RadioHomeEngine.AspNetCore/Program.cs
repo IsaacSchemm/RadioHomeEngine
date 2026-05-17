@@ -1,4 +1,5 @@
 using RadioHomeEngine;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +11,12 @@ builder.Services.AddHostedService<WeatherService>();
 builder.Services.AddHostedService<LyrionPlayerDetectionService>();
 builder.Services.AddHostedService<DiscDriveChangeDetectionService>();
 
+builder.Services.AddOpenApi();
+
 var app = builder.Build();
+
+app.MapOpenApi();
+app.MapScalarApiReference();
 
 app.MapControllerRoute(
     name: "default",

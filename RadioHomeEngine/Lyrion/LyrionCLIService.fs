@@ -30,7 +30,7 @@ type LyrionCLIService() =
                     connected <- true
                 with :? SocketException as ex ->
                     printfn "%O" ex
-                    do! Task.Delay(TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
+                    do! Task.Delay(TimeSpan.FromSeconds(5.0), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
 
             LyrionCLI.initialConnectionEstablished <- true
 
@@ -91,5 +91,5 @@ type LyrionCLIService() =
                 
             cancelWrite ()
 
-            do! Task.Delay(TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
+            do! Task.Delay(TimeSpan.FromSeconds(5.0), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
     }

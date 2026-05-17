@@ -8,12 +8,16 @@ open FSharp.Control
 
 open LyrionCLI
 
+type PlaylistPosition =
+| Now
+| Last
+
 type AtomicAction =
-| PlaySiriusXMChannel of int
+| PlaySiriusXMChannel of int * PlaylistPosition
 | Information
 | PlayPause
 | Replay
-| PlayCD of DiscDriveScope
+| PlayCD of DiscDriveScope * PlaylistPosition
 | RipCD of DiscDriveScope
 | EjectCD of DiscDriveScope
 | Forecast
@@ -22,7 +26,7 @@ type AtomicAction =
 module AtomicActions =
     let zeroCodes = [
         ("00", Information, "Information")
-        ("01", PlayCD AllDrives, "Play CD")
+        ("01", PlayCD (AllDrives, Now), "Play CD")
         ("02", RipCD AllDrives, "Rip CD")
         ("03", EjectCD AllDrives, "Eject CD")
         ("04", Forecast, "Weather")
@@ -46,20 +50,6 @@ module AtomicActions =
 
     let targetPlayerPrefix = "09"
 
-    let rippingFlag = new SemaphoreSlim(1, 1)
-
-    let beginRipAsync scope = ignore (task {
-        do! rippingFlag.WaitAsync()
-
-        try
-            do! DataCD.ripAsync scope
-            do! Abcde.ripAsync scope
-        finally
-            ignore (rippingFlag.Release())
-
-        do! DiscDrives.ejectAsync scope
-    })
-
     let tryGetAction (entry: string) = Seq.tryHead (seq {
         if entry.StartsWith("0") then
             for num, action, _ in zeroCodes do
@@ -67,13 +57,13 @@ module AtomicActions =
                     action
 
         match entry with
-        | Int32 n when n > 0 -> PlaySiriusXMChannel n
+        | Int32 n when n > 0 -> PlaySiriusXMChannel (n, Now)
         | _ -> ()
     })
 
     let performActionAsync player atomicAction = task {
         match atomicAction with
-        | PlaySiriusXMChannel channelNumber ->
+        | PlaySiriusXMChannel (channelNumber, position) ->
             let! channels = SiriusXMClient.getChannelsAsync CancellationToken.None
             let name =
                 channels
@@ -85,11 +75,16 @@ module AtomicActions =
             | None -> ()
             | Some channelName ->
                 let! address = Network.getAddressAsync ()
-                do! Playlist.playItemAsync player $"http://{address}:{Config.port}/SXM/PlayChannel?num={channelNumber}" $"[{channelNumber}] {channelName}"
+                let url = $"http://{address}:{Config.port}/SXM/PlayChannel?num={channelNumber}"
+                let title = $"[{channelNumber}] {channelName}"
+                match position with
+                | Now -> do! Playlist.playItemAsync player url title
+                | Last -> do! Playlist.addItemAsync player url title
 
         | Information ->
-            let sec n = TimeSpan.FromSeconds(n)
-            let wait n = Task.Delay(sec n)
+            let sec (n: float) = TimeSpan.FromSeconds(n)
+            let wait (n: float) = Task.Delay(sec n)
+
             let title = "Numeric Entry"
 
             for code, _, name in zeroCodes do
@@ -120,10 +115,12 @@ module AtomicActions =
         | Replay ->
             do! Playlist.setTimeAsync player SeekOrigin.Current -10m
 
-        | PlayCD scope ->
+        | PlayCD (scope, position) ->
             do! Players.simulateButtonAsync player "stop"
 
-            do! Playlist.clearAsync player
+            match position with
+            | Now -> do! Playlist.clearAsync player
+            | Last -> ()
 
             let! address = Network.getAddressAsync ()
 
@@ -152,13 +149,13 @@ module AtomicActions =
             do! Playlist.playAsync player
 
         | RipCD scope ->
-            beginRipAsync scope
+            Ripping.beginRip scope
 
         | EjectCD scope ->
             do! DiscDrives.ejectAsync scope
 
         | Forecast ->
-            do! Players.setDisplayAsync player "Forecast" "Please wait..." (TimeSpan.FromSeconds(5))
+            do! Players.setDisplayAsync player "Forecast" "Please wait..." (TimeSpan.FromSeconds(5.0))
 
             let! forecasts = Weather.getForecastsAsync CancellationToken.None
             let! alerts = Weather.getAlertsAsync CancellationToken.None
@@ -176,8 +173,8 @@ module AtomicActions =
 
     let performAlternateActionAsync player atomicAction = task {
         match atomicAction with
-        | PlaySiriusXMChannel channelNumber ->
-            do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10))
+        | PlaySiriusXMChannel (channelNumber, _) ->
+            do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
 
             let! channels = SiriusXMClient.getChannelsAsync CancellationToken.None
             let channel =
@@ -198,10 +195,10 @@ module AtomicActions =
                 | None -> ()
                 | Some c ->
                     let artist = String.concat " / " c.artists
-                    do! Players.setDisplayAsync player artist c.title (TimeSpan.FromSeconds(10))
+                    do! Players.setDisplayAsync player artist c.title (TimeSpan.FromSeconds(10.0))
 
-        | PlayCD scope ->
-            do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10))
+        | PlayCD (scope, _) ->
+            do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
 
             let drives = Discovery.getDriveInfo scope
 
@@ -213,7 +210,7 @@ module AtomicActions =
 
             match disc with
             | None ->
-                do! Players.setDisplayAsync player "CD" "No disc found" (TimeSpan.FromSeconds(10))
+                do! Players.setDisplayAsync player "CD" "No disc found" (TimeSpan.FromSeconds(10.0))
             | Some disc ->
                 let title =
                     match disc.titles with
@@ -223,7 +220,7 @@ module AtomicActions =
                     match disc.artists with
                     | [] -> "Unknown artist"
                     | x -> String.concat ", " x
-                do! Players.setDisplayAsync player artist title (TimeSpan.FromSeconds(10))
+                do! Players.setDisplayAsync player artist title (TimeSpan.FromSeconds(10.0))
 
         | _ -> ()
     }

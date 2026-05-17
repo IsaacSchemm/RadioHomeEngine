@@ -10,7 +10,7 @@ module LyrionCLI =
 
     let private event = new Event<string list>()
 
-    let sendCommandAsync command =
+    let sendCommandAsync (command: string seq) =
         command
         |> Seq.map Uri.EscapeDataString
         |> String.concat " "
@@ -40,10 +40,10 @@ module LyrionCLI =
             |> Observable.subscribe tcs.SetResult
 
         while not initialConnectionEstablished do
-            do! Task.Delay(TimeSpan.FromSeconds(1))
+            do! Task.Delay(TimeSpan.FromSeconds(1.0))
 
         let jointTask = Task.WhenAny [
-            Task.Delay(TimeSpan.FromSeconds(5))
+            Task.Delay(TimeSpan.FromSeconds(5.0))
             tcs.Task
         ]
 

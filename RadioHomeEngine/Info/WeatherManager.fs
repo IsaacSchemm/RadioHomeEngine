@@ -25,5 +25,5 @@ type WeatherService() =
                             do! Speech.readAsync player [for alert in alerts do alert.info]
             with ex -> Console.Error.WriteLine(ex)
 
-            do! Task.Delay(TimeSpan.FromMinutes(5), cancellationToken)
+            do! Task.Delay(TimeSpan.FromMinutes(5.0), cancellationToken)
     }
