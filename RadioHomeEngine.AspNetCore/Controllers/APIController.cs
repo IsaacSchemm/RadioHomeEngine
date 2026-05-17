@@ -213,5 +213,10 @@ namespace RadioHomeEngine.AspNetCore.Controllers
             await AtomicActions.performActionAsync(
                 LyrionCLI.Player.NewPlayer(playerId),
                 AtomicAction.Forecast);
+
+        [HttpPost("players/{playerId}/clear")]
+        public async Task Clear(string playerId) =>
+            await LyrionCLI.Playlist.clearAsync(
+                LyrionCLI.Player.NewPlayer(playerId));
     }
 }
