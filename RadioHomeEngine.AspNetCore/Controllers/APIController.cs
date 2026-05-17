@@ -5,13 +5,16 @@ using System.Runtime.CompilerServices;
 namespace RadioHomeEngine.AspNetCore.Controllers
 {
     [ApiController]
-    [Route("api")]
+    [Route("api/v1")]
     public class APIController : Controller
     {
+        public record APISXMImage(
+            string Url);
+
         public record APISXMChannel(
             string ChannelNumber,
             string Name,
-            FSharpList<string> ImageUrls);
+            APISXMImage? Image);
 
         [HttpGet("sxm")]
         public async IAsyncEnumerable<APISXMChannel> GetSXMChannels(
@@ -24,12 +27,11 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 yield return new APISXMChannel(
                     channel.channelNumber,
                     channel.name,
-                    [
-                        .. channel.images.images
-                            .Where(i => i.name == "color channel logo (on dark)")
-                            .Where(i => i.width * 1.0 / i.height == 1.25)
-                            .Select(i => i.url)
-                    ]);
+                    channel.images.images
+                        .Where(i => i.name == "color channel logo (on dark)")
+                        .Where(i => i.width * 1.0 / i.height == 1.25)
+                        .Select(i => new APISXMImage(i.url))
+                        .FirstOrDefault());
             }
         }
 
@@ -45,14 +47,15 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         public record APISXMSong(
             string Title,
             string Artist,
-            APISXMAlbum? Album);
+            APISXMAlbum? Album,
+            DateTimeOffset StartTime);
 
         public record APISXMAlbum(
             string Title,
-            FSharpList<string> ImageUrls);
+            APISXMImage? Image);
 
-        [HttpGet("sxm/{channelNumber}/now-playing/songs")]
-        public async IAsyncEnumerable<APISXMSong> GetSXMChannels(
+        [HttpGet("sxm/{channelNumber}/now-playing/history")]
+        public async IAsyncEnumerable<APISXMSong> GetNowPlayingHistory(
             string channelNumber,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
@@ -71,11 +74,14 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 yield return new APISXMSong(
                     cut.title,
                     string.Join(" / ", cut.artists),
-                    album == null
-                        ? null
-                        : new(
+                    cut.albums
+                        .Select(album => new APISXMAlbum(
                             album.title,
-                            album.images));
+                            album.images
+                                .Select(i => new APISXMImage(i))
+                                .FirstOrDefault()))
+                        .FirstOrDefault(),
+                    cut.startTime);
             }
         }
 
@@ -171,32 +177,36 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         public APIPlayer GetPlayer(string playerId) =>
             GetPlayers().Single(p => p.Id == playerId);
 
-        private static PlaylistPosition GetPlaylistPosition(string parameterName) =>
-            parameterName switch
-            {
-                "play" => PlaylistPosition.Now,
-                "append" => PlaylistPosition.Last,
-                _ => throw new ArgumentException(
-                    "Invalid parameter name for \"play\" call",
-                    nameof(parameterName))
-            };
-
-        [HttpPost("players/{playerId}/{playlistAction:regex(^(play|append)$)}/sxm/{channelNumber}")]
-        public async Task PlaySXMChannel(string playerId, string playlistAction, int channelNumber) =>
+        private static async Task AddSXMChannelAsync(string playerId, PlaylistPosition playlistPosition, int channelNumber) =>
             await AtomicActions.performActionAsync(
                 LyrionCLI.Player.NewPlayer(playerId),
                 AtomicAction.NewPlaySiriusXMChannel(
                     channelNumber,
-                    GetPlaylistPosition(playlistAction)));
+                    playlistPosition));
 
-        [HttpPost("players/{playerId}/{playlistAction:regex(^(play|append)$)}/cddrives/{driveId}")]
-        public async Task PlayCD(string playerId, string playlistAction, string driveId) =>
+        [HttpPost("players/{playerId}/play/sxm/{channelNumber}")]
+        public async Task PlaySXMChannel(string playerId, int channelNumber) =>
+            await AddSXMChannelAsync(playerId, PlaylistPosition.Now, channelNumber);
+
+        [HttpPost("players/{playerId}/append/sxm/{channelNumber}")]
+        public async Task AppendSXMChannel(string playerId, int channelNumber) =>
+            await AddSXMChannelAsync(playerId, PlaylistPosition.Last, channelNumber);
+
+        private static async Task AddCDAsync(string playerId, PlaylistPosition playlistPosition, string driveId) =>
             await AtomicActions.performActionAsync(
                 LyrionCLI.Player.NewPlayer(playerId),
                 AtomicAction.NewPlayCD(
                     DiscDriveScope.NewSingleDrive(
                         DiscDeviceModule.fromId(driveId)),
-                    GetPlaylistPosition(playlistAction)));
+                    playlistPosition));
+
+        [HttpPost("players/{playerId}/play/cddrives/{driveId}")]
+        public async Task PlaySXMChannel(string playerId, string driveId) =>
+            await AddCDAsync(playerId, PlaylistPosition.Now, driveId);
+
+        [HttpPost("players/{playerId}/append/cddrives/{driveId}")]
+        public async Task AppendSXMChannel(string playerId, string driveId) =>
+            await AddCDAsync(playerId, PlaylistPosition.Last, driveId);
 
         [HttpPost("players/{playerId}/play/forecast")]
         public async Task PlayForecast(string playerId) =>

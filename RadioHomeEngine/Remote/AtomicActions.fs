@@ -118,9 +118,8 @@ module AtomicActions =
         | PlayCD (scope, position) ->
             do! Players.simulateButtonAsync player "stop"
 
-            match position with
-            | Now -> do! Playlist.clearAsync player
-            | Last -> ()
+            if position = Now then
+                do! Playlist.clearAsync player
 
             let! address = Network.getAddressAsync ()
 
