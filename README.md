@@ -4,33 +4,33 @@ An ASP.NET Core sidecar for Lyrion Music Server.
 
 RadioHomeEngine is designed to run on a Linux server that is also running [Lyrion Music Server](https://lyrion.org/) (LMS).
 
-Functionality available from the web interface (port 5000):
+Functionality available from the web interface or API (port 5000):
 
 * Audio CD playback
     * Album and track names (from CD-Text or MusicBrainz)
-    * Play an audio or data disc on a device connected to LMS
-    * Rip an audio or data disc to LMS's media folder
+    * Play an audio or data CD on a connected device
+    * Rip an audio or data CD to LMS's media folder
 * SiriusXM
     * List channels (live streams only; Xtra channels not supported)
-    * Play a channel on a device connected to LMS
-    * Play a channel in the browser, and view a list of recently played songs
+    * Play a channel on a connected device
+    * Play a channel in the browser, and view a list of recently played songs on the channel
+* Weather
+    * Play weather forecast (API only)
 
 Functionality available from a custom infrared remote:
 
-* Audio CD playback
-    * Album and track names (from CD-Text or MusicBrainz)
-    * Play an audio or data disc (all tracks, or all audio files)
-    * Rip an audio or data disc to LMS's media folder
-* SiriusXM
-    * Play channel by number (live streams only; Xtra channels not supported)
-    * View currently playing program title (for the last SiriusXM channel number entered)
-* U.S. weather forcasts and alerts from `weather.gov`, using `espeak` speech synthesis
+* Stop (0 + "OK")
+* Play a CD (00 + "OK")
+* View the artist and title of a CD (00 + "Alternate Action")
+* Play weather forecast (000 + "OK")
+* Play a SiriusXM channel (Number + "OK")
+* See what's playing on a SiriusXM channel (Number + "Alternate Action")
 
 *This application's port 5000 should not be exposed to the internet* - like LMS, it is designed only for use within a local home network.
 
 ## Build
 
-* Install Visual Studio 2022 Community
+* Install Visual Studio 2026 Community
 * Open the `.sln` file
 * Right-click on the project `RadioHomeEngine.AspNetCore` and click Publish
 
@@ -42,7 +42,7 @@ and/or through `screen`.
 
 ## Configuration
 
-The user's latitude and longitude (used for weather forecasts) are stored in `location.txt`.
+The user's latitude and longitude (used for weather alerts and forecasts) are stored in `location.txt`.
 Their SiriusXM username and password are stored in `username.txt` and `password.txt`, respectively.
 
 (In both cases, the software assumes the user is in the U.S.)

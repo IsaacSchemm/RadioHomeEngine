@@ -19,7 +19,7 @@ type LyrionIRHandler(player: Player) =
     let writePromptAsync text = task {
         promptText <- Some text
 
-        let promptHeader = "Enter channel or zero code"
+        let promptHeader = "Enter SiriusXM channel"
         do! Players.setDisplayAsync player promptHeader text (TimeSpan.FromSeconds(10.0))
 
         if promptMonitor.IsCompleted then
@@ -97,27 +97,14 @@ type LyrionIRHandler(player: Player) =
         | Some prompt, Button "knob_push" ->
             do! clearAsync ()
 
-            let mutable entry = prompt.Substring(2)
-            let mutable target = player
-
-            let prefixDetail =
-                AtomicActions.getPrefixDetails ()
-                |> Seq.where (fun pd -> entry.StartsWith(pd.prefix))
-                |> Seq.tryExactlyOne
-
-            match prefixDetail with
-            | None -> ()
-            | Some pd ->
-                if entry.StartsWith(pd.prefix) then
-                    target <- pd.player
-                    entry <- entry.Substring(pd.prefix.Length)
+            let entry = prompt.Substring(2)
 
             match AtomicActions.tryGetAction entry with
             | None -> ()
             | Some action ->
-                do! AtomicActions.performActionAsync target action
+                do! AtomicActions.performActionAsync player action
 
-        | Some prompt, Atomic Information ->
+        | Some prompt, AlternateAction ->
             do! clearAsync ()
 
             let entry = prompt.Substring(2)
