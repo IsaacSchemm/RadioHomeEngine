@@ -114,6 +114,8 @@ type LyrionIRHandler(player: Player) =
             | Some action ->
                 do! AtomicActions.performAlternateActionAsync player action
 
+        | None, AlternateAction -> ()
+
         | Some _, _ ->
             do! clearAsync()
     }

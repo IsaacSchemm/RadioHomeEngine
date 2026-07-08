@@ -47,13 +47,13 @@ module LyrionCLI =
             tcs.Task
         ]
 
-        let _ = task {
+        ignore (task {
             try
                 while not jointTask.IsCompleted do
                     do! sendCommandAsync command
                     do! Task.Delay(500)
             with ex -> Console.Error.WriteLine(ex)
-        }
+        })
 
         let! completedTask = jointTask
 

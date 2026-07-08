@@ -67,10 +67,10 @@ module Icedax =
                 WorkingDirectory = "/tmp")
             |> Process.Start
 
-        let _ = task {
+        ignore (task {
             do! Task.Delay(10000)
             if not proc.HasExited then proc.Kill()
-        }
+        })
 
         let! body = task {
             let body = new StringBuilder()
