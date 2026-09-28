@@ -37,8 +37,6 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 
         public async Task<IActionResult> PlayChannel(int num, CancellationToken cancellationToken)
         {
-            ChannelMemory.LastPlayed = ChannelMemory.Channel.NewSiriusXM(num);
-
             var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
 
             var channel = channels
