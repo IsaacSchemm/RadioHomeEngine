@@ -7,8 +7,8 @@ namespace RadioHomeEngine.AspNetCore.Controllers
     {
         public async Task<IActionResult> PlayTrack(string id, int track)
         {
-            var device = DiscDrives.getAll()
-                .FirstOrDefault(device => DiscDeviceModule.getId(device) == id);
+            var device = DiscDriveModule.getAll()
+                .FirstOrDefault(device => DiscDriveModule.getId(device) == id);
 
             if (device == null)
                 return BadRequest();

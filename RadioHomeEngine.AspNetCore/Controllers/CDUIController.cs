@@ -8,7 +8,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         public IActionResult Index() =>
             View(new CDsModel
             {
-                CDs = Discovery.getDriveInfo(DiscDriveScope.AllDrives),
+                CDs = CD.getDriveInfo(DiscDriveScope.AllDrives),
                 Players = PlayerConnections.GetAll()
             });
 
@@ -18,19 +18,19 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 LyrionCLI.Player.NewPlayer(mac),
                 AtomicAction.NewPlayCD(
                     DiscDriveScope.NewSingleDrive(
-                        DiscDevice.NewDiscDevice(id)),
+                        DiscDrive.NewDiscDrive(id)),
                     PlaylistPosition.Now));
 
         [HttpPost]
         public void RipCD(string id) =>
-            Ripping.beginRip(
+            CD.beginRip(
                 DiscDriveScope.NewSingleDrive(
-                    DiscDevice.NewDiscDevice(id)));
+                    DiscDrive.NewDiscDrive(id)));
 
         [HttpPost]
         public void EjectCD(string id) =>
-            Ripping.beginRip(
+            CD.beginRip(
                 DiscDriveScope.NewSingleDrive(
-                    DiscDevice.NewDiscDevice(id)));
+                    DiscDrive.NewDiscDrive(id)));
     }
 }

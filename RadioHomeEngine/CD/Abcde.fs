@@ -4,12 +4,14 @@ open System
 open System.Diagnostics
 open System.Threading.Tasks
 
+/// An interface to the `abcde` audio CD ripping software.
 module Abcde =
-    let getMusicBrainzDiscIdAsync (device: DiscDevice) = task {
+    /// Calculates the MusicBrainz disc ID for the disc inserted in the given drive.
+    let getMusicBrainzDiscIdAsync (device: DiscDrive) = task {
         let proc =
             new ProcessStartInfo(
                 "abcde-musicbrainz-tool",
-                $"--command id --device {DiscDevice.getPath device}",
+                $"--command id --device {DiscDrive.getPath device}",
                 RedirectStandardOutput = true)
             |> Process.Start
 
@@ -32,6 +34,7 @@ module Abcde =
         else return Some id
     }
 
+    /// Rips one or more audio CDs to the media directory used by Lyrion.
     let ripAsync scope = task {
         try
             let! dirs = LyrionCLI.General.getMediaDirsAsync()
@@ -41,7 +44,7 @@ module Abcde =
                 |> Seq.tryHead
                 |> Option.defaultWith (fun () -> failwith "No media_dir found to rip to")
 
-            for device in DiscDrives.getDevices scope do
+            for device in DiscDrive.getDevices scope do
                 let! info = Icedax.getInfoAsync device
 
                 let trackString = String.concat " " [for t in info.disc.tracks do string t.position]
@@ -49,7 +52,7 @@ module Abcde =
                 let proc =
                     new ProcessStartInfo(
                         "abcde",
-                        $"-a move,embedalbumart,clean -d {DiscDevice.getPath device} -o flac -f -N {trackString}",
+                        $"-a move,embedalbumart,clean -d {DiscDrive.getPath device} -o flac -f -N {trackString}",
                         WorkingDirectory = dir)
                     |> Process.Start
 

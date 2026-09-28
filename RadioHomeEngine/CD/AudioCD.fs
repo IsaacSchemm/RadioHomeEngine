@@ -4,6 +4,8 @@ open System
 open System.Threading.Tasks
 open FSharp.Control
 
+/// Exposes an interface to get information about the contents of an audio CD,
+/// combining multiple possible sources (MusicBrainz first, then CD-Text).
 module AudioCD =
     let private asyncGetDiscIds device driveInfo = asyncSeq {
         let icedax_id = driveInfo.discid
@@ -32,17 +34,18 @@ module AudioCD =
             return None
     }
 
+    /// Get info about the audio CD in the given disc drive.
     let getInfoForDeviceAsync device = task {
-        printfn $"[AudioCD] [{DiscDevice.getPath device}] Scanning audio CD {DiscDevice.getPath device}..."
+        printfn $"[AudioCD] [{DiscDrive.getPath device}] Scanning audio CD {DiscDrive.getPath device}..."
 
         let! icedax = Icedax.getInfoAsync device
 
         if icedax.disc.tracks = [] then
-            printfn $"[AudioCD] [{DiscDevice.getPath device}] No tracks found on disc"
+            printfn $"[AudioCD] [{DiscDrive.getPath device}] No tracks found on disc"
             return icedax.disc
 
         else
-            printfn $"[AudioCD] [{DiscDevice.getPath device}] Preparing to query MusicBrainz..."
+            printfn $"[AudioCD] [{DiscDrive.getPath device}] Preparing to query MusicBrainz..."
 
             let! candidate =
                 asyncGetDiscIds device icedax.disc
@@ -53,18 +56,19 @@ module AudioCD =
 
             match candidate with
             | Some newDisc ->
-                printfn $"[AudioCD] [{DiscDevice.getPath device}] Using title {newDisc.titles} from MusicBrainz"
+                printfn $"[AudioCD] [{DiscDrive.getPath device}] Using title {newDisc.titles} from MusicBrainz"
                 return newDisc
             | None ->
-                printfn $"[AudioCD] [{DiscDevice.getPath device}] Not found on MusicBrainz"
-                printfn $"[AudioCD] [{DiscDevice.getPath device}] Using title {icedax.disc.titles} from icedax"
+                printfn $"[AudioCD] [{DiscDrive.getPath device}] Not found on MusicBrainz"
+                printfn $"[AudioCD] [{DiscDrive.getPath device}] Using title {icedax.disc.titles} from icedax"
                 return icedax.disc
     }
 
+    /// Get info about the audio CDs in the given disc drives.
     let getInfoAsync scope = task {
         let! array =
             scope
-            |> DiscDrives.getDevices
+            |> DiscDrive.getDevices
             |> Seq.map getInfoForDeviceAsync
             |> Task.WhenAll
 

@@ -6,7 +6,12 @@ open System.IO
 open System.Threading
 open System.Text.Json
 
+/// Holds onto information about the discs inserted in disc drives on the system,
+/// so this information doesn't need to be re-read from the disc every time.
 module DiscDriveStatus =
+
+    /// Maintains a set of mount points on the filesystem for data discs,
+    /// mounting and unmounting them when requested.
     module private MountPoints =
         let mutable map = Map.empty
         let flag = new SemaphoreSlim(1, 1)
@@ -26,7 +31,7 @@ module DiscDriveStatus =
 
                     ignore (Directory.CreateDirectory(path))
 
-                    use proc = Process.Start("mount", $"-o ro \"{DiscDevice.getPath device}\" \"{path}\"")
+                    use proc = Process.Start("mount", $"-o ro \"{DiscDrive.getPath device}\" \"{path}\"")
                     do! proc.WaitForExitAsync()
 
                     if proc.ExitCode <> 0 then
@@ -57,6 +62,8 @@ module DiscDriveStatus =
                 ignore (flag.Release())
         }
 
+    /// Maintains a set of track lists for currently inserted audio CDs,
+    /// re-reading or clearing them when requested.
     module private TrackLists =
         let mutable map = Map.empty
 
@@ -77,7 +84,7 @@ module DiscDriveStatus =
         use proc =
             new ProcessStartInfo(
                 "udevadm",
-                $"info --json=short \"{DiscDevice.getPath device}\"",
+                $"info --json=short \"{DiscDrive.getPath device}\"",
                 RedirectStandardOutput = true)
             |> Process.Start
 
@@ -105,6 +112,7 @@ module DiscDriveStatus =
         |}
     }
 
+    /// Set up audio disc info and/or a filesystem mount point for a newly inserted disc.
     let attachAsync device = task {
         let! newStatus = getStatusAsync device
 
@@ -122,13 +130,15 @@ module DiscDriveStatus =
             do! MountPoints.unmountAsync device
     }
 
+    /// Clear audio disc info and/or a filesystem mount point for a disc that has been, or is about to be, removed.
     let detachAsync device = task {
         do! TrackLists.forgetAsync device
         do! MountPoints.unmountAsync device
     }
 
+    /// Set up audio disc info and/or a filesystem mount point for all inserted discs.
     let attachAllAsync () = task {
-        let devices = DiscDrives.getAll ()
+        let devices = DiscDrive.getAll ()
 
         for device in devices do
             do! attachAsync device
@@ -139,12 +149,15 @@ module DiscDriveStatus =
             do! detachAsync device
     }
 
+    /// Look for cached audio disc info, if any, for the disc in the given drive.
     let tryGetAudioDiscInfo device =
         Map.tryFind device TrackLists.map
 
+    /// Look for an active mount point, if any, for the disc in the given drive.
     let tryGetMountPoint device =
         Map.tryFind device MountPoints.map
 
+    /// Clear audio disc info and/or a filesystem mount point for all discs.
     let detachAllAsync () = task {
         for device in Map.keys MountPoints.map do
             do! detachAsync device

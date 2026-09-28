@@ -4,8 +4,9 @@ open System
 open System.Diagnostics
 open System.IO
 
+/// A set of functions for working with data discs.
 module DataCD =
-    let extensions = set [
+    let private extensions = set [
         ".aac"
         ".aif"
         ".aiff"
@@ -18,6 +19,7 @@ module DataCD =
         ".wma"
     ]
 
+    /// Enumerate all audio files on the data disc in the given drive (if any).
     let tryGetDataDiscInfo device =
         DiscDriveStatus.tryGetMountPoint device
         |> Option.map (fun dir -> {
@@ -33,10 +35,12 @@ module DataCD =
             ]
         })
 
+    /// Given a file on the data disc in the drive, try to get its path on the filesystem.
     let tryGetPath device file =
         DiscDriveStatus.tryGetMountPoint device
         |> Option.map (fun dir -> Path.Combine(dir, file.name))
 
+    /// Copy all audio files on data discs in the given scope to a new folder in the Lyrion music library.
     let ripAsync scope = task {
         let! dirs = LyrionCLI.General.getMediaDirsAsync()
 
@@ -49,7 +53,7 @@ module DataCD =
             mediaDir,
             "CD-ROM")
 
-        for device in DiscDrives.getDevices scope do
+        for device in DiscDrive.getDevices scope do
             try
                 match DiscDriveStatus.tryGetMountPoint device with
                 | Some srcDir ->

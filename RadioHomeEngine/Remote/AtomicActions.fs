@@ -69,7 +69,7 @@ module AtomicActions =
 
             let! address = Network.getAddressAsync ()
 
-            let drives = Discovery.getDriveInfo scope
+            let drives = CD.getDriveInfo scope
 
             for info in drives do
                 match info.disc.audio with
@@ -80,7 +80,7 @@ module AtomicActions =
                             match track.title with
                             | "" -> $"Track {track.position}"
                             | x -> x
-                        do! Playlist.addItemAsync player $"http://{address}:{Config.port}/CD/PlayTrack?id={Uri.EscapeDataString(DiscDevice.getId info.device)}&track={track.position}" title
+                        do! Playlist.addItemAsync player $"http://{address}:{Config.port}/CD/PlayTrack?id={Uri.EscapeDataString(DiscDrive.getId info.device)}&track={track.position}" title
 
                 match info.disc.data with
                 | None -> ()
@@ -94,10 +94,10 @@ module AtomicActions =
             do! Playlist.playAsync player
 
         | RipCD scope ->
-            Ripping.beginRip scope
+            CD.beginRip scope
 
         | EjectCD scope ->
-            do! DiscDrives.ejectAsync scope
+            do! DiscDrive.ejectAsync scope
 
         | Forecast ->
             do! Players.setDisplayAsync player "Forecast" "Please wait..." (TimeSpan.FromSeconds(5.0))
@@ -145,7 +145,7 @@ module AtomicActions =
         | PlayCD (scope, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
 
-            let drives = Discovery.getDriveInfo scope
+            let drives = CD.getDriveInfo scope
 
             let disc =
                 drives

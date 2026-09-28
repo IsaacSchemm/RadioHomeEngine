@@ -8,6 +8,7 @@ open System.Threading
 open System.Threading.Tasks
 open Microsoft.Extensions.Hosting
 
+/// A background service that mounts data discs and scans for tracks on audio discs when they are inserted.
 type DiscDriveChangeDetectionService() =
     inherit BackgroundService()
 

@@ -7,14 +7,15 @@ open System.Text
 open System.Text.RegularExpressions
 open System.Threading.Tasks
 
+/// An interface for the `icedax` application.
 module Icedax =
-    let albumTitlePattern = new Regex("^Album title: '(.*)")
-    let audioTrackPattern = new Regex("^T([0-9]+): +[^ ]+ +[^ ]+ +audio .* title '(.*)")
-    let dataTrackPattern = new Regex("^T([0-9]+): +[^ ]+ +[^ ]+ +data")
-    let cdIndexPattern = new Regex("^CDINDEX discid: (.+)")
-    let sampleFileSizePattern = new Regex("^samplefile size will be ([0-9]+) bytes")
+    let private albumTitlePattern = new Regex("^Album title: '(.*)")
+    let private audioTrackPattern = new Regex("^T([0-9]+): +[^ ]+ +[^ ]+ +audio .* title '(.*)")
+    let private dataTrackPattern = new Regex("^T([0-9]+): +[^ ]+ +[^ ]+ +data")
+    let private cdIndexPattern = new Regex("^CDINDEX discid: (.+)")
+    let private sampleFileSizePattern = new Regex("^samplefile size will be ([0-9]+) bytes")
 
-    let unescapeTitle str = String [|
+    let private unescapeTitle str = String [|
         use sr = new StringReader(str)
 
         let mutable finished = false
@@ -30,13 +31,13 @@ module Icedax =
                 char v
     |]
 
-    let (|AlbumTitle|_|) (str: string) = Seq.tryHead (seq {
+    let private (|AlbumTitle|_|) (str: string) = Seq.tryHead (seq {
         let m = albumTitlePattern.Match(str)
         if m.Success then
             unescapeTitle m.Groups[1].Value
     })
 
-    let (|AudioTrack|_|) (str: string) = Seq.tryHead (seq {
+    let private (|AudioTrack|_|) (str: string) = Seq.tryHead (seq {
         let m = audioTrackPattern.Match(str)
         if m.Success then
             let trackNumber = int m.Groups[1].Value
@@ -44,25 +45,27 @@ module Icedax =
             (trackNumber, title)
     })
 
-    let (|DataTrack|_|) (str: string) = Seq.tryHead (seq {
+    let private (|DataTrack|_|) (str: string) = Seq.tryHead (seq {
         let m = dataTrackPattern.Match(str)
         if m.Success then
             int m.Groups[1].Value
     })
 
-    let (|CDINDEX|_|) (str: string) = Seq.tryHead (seq {
+    let private (|CDINDEX|_|) (str: string) = Seq.tryHead (seq {
         let m = cdIndexPattern.Match(str)
         if m.Success then
             m.Groups[1].Value
     })
 
-    let noDiscMessage = "load cdrom please and press enter"
+    let private noDiscMessage = "load cdrom please and press enter"
 
-    let getInfoAsync (device: DiscDevice) = task {
+    /// Uses `icedax` to get information about the audio CD inserted in the drive,
+    /// including any CD-Text information.
+    let getInfoAsync (device: DiscDrive) = task {
         let proc =
             new ProcessStartInfo(
                 "icedax",
-                $"-J -g -D {DiscDevice.getPath device} -S 1 -v toc",
+                $"-J -g -D {DiscDrive.getPath device} -S 1 -v toc",
                 RedirectStandardError = true,
                 WorkingDirectory = "/tmp")
             |> Process.Start
@@ -129,10 +132,11 @@ module Icedax =
         |}
     }
 
-    let bytesPerSecond = 44100 * sizeof<uint16> * 2
-    let sectorsPerSecond = 75
-    let bytesPerSector = bytesPerSecond / sectorsPerSecond
+    let private bytesPerSecond = 44100 * sizeof<uint16> * 2
+    let private sectorsPerSecond = 75
+    let private bytesPerSector = bytesPerSecond / sectorsPerSecond
 
+    /// Uses `icedax` to read a track on the audio CD inserted in the drive.
     let extractWaveAsync device trackNumber skip = task {
         let spanString = $"-t {trackNumber}"
 
@@ -152,7 +156,7 @@ module Icedax =
         let proc =
             new ProcessStartInfo(
                 "icedax",
-                $"-D {DiscDevice.getPath device} {spanString} -S 1 -o {factor.sectors} -",
+                $"-D {DiscDrive.getPath device} {spanString} -S 1 -o {factor.sectors} -",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 WorkingDirectory = "/tmp")

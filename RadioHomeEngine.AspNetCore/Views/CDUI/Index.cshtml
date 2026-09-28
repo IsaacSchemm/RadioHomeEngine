@@ -41,9 +41,9 @@
 
     @foreach (var drive in Model.CDs)
     {
-        <h1>CD Drive @DiscDeviceModule.getPath(drive.device)</h1>
+        <h1>CD Drive @DiscDriveModule.getPath(drive.device)</h1>
 
-        if (Ripping.isCurrentlyRipping(drive.device))
+        if (CD.isCurrentlyRipping(drive.device))
         {
             <h2>Rip in progress</h2>
         }
@@ -59,7 +59,7 @@
                 {
                     <p>
                         <form asp-action="PlayCD" target="myframe">
-                            <input type="hidden" name="id" value="@DiscDeviceModule.getId(drive.device)" />
+                            <input type="hidden" name="id" value="@DiscDriveModule.getId(drive.device)" />
                             <input type="hidden" name="mac" value="@player.MacAddress" />
                             <button type="submit">
                                 @player.Name
@@ -102,7 +102,7 @@
                                 @track.title
                             </td>
                             <td align="left">
-                                <a href="/CD/PlayTrack?id=@DiscDeviceModule.getId(drive.device)&track=@track.position">
+                                <a href="/CD/PlayTrack?id=@DiscDriveModule.getId(drive.device)&track=@track.position">
                                     .wav
                                 </a>
                             </td>
@@ -145,7 +145,7 @@
         {
             <p>
                 <form asp-action="RipCD" target="myframe">
-                    <input type="hidden" name="id" value="@DiscDeviceModule.getId(drive.device)" />
+                    <input type="hidden" name="id" value="@DiscDriveModule.getId(drive.device)" />
                     <button type="submit">
                         Rip CD
                     </button>
@@ -155,7 +155,7 @@
 
         <p>
             <form asp-action="EjectCD" target="myframe">
-                <input type="hidden" name="id" value="@DiscDeviceModule.getId(drive.device)" />
+                <input type="hidden" name="id" value="@DiscDriveModule.getId(drive.device)" />
                 <button type="submit">
                     Eject CD
                 </button>

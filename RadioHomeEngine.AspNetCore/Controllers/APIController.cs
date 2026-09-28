@@ -105,8 +105,8 @@ namespace RadioHomeEngine.AspNetCore.Controllers
             FSharpList<string> Files);
 
         private static APICDDrive ToAPICDDrive(DriveInfo drive) => new(
-            Id: DiscDeviceModule.getId(drive.device),
-            DevicePath: DiscDeviceModule.getPath(drive.device),
+            Id: DiscDriveModule.getId(drive.device),
+            DevicePath: DiscDriveModule.getPath(drive.device),
             AudioCD: drive.disc.AudioDiscs switch
             {
                 [AudioDiscInfo adi] => new(
@@ -127,38 +127,38 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                     ]),
                 _ => null
             },
-            Ripping: Ripping.isCurrentlyRipping(drive.device));
+            Ripping: CD.isCurrentlyRipping(drive.device));
 
         [HttpGet("cddrives")]
         public IEnumerable<APICDDrive> GetCDDrives()
         {
-            foreach (var drive in Discovery.getDriveInfo(DiscDriveScope.AllDrives))
+            foreach (var drive in CD.getDriveInfo(DiscDriveScope.AllDrives))
                 yield return ToAPICDDrive(drive);
         }
 
         [HttpGet("cddrives/{driveId}")]
         public APICDDrive GetCDDrive(string driveId) =>
-            Discovery.getDriveInfo(
+            CD.getDriveInfo(
                 DiscDriveScope.NewSingleDrive(
-                    DiscDeviceModule.fromId(driveId)))
+                    DiscDriveModule.fromId(driveId)))
             .Select(ToAPICDDrive)
             .Single();
 
         [HttpPost("cddrives/{driveId}/rip")]
         public ActionResult RipCD(string driveId)
         {
-            Ripping.beginRip(
+            CD.beginRip(
                 DiscDriveScope.NewSingleDrive(
-                    DiscDeviceModule.fromId(driveId)));
+                    DiscDriveModule.fromId(driveId)));
 
             return Accepted();
         }
 
         [HttpPost("cddrives/{driveId}/eject")]
         public async Task EjectCD(string driveId) =>
-            await DiscDrives.ejectAsync(
+            await DiscDriveModule.ejectAsync(
                 DiscDriveScope.NewSingleDrive(
-                    DiscDeviceModule.fromId(driveId)));
+                    DiscDriveModule.fromId(driveId)));
 
         public record APIPlayer(
             string Id,
@@ -197,7 +197,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 LyrionCLI.Player.NewPlayer(playerId),
                 AtomicAction.NewPlayCD(
                     DiscDriveScope.NewSingleDrive(
-                        DiscDeviceModule.fromId(driveId)),
+                        DiscDriveModule.fromId(driveId)),
                     playlistPosition));
 
         [HttpPost("players/{playerId}/play/cddrives/{driveId}")]

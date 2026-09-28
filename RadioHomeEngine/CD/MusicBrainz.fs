@@ -5,6 +5,7 @@ open System.Net
 open System.Net.Http
 open System.Text
 
+/// An interface to the online MusicBrainz album database.
 module MusicBrainz =
     let private client =
         let c = new HttpClient()
@@ -15,6 +16,8 @@ module MusicBrainz =
 
     let private parseAs<'T> (_: 'T) (json: string) = Json.JsonSerializer.Deserialize<'T>(json)
 
+    /// Given a disc's "disc ID" (calculated by something like `abcde-musicbrainz-tool`),
+    /// look for info about the artists, title, and tracks in MusicBrainz.
     let getInfoAsync (discId: string) = task {
         use! discResponse = client.GetAsync($"discid/{discId}?inc=recordings+artist-credits")
         if discResponse.StatusCode = HttpStatusCode.NotFound then
