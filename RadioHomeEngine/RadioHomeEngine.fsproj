@@ -43,16 +43,16 @@
 
   <ItemGroup>
     <PackageReference Include="FSharp.Control.AsyncSeq" Version="4.15.0" />
-    <PackageReference Include="FSharp.Data" Version="8.1.14" />
-    <PackageReference Include="FSharp.Data.Json.Core" Version="8.1.14" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
+    <PackageReference Include="FSharp.Data" Version="8.2.0" />
+    <PackageReference Include="FSharp.Data.Json.Core" Version="8.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.12" />
     <PackageReference Include="Nito.Disposables" Version="2.5.0" />
-    <PackageReference Include="System.Runtime.Caching" Version="10.0.8" />
+    <PackageReference Include="System.Runtime.Caching" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="10.1.300" />
+    <PackageReference Update="FSharp.Core" Version="10.1.401" />
   </ItemGroup>
 
 </Project>
