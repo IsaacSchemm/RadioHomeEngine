@@ -475,8 +475,16 @@ module SiriusXMClient =
 
     let getKey () = Option.get SXM.key
 
-    let getPlaylistAsync guid channelId cancellationToken =
-        SXM.getPlaylistAsync guid channelId cancellationToken
+    let getPlaylistAsync (channelNumber: int) cancellationToken = task {
+        let! channels = SXM.getChannelsAsync cancellationToken
+
+        let channel =
+            channels
+            |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
+            |> Seq.head
+
+        return! SXM.getPlaylistAsync channel.channelGuid channel.channelId cancellationToken
+    }
 
     let getChannelsAsync cancellationToken =
         if File.Exists(usernameFile) && File.Exists(passwordFile)

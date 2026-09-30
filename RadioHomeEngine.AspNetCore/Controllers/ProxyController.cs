@@ -5,11 +5,11 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 {
     public class ProxyController : Controller
     {
-        [Route("Proxy/playlist-{id}.m3u8")]
-        public async Task<IActionResult> Playlist(string id, string path, CancellationToken cancellationToken)
+        [Route("Proxy/playlist-{channelNumber}.m3u8")]
+        public async Task<IActionResult> Playlist(int channelNumber, CancellationToken cancellationToken)
         {
             string contents = await MediaProxy.getPlaylistAsync(
-                id,
+                channelNumber,
                 cancellationToken);
 
             return Content(
@@ -18,10 +18,10 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 Encoding.UTF8);
         }
 
-        [Route("Proxy/chunklist-{id}-{index}.m3u8")]
-        public async Task<IActionResult> Chunklist(string id, int index, CancellationToken cancellationToken)
+        [Route("Proxy/chunklist-{channelNumber}-{index}.m3u8")]
+        public async Task<IActionResult> Chunklist(int channelNumber, int index, CancellationToken cancellationToken)
         {
-            string contents = await MediaProxy.getChunklistAsync(id, index, cancellationToken);
+            string contents = await MediaProxy.getChunklistAsync(channelNumber, index, cancellationToken);
 
             return Content(
                 contents,
@@ -29,10 +29,10 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 Encoding.UTF8);
         }
 
-        [Route("Proxy/chunk-{id}-{index}-{sequenceNumber}.ts")]
-        public async Task<IActionResult> Chunk(string id, int index, UInt128 sequenceNumber, CancellationToken cancellationToken)
+        [Route("Proxy/chunk-{channelNumber}-{index}-{sequenceNumber}.ts")]
+        public async Task<IActionResult> Chunk(int channelNumber, int index, UInt128 sequenceNumber, CancellationToken cancellationToken)
         {
-            var data = await MediaProxy.getChunkAsync(id, index, sequenceNumber, cancellationToken);
+            var data = await MediaProxy.getChunkAsync(channelNumber, index, sequenceNumber, cancellationToken);
 
             return File(
                 data,

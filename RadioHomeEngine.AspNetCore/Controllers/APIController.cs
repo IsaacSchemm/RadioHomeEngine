@@ -56,15 +56,14 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 
         [HttpGet("sxm/{channelNumber}/now-playing/history")]
         public async IAsyncEnumerable<APISXMSong> GetNowPlayingHistory(
-            string channelNumber,
+            int channelNumber,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
-            var channel = channels.First(c => c.channelNumber == channelNumber);
+            var channel = channels.First(c => c.channelNumber == "${channelNumber}");
 
             var playlist = await SiriusXMClient.getPlaylistAsync(
-                channel.channelGuid,
-                channel.channelId,
+                channelNumber,
                 cancellationToken);
 
             foreach (var cut in playlist.cuts)

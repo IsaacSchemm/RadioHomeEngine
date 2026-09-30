@@ -37,15 +37,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 
         public async Task<IActionResult> PlayChannel(int num, CancellationToken cancellationToken)
         {
-            var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
-
-            var channel = channels
-                .Where(c => c.channelNumber == $"{num}")
-                .FirstOrDefault();
-
-            return channel != null
-                ? Redirect($"/Proxy/playlist-{channel.channelId}.m3u8")
-                : NotFound();
+            return Redirect($"/Proxy/playlist-{num}.m3u8");
         }
 
         public async Task<IActionResult> ViewChannel(int num, CancellationToken cancellationToken)
@@ -56,8 +48,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 .First();
 
             var playlist = await SiriusXMClient.getPlaylistAsync(
-                channel.channelGuid,
-                channel.channelId,
+                num,
                 cancellationToken);
 
             return View(new RecentlyPlayingModel

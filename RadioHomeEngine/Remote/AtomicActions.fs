@@ -121,26 +121,17 @@ module AtomicActions =
         | PlaySiriusXMChannel (channelNumber, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
 
-            let! channels = SiriusXMClient.getChannelsAsync CancellationToken.None
-            let channel =
-                channels
-                |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
+            let! playlist = SiriusXMClient.getPlaylistAsync channelNumber CancellationToken.None
+            let song =
+                playlist.cuts
+                |> Seq.sortByDescending (fun cut -> cut.startTime)
                 |> Seq.tryHead
 
-            match channel with
+            match song with
             | None -> ()
             | Some c ->
-                let! playlist = SiriusXMClient.getPlaylistAsync c.channelGuid c.channelId CancellationToken.None
-                let song =
-                    playlist.cuts
-                    |> Seq.sortByDescending (fun cut -> cut.startTime)
-                    |> Seq.tryHead
-
-                match song with
-                | None -> ()
-                | Some c ->
-                    let artist = String.concat " / " c.artists
-                    do! Players.setDisplayAsync player artist c.title (TimeSpan.FromSeconds(10.0))
+                let artist = String.concat " / " c.artists
+                do! Players.setDisplayAsync player artist c.title (TimeSpan.FromSeconds(10.0))
 
         | PlayCD (scope, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
