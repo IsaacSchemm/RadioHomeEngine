@@ -13,19 +13,11 @@
     @await Html.PartialAsync("_Styles")
 </head>
 <body>
-    <main>
-        @if (Model.Channel != null)
-        {
-            <div id="channel">
-                @await Html.PartialAsync("_Channel", Model.Channel)
-            </div>
-        }
-
-        <hr />
-
-        @* <audio controls src="/SXM/PlayChannel?num=@Model.Channel.Number">
-            HTML5 audio is not supported in this browser.
-        </audio> *@
+    @if (Model.Channel != null)
+    {
+        <div id="channel">
+            @await Html.PartialAsync("_Channel", Model.Channel)
+        </div>
 
         @foreach (var item in Model.Songs)
         {
@@ -34,37 +26,10 @@
                 @await Html.PartialAsync("_Song", item)
             </section>
         }
-    </main>
-
-    @* <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.18/hls.min.js"
-            integrity="sha512-hARxLWym80kd0Bzl5/93OuW1ujaKfvmJ90yTKak/RB67JuNIjtErU2H7H3bteyfzMuqiSK0tXarT7eK6lEWBBA=="
-            crossorigin="anonymous"
-            referrerpolicy="no-referrer"></script>
-
-    <script type="text/javascript">
-        if ("Hls" in window && Hls.isSupported()) {
-            const audio = document.getElementsByTagName("audio")[0];
-
-            audio.style.visibility = "hidden";
-
-            const url = audio.src;
-
-            const hls = new Hls({ startPosition: 0 });
-
-            hls.on(Hls.Events.ERROR, function (event, data) {
-                console.warn({ event, data });
-            });
-
-            hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    audio.style.visibility = "visible";
-                });
-
-                hls.loadSource(url);
-            });
-
-            hls.attachMedia(audio);
-        }
-    </script> *@
+    }
+    else
+    {
+        @:You are not currently tuned into any channel.
+    }
 </body>
 </html>

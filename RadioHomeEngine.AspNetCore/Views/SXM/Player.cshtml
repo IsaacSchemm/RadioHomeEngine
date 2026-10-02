@@ -1,0 +1,55 @@
+﻿@model SiriusXMIndexModel
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
+    <title>Radio Home Engine - SiriusXM</title>
+    @await Html.PartialAsync("_Styles")
+</head>
+<body>
+    <audio controls src="/Proxy/playlist-0.m3u8">
+        HTML5 audio is not supported in this browser.
+    </audio>
+
+    <form asp-action="Player">
+        <button type="submit">Reload</button>
+    </form>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.18/hls.min.js"
+            integrity="sha512-hARxLWym80kd0Bzl5/93OuW1ujaKfvmJ90yTKak/RB67JuNIjtErU2H7H3bteyfzMuqiSK0tXarT7eK6lEWBBA=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+
+    <script type="text/javascript">
+        if ("Hls" in window && Hls.isSupported()) {
+            const audio = document.getElementsByTagName("audio")[0];
+
+            audio.style.visibility = "hidden";
+
+            const url = audio.src;
+
+            const hls = new Hls({ startPosition: 0 });
+
+            hls.on(Hls.Events.ERROR, function (event, data) {
+                console.warn({ event, data });
+            });
+
+            hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    audio.style.visibility = "visible";
+                });
+
+                hls.loadSource(url);
+            });
+
+            hls.attachMedia(audio);
+        }
+    </script>
+</body>
+</html>

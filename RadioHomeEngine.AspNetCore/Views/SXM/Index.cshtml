@@ -12,67 +12,53 @@
     <title>Radio Home Engine - SiriusXM</title>
     @await Html.PartialAsync("_Styles")
     <style type="text/css">
-        html, body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-        }
+            html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+            }
 
-        body {
-            display: flex;
-            flex-direction: column;
-        }
+            body {
+                display: flex;
+                flex-direction: column;
+            }
+
+            input[type=number], button {
+                line-height: 2em;
+                margin: 0.5em;
+                padding-left: 1em;
+                padding-right: 1em;
+            }
     </style>
 </head>
 <body>
-    <section aria-label="Tuner" style="flex: 0 0 auto">
-        <form asp-action="SetChannel" target="currentChannelFrame">
-            <input type="number" min="1" max="@Model.Channels.Select(c => c.ChannelNumber).DefaultIfEmpty(1).Max()" name="channelNumber" />
-            <button type="submit">Play</button>
-        </form>
+    <section aria-label="Tuner" style="flex: 0 0 auto; display: flex; flex-direction: row">
+        <div style="flex: 0 0 auto">
+            <form asp-action="SetChannel" target="currentChannelFrame">
+                <input type="number"
+                       min="1"
+                       max="@Model.Channels.Select(c => c.ChannelNumber).DefaultIfEmpty(1).Max()"
+                       name="channelNumber"
+                       value="@Model.ChannelNumber" />
 
-        <form asp-action="ClearChannel" target="currentChannelFrame">
-            <button type="submit">Stop</button>
-        </form>
+                <button type="submit">Tune</button>
+            </form>
+        </div>
+
+        <div style="flex: 1 1 auto"></div>
+
+        <div style="flex: 0 0 auto">
+            <form asp-action="ClearChannel" target="currentChannelFrame">
+                <button type="submit">Untune</button>
+            </form>
+        </div>
     </section>
 
-    <section aria-label="Player" style="flex: 0 0 auto">
-        <audio controls src="/Proxy/playlist-0.m3u8">
-            HTML5 audio is not supported in this browser.
-        </audio>
-    </section>
+    <iframe name="audioFrame" src="/SXM/Player" style="border: 0; flex: 0 0 auto" height="80"></iframe>
 
-    <iframe name="currentChannelFrame" src="/SXM/ViewChannel" style="border: 0; flex: 1 1 auto"></iframe>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.18/hls.min.js"
-            integrity="sha512-hARxLWym80kd0Bzl5/93OuW1ujaKfvmJ90yTKak/RB67JuNIjtErU2H7H3bteyfzMuqiSK0tXarT7eK6lEWBBA=="
-            crossorigin="anonymous"
-            referrerpolicy="no-referrer"></script>
-
-    <script type="text/javascript">
-        if ("Hls" in window && Hls.isSupported()) {
-            const audio = document.getElementsByTagName("audio")[0];
-
-            audio.style.visibility = "hidden";
-
-            const url = audio.src;
-
-            const hls = new Hls({ startPosition: 0 });
-
-            hls.on(Hls.Events.ERROR, function (event, data) {
-                console.warn({ event, data });
-            });
-
-            hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    audio.style.visibility = "visible";
-                });
-
-                hls.loadSource(url);
-            });
-
-            hls.attachMedia(audio);
-        }
-    </script>
+    <iframe aria-label="Channel Information"
+            name="currentChannelFrame"
+            src="/SXM/ViewChannel"
+            style="border: 0; flex: 1 1 auto"></iframe>
 </body>
 </html>

@@ -108,5 +108,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 ]
             });
         }
+
+        public ActionResult Player() => View();
     }
 }
