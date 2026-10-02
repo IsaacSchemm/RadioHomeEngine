@@ -6,6 +6,61 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 {
     public class SXMController(IHttpClientFactory httpClientFactory) : Controller
     {
+        public async Task<IActionResult> Index(CancellationToken cancellationToken)
+        {
+            var channelNumber = TunerProxy.getCurrentChannel();
+
+            var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
+
+            var model = new SiriusXMIndexModel
+            {
+                ChannelNumber = channelNumber,
+                Channels = [
+                    .. channels.Select(c => new SiriusXMIndexModel.Channel
+                    {
+                        ChannelNumber = int.Parse(c.channelNumber),
+                        Name = c.name
+                    })
+                ]
+            };
+
+            return View(model);
+        }
+
+        public async Task<IActionResult> CurrentChannel(CancellationToken cancellationToken)
+        {
+            var channelNumber = TunerProxy.getCurrentChannel();
+
+            var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
+
+            var channel = channels.FirstOrDefault(c => c.channelNumber == $"{channelNumber}");
+
+            var model = channel == null
+                ? null
+                : new PlayingChannelModel
+                {
+                    Name = channel.name,
+                    Number = channelNumber ?? 0,
+                    Description = channel.mediumDescription
+                };
+
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SetChannel(int channelNumber, CancellationToken cancellationToken)
+        {
+            await TunerProxy.setCurrentChannelAsync(channelNumber, cancellationToken);
+            return RedirectToAction(nameof(CurrentChannel));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ClearChannel(CancellationToken cancellationToken)
+        {
+            await TunerProxy.clearCurrentChannelAsync(cancellationToken);
+            return RedirectToAction(nameof(CurrentChannel));
+        }
+
         public async Task<IActionResult> ChannelImage(int num, CancellationToken cancellationToken)
         {
             var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
@@ -47,9 +102,9 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 .Where(c => c.channelNumber == $"{num}")
                 .First();
 
-            var playlist = await SiriusXMClient.getPlaylistAsync(
-                num,
-                cancellationToken);
+            //var playlist = await SiriusXMClient.getPlaylistAsync(
+            //    num,
+            //    cancellationToken);
 
             return View(new RecentlyPlayingModel
             {
@@ -60,16 +115,16 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                     Description = channel.mediumDescription
                 },
                 Songs = [
-                    ..playlist.cuts
-                        .OrderByDescending(c => c.startTime)
-                        .Take(10)
-                        .Select(c => new SongModel
-                        {
-                            Title = c.title,
-                            Artist = string.Join(" / ", c.artists.Except([c.title])),
-                            Album = c.albums.Select(a => a.title).FirstOrDefault(),
-                            Image = c.albums.SelectMany(a => a.images).FirstOrDefault()
-                        })
+                    //..playlist.cuts
+                    //    .OrderByDescending(c => c.startTime)
+                    //    .Take(10)
+                    //    .Select(c => new SongModel
+                    //    {
+                    //        Title = c.title,
+                    //        Artist = string.Join(" / ", c.artists.Except([c.title])),
+                    //        Album = c.albums.Select(a => a.title).FirstOrDefault(),
+                    //        Image = c.albums.SelectMany(a => a.images).FirstOrDefault()
+                    //    })
                 ]
             });
         }

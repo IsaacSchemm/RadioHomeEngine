@@ -84,9 +84,9 @@ module MediaProxy =
         }
 
     let getPlaylistAsync channelNumber cancellationToken = task {
-        let! playlist = SiriusXMClient.getPlaylistAsync channelNumber cancellationToken
+        let! playlist = SiriusXMClient.tryGetPlaylistAsync channelNumber cancellationToken
 
-        let playlistUri = new Uri(playlist.url)
+        let playlistUri = new Uri(playlist.Value.url)
 
         let! data = SiriusXMClient.getFileAsync playlistUri cancellationToken
 

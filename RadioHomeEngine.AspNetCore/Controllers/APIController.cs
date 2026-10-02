@@ -62,26 +62,28 @@ namespace RadioHomeEngine.AspNetCore.Controllers
             var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
             var channel = channels.First(c => c.channelNumber == "${channelNumber}");
 
-            var playlist = await SiriusXMClient.getPlaylistAsync(
-                channelNumber,
-                cancellationToken);
+            //var playlist = await SiriusXMClient.getPlaylistAsync(
+            //    channelNumber,
+            //    cancellationToken);
 
-            foreach (var cut in playlist.cuts)
-            {
-                var album = cut.albums.HeadOrDefault;
+            //foreach (var cut in playlist.cuts)
+            //{
+            //    var album = cut.albums.HeadOrDefault;
 
-                yield return new APISXMSong(
-                    cut.title,
-                    string.Join(" / ", cut.artists),
-                    cut.albums
-                        .Select(album => new APISXMAlbum(
-                            album.title,
-                            album.images
-                                .Select(i => new APISXMImage(i))
-                                .FirstOrDefault()))
-                        .FirstOrDefault(),
-                    cut.startTime);
-            }
+            //    yield return new APISXMSong(
+            //        cut.title,
+            //        string.Join(" / ", cut.artists),
+            //        cut.albums
+            //            .Select(album => new APISXMAlbum(
+            //                album.title,
+            //                album.images
+            //                    .Select(i => new APISXMImage(i))
+            //                    .FirstOrDefault()))
+            //            .FirstOrDefault(),
+            //        cut.startTime);
+            //}
+
+            yield break;
         }
 
         public record APICDDrive(

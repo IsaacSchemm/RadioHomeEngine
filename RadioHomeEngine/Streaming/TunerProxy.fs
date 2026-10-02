@@ -23,7 +23,7 @@ module TunerProxy =
     // and expose a single playlist and chunklist based on what we have cached.
     // (This sacrifices the adaptive streaming capability of HLS for the sake of simplicity.)
 
-    let mutable private currentChannel = Some 4
+    let mutable private currentChannel = None
     let mutable private currentChunklist = None
 
     // The playlist.m3u8 file contains a bandwidth estimate for each chunklist.
@@ -46,33 +46,38 @@ module TunerProxy =
                 flag.Release() |> ignore
         }
 
+    let getCurrentChannel() = Option.toNullable currentChannel
+
     let setCurrentChannelAsync channelNumber cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
         currentChannel <- Some channelNumber
         currentChunklist <- None
 
-        let! playlist = SiriusXMClient.getPlaylistAsync channelNumber cancellationToken
+        let! playlist = SiriusXMClient.tryGetPlaylistAsync channelNumber cancellationToken
 
-        let playlistUri = new Uri(playlist.url)
+        match playlist with
+        | None -> ()
+        | Some p ->
+            let playlistUri = new Uri(p.url)
 
-        let! data = SiriusXMClient.getFileAsync playlistUri cancellationToken
+            let! data = SiriusXMClient.getFileAsync playlistUri cancellationToken
 
-        let text = Encoding.UTF8.GetString(data.content)
+            let text = Encoding.UTF8.GetString(data.content)
 
-        let matches = Regex.Matches(text, "^#EXT-X-STREAM-INF:.*BANDWIDTH=([0-9]+)")
-        if matches.Count > 0 then
-            bandwidth <- matches.Item(0).Groups[1].Value |> Int32.Parse
+            let matches = Regex.Matches(text, "^#EXT-X-STREAM-INF:.*BANDWIDTH=([0-9]+)")
+            if matches.Count > 0 then
+                bandwidth <- matches.Item(0).Groups[1].Value |> Int32.Parse
 
-        let lines = Utility.split '\n' text
+            let lines = Utility.split '\n' text
 
-        currentChunklist <- Seq.tryHead (seq {
-            let mutable i = 0
-            for line in lines do
-                if not (line.StartsWith('#')) then
-                    yield new Uri(playlistUri, line)
-        })
+            currentChunklist <- Seq.tryHead (seq {
+                let mutable i = 0
+                for line in lines do
+                    if not (line.StartsWith('#')) then
+                        yield new Uri(playlistUri, line)
+            })
     })
 
-    let clearCurrentChannelAsync channelNumber cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
+    let clearCurrentChannelAsync cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
         currentChannel <- None
         currentChunklist <- None
     })

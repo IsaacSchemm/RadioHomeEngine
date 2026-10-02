@@ -1,0 +1,25 @@
+﻿@model PlayingChannelModel
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
+    <title>Radio Home Engine - SiriusXM</title>
+    @await Html.PartialAsync("_Styles")
+</head>
+<body>
+    <main>
+        @if (Model != null)
+        {
+            <div id="channel">
+                @await Html.PartialAsync("_Channel", Model)
+            </div>
+        }
+    </main>
+</body>
+</html>

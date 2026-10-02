@@ -121,9 +121,11 @@ module AtomicActions =
         | PlaySiriusXMChannel (channelNumber, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
 
-            let! playlist = SiriusXMClient.getPlaylistAsync channelNumber CancellationToken.None
+            let! playlist = SiriusXMClient.tryGetPlaylistAsync channelNumber CancellationToken.None
             let song =
-                playlist.cuts
+                playlist
+                |> Option.map (fun p -> p.cuts)
+                |> Option.defaultValue []
                 |> Seq.sortByDescending (fun cut -> cut.startTime)
                 |> Seq.tryHead
 

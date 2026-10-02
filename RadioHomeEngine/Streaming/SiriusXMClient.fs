@@ -475,15 +475,20 @@ module SiriusXMClient =
 
     let getKey () = Option.get SXM.key
 
-    let getPlaylistAsync (channelNumber: int) cancellationToken = task {
+    let tryGetPlaylistAsync (channelNumber: int) cancellationToken = task {
         let! channels = SXM.getChannelsAsync cancellationToken
 
         let channel =
             channels
             |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
-            |> Seq.head
+            |> Seq.tryHead
 
-        return! SXM.getPlaylistAsync channel.channelGuid channel.channelId cancellationToken
+        match channel with
+        | Some c ->
+            let! playlist = SXM.getPlaylistAsync c.channelGuid c.channelId cancellationToken
+            return Some playlist
+        | None ->
+            return None
     }
 
     let getChannelsAsync cancellationToken =

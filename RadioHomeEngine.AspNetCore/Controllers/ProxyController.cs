@@ -8,7 +8,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         [Route("Proxy/playlist-{channelNumber}.m3u8")]
         public async Task<IActionResult> Playlist(int channelNumber, CancellationToken cancellationToken)
         {
-            await TunerProxy.setCurrentChannelAsync(channelNumber, cancellationToken);
+            //await TunerProxy.setCurrentChannelAsync(channelNumber, cancellationToken);
 
             string contents = await TunerProxy.getPlaylistAsync(
                 cancellationToken);
