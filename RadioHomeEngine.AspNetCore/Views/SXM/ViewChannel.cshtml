@@ -9,20 +9,23 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
-    <title>@Model.Channel.Name - Recently Playing</title>
+    <title>@Model.Channel?.Name - Recently Playing</title>
     @await Html.PartialAsync("_Styles")
 </head>
 <body>
     <main>
-        <div id="channel">
-            @await Html.PartialAsync("_Channel", Model.Channel)
-        </div>
+        @if (Model.Channel != null)
+        {
+            <div id="channel">
+                @await Html.PartialAsync("_Channel", Model.Channel)
+            </div>
+        }
 
         <hr />
 
-        <audio controls src="/SXM/PlayChannel?num=@Model.Channel.Number">
+        @* <audio controls src="/SXM/PlayChannel?num=@Model.Channel.Number">
             HTML5 audio is not supported in this browser.
-        </audio>
+        </audio> *@
 
         @foreach (var item in Model.Songs)
         {
@@ -33,7 +36,7 @@
         }
     </main>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.18/hls.min.js"
+    @* <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.18/hls.min.js"
             integrity="sha512-hARxLWym80kd0Bzl5/93OuW1ujaKfvmJ90yTKak/RB67JuNIjtErU2H7H3bteyfzMuqiSK0tXarT7eK6lEWBBA=="
             crossorigin="anonymous"
             referrerpolicy="no-referrer"></script>
@@ -62,6 +65,6 @@
 
             hls.attachMedia(audio);
         }
-    </script>
+    </script> *@
 </body>
 </html>

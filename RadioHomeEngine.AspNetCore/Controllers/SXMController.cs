@@ -27,38 +27,18 @@ namespace RadioHomeEngine.AspNetCore.Controllers
             return View(model);
         }
 
-        public async Task<IActionResult> CurrentChannel(CancellationToken cancellationToken)
-        {
-            var channelNumber = TunerProxy.getCurrentChannel();
-
-            var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
-
-            var channel = channels.FirstOrDefault(c => c.channelNumber == $"{channelNumber}");
-
-            var model = channel == null
-                ? null
-                : new PlayingChannelModel
-                {
-                    Name = channel.name,
-                    Number = channelNumber ?? 0,
-                    Description = channel.mediumDescription
-                };
-
-            return View(model);
-        }
-
         [HttpPost]
         public async Task<IActionResult> SetChannel(int channelNumber, CancellationToken cancellationToken)
         {
             await TunerProxy.setCurrentChannelAsync(channelNumber, cancellationToken);
-            return RedirectToAction(nameof(CurrentChannel));
+            return RedirectToAction(nameof(ViewChannel));
         }
 
         [HttpPost]
         public async Task<IActionResult> ClearChannel(CancellationToken cancellationToken)
         {
             await TunerProxy.clearCurrentChannelAsync(cancellationToken);
-            return RedirectToAction(nameof(CurrentChannel));
+            return RedirectToAction(nameof(ViewChannel));
         }
 
         public async Task<IActionResult> ChannelImage(int num, CancellationToken cancellationToken)
@@ -90,41 +70,41 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 resp.Content.Headers.ContentType?.MediaType ?? "application/octet-stream");
         }
 
+        [Obsolete]
         public async Task<IActionResult> PlayChannel(int num, CancellationToken cancellationToken)
         {
             return Redirect($"/Proxy/playlist-{num}.m3u8");
         }
 
-        public async Task<IActionResult> ViewChannel(int num, CancellationToken cancellationToken)
+        public async Task<IActionResult> ViewChannel(CancellationToken cancellationToken)
         {
             var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
             var channel = channels
-                .Where(c => c.channelNumber == $"{num}")
-                .First();
+                .FirstOrDefault(c => c.channelNumber == $"{TunerProxy.getCurrentChannel()}");
 
-            //var playlist = await SiriusXMClient.getPlaylistAsync(
-            //    num,
-            //    cancellationToken);
+            var history = await TunerProxy.getCurrentChannelHistoryAsync(cancellationToken);
 
             return View(new RecentlyPlayingModel
             {
-                Channel = new PlayingChannelModel
-                {
-                    Name = channel.name,
-                    Number = num,
-                    Description = channel.mediumDescription
-                },
+                Channel = channel == null
+                    ? null
+                    : new PlayingChannelModel
+                    {
+                        Name = channel.name,
+                        Number = channel.channelNumber,
+                        Description = channel.mediumDescription
+                    },
                 Songs = [
-                    //..playlist.cuts
-                    //    .OrderByDescending(c => c.startTime)
-                    //    .Take(10)
-                    //    .Select(c => new SongModel
-                    //    {
-                    //        Title = c.title,
-                    //        Artist = string.Join(" / ", c.artists.Except([c.title])),
-                    //        Album = c.albums.Select(a => a.title).FirstOrDefault(),
-                    //        Image = c.albums.SelectMany(a => a.images).FirstOrDefault()
-                    //    })
+                    .. history
+                        .OrderByDescending(c => c.startTime)
+                        .Take(5)
+                        .Select(c => new SongModel
+                        {
+                            Title = c.title,
+                            Artist = string.Join(" / ", c.artists.Except([c.title])),
+                            Album = c.albums.Select(a => a.title).FirstOrDefault(),
+                            Image = c.albums.SelectMany(a => a.images).FirstOrDefault()
+                        })
                 ]
             });
         }

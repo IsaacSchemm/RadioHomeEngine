@@ -82,6 +82,17 @@ module TunerProxy =
         currentChunklist <- None
     })
 
+    let getCurrentChannelHistoryAsync cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
+        let! playlist =
+            match currentChannel with
+            | Some n -> SiriusXMClient.tryGetPlaylistAsync n cancellationToken
+            | None -> task { return None }
+
+        match playlist with
+        | None -> return []
+        | Some p -> return p.cuts
+    })
+
     let getPlaylistAsync cancellationToken = task {
         return String.concat "\n" [
             "#EXTM3U"
