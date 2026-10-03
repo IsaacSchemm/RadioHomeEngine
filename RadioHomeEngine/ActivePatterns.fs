@@ -18,3 +18,8 @@ module ActivePatterns =
         match UInt128.TryParse(str) with
         | true, value -> Some value
         | false, _ -> None
+
+    let (|DateTimeOffset|_|) (str: string) =
+        match DateTimeOffset.TryParse(str) with
+        | true, value -> Some value
+        | false, _ -> None

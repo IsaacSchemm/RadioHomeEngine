@@ -73,7 +73,8 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         [Obsolete]
         public async Task<IActionResult> PlayChannel(int num, CancellationToken cancellationToken)
         {
-            return Redirect($"/Proxy/playlist-{num}.m3u8");
+            await TunerProxy.setCurrentChannelAsync(num, cancellationToken);
+            return Redirect($"/Proxy/playlist.m3u8");
         }
 
         public async Task<IActionResult> ViewChannel(CancellationToken cancellationToken)

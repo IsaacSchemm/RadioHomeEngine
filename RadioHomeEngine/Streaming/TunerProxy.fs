@@ -13,11 +13,7 @@ open System.Threading.Tasks
 
 /// Takes the audio streams from SiriusXMClient, decrypts segments, and exposes them to the user.
 module TunerProxy =
-    type Encryption = Key1 | NoEncryption
-
-    exception UnknownEncryptionException
-
-    // This proxy carries the concept of a "current channel".
+    // This module has the concept of a "current channel".
     // Since SiriusXMClient emulates a single user agent, this application can only stream one channel at a time.
     // Therefore, we read individual media segments from whichever channel is current whenever the chunklist is updated,
     // and expose a single playlist and chunklist based on what we have cached.
@@ -26,10 +22,10 @@ module TunerProxy =
     let mutable private currentChannel = None
     let mutable private currentChunklist = None
 
-    // The playlist.m3u8 file contains a bandwidth estimate for each chunklist.
+    // The playlist.m3u8 file must contain a bandwidth estimate for each chunklist.
     // We're only keeping one chunklist, so when we update it, let's update this value too.
 
-    let mutable private bandwidth = 281600
+    let mutable private bandwidth: int option = None
 
     // Prevent interference between different clients.
     // (Typically, there will be only one active listener to the stream, if any.)
@@ -46,8 +42,32 @@ module TunerProxy =
                 flag.Release() |> ignore
         }
 
+    // Here we generate a media segment of 10 seconds of silence.
+    // This will be used in place of any segment that is missing from the cache (e.g. too old).
+
+    let private silentSegment = lazy task {
+        let ffmpeg =
+            new ProcessStartInfo(
+                "ffmpeg",
+                "-f lavfi -i anullsrc=cl=stereo:sample_rate=44100 -t 10 -c:a aac -f mpegts -",
+                RedirectStandardOutput = true)
+            |> Process.Start
+
+        use buffer = new MemoryStream()
+
+        let readTask = ffmpeg.StandardOutput.BaseStream.CopyToAsync(buffer)
+
+        do! readTask
+        do! ffmpeg.WaitForExitAsync()
+
+        return buffer.ToArray()
+    }
+
+    /// Returns the currently tuned channel number, if any.
     let getCurrentChannel() = Option.toNullable currentChannel
 
+    /// Changes the currently tuned channel.
+    /// This will fetch the stream information from SiriusXM and update this proxy's current chunklist pointer.
     let setCurrentChannelAsync channelNumber cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
         currentChannel <- Some channelNumber
         currentChunklist <- None
@@ -57,31 +77,39 @@ module TunerProxy =
         match playlist with
         | None -> ()
         | Some p ->
+            // Download the playlist.m3u8 file.
+
             let playlistUri = new Uri(p.url)
 
             let! data = SiriusXMClient.getFileAsync playlistUri cancellationToken
 
             let text = Encoding.UTF8.GetString(data.content)
 
+            // Find the estimated bandwidth value from the first chunklist and record it for use in our own `playlist.m3u8`.
+
             let matches = Regex.Matches(text, "^#EXT-X-STREAM-INF:.*BANDWIDTH=([0-9]+)")
             if matches.Count > 0 then
-                bandwidth <- matches.Item(0).Groups[1].Value |> Int32.Parse
+                bandwidth <- Some (Int32.Parse(matches.Item(0).Groups[1].Value))
 
             let lines = Utility.split '\n' text
 
-            currentChunklist <- Seq.tryHead (seq {
-                let mutable i = 0
-                for line in lines do
-                    if not (line.StartsWith('#')) then
-                        yield new Uri(playlistUri, line)
-            })
+            // Find the first chunklist and record its URL.
+
+            currentChunklist <-
+                text
+                |> Utility.split '\n'
+                |> Seq.where (fun line -> not (line.StartsWith('#')))
+                |> Seq.map (fun line -> new Uri(playlistUri, line))
+                |> Seq.tryHead
     })
 
+    /// Untunes the currently tuned channel.
     let clearCurrentChannelAsync cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
         currentChannel <- None
         currentChunklist <- None
     })
 
+    /// Gets a list of currently and recently playing songs or programs on the currently tuned channel.
     let getCurrentChannelHistoryAsync cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
         let! playlist =
             match currentChannel with
@@ -93,159 +121,60 @@ module TunerProxy =
         | Some p -> return p.cuts
     })
 
-    let getPlaylistAsync cancellationToken = task {
-        return String.concat "\n" [
-            "#EXTM3U"
-            "#EXT-X-ALLOW-CACHE:NO"
-            "#EXT-X-VERSION:1"
-            $"#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH={bandwidth},CODECS=\"mp4a.40.2\""
-            "chunklist-0-0.m3u8"
-        ]
+    /// Gets a single segment's unencrypted audio data, using its new (client-facing) sequence number.
+    /// If the segment is no longer cached, a segment that consists of ten seconds of silence will be returned instead.
+    let getChunkAsync index sequenceNumber cancellationToken = task {
+        match SegmentCache.tryGetData sequenceNumber with
+        | Some s -> return s
+        | None -> return! silentSegment.Value
     }
 
-    module private SegmentCache =
-        type Segment = {
-            original: ChunklistParser.Segment
-            proxied: ChunklistParser.Segment
-            data: byte array
-        }
-
-        let mutable segments = []
-
-        let tryFindByOriginal segment =
-            segments
-            |> Seq.where (fun s -> s.original = segment)
-            |> Seq.tryHead
-
-        let addAsync (segment: ChunklistParser.Segment) uri cancellationToken = task {
-            let prev =
-                match segments with
-                | [] ->
-                    UInt128.Zero
-                | _::_ ->
-                    segments
-                    |> Seq.map (fun s -> s.proxied.mediaSequence)
-                    |> Seq.max
-
-            let next = prev + UInt128.One
-
-            let! encryptedData = SiriusXMClient.getFileAsync uri cancellationToken
-
-            let encryption =
-                match segment.key with
-                | "METHOD=AES-128,URI=\"key/1\"" -> Key1
-                | "NONE" -> NoEncryption
-                | _ -> raise UnknownEncryptionException
-
-            let! data = task {
-                match encryption with
-                | NoEncryption ->
-                    return encryptedData.content
-                | Key1 ->
-                    use algorithm = Aes.Create()
-                    algorithm.Padding <- PaddingMode.PKCS7
-                    algorithm.Mode <- CipherMode.CBC
-                    algorithm.KeySize <- 128
-                    algorithm.BlockSize <- 128
-
-                    algorithm.Key <- SiriusXMClient.getKey ()
-
-                    algorithm.IV <-
-                        let iv = Array.zeroCreate 16
-                        BinaryPrimitives.WriteUInt128BigEndian(iv.AsSpan(), segment.mediaSequence)
-                        iv
-
-                    use outputStream = new MemoryStream()
-
-                    do! task {
-                        use cryptoStream = new CryptoStream(outputStream, algorithm.CreateDecryptor(), CryptoStreamMode.Write)
-                        do! cryptoStream.WriteAsync(encryptedData.content)
-                    }
-
-                    return outputStream.ToArray()
-            }
-
-            let ffmpeg =
-                new ProcessStartInfo(
-                    "ffmpeg",
-                    "-i - -f mpegts -c:a copy -",
-                    RedirectStandardInput = true,
-                    RedirectStandardOutput = true)
-                |> Process.Start
-
-            let! decrypted_data = task {
-                use buffer = new MemoryStream()
-
-                let writeTask = ffmpeg.StandardInput.BaseStream.WriteAsync(data)
-                let readTask = ffmpeg.StandardOutput.BaseStream.CopyToAsync(buffer)
-
-                do! writeTask
-
-                ffmpeg.StandardInput.BaseStream.Close()
-
-                do! readTask
-                do! ffmpeg.WaitForExitAsync()
-
-                return buffer.ToArray()
-            }
-
-            segments <- {
-                original = segment
-                proxied = {
-                    segment with
-                        key = "NONE"
-                        mediaSequence = next
-                        path = $"chunk-0-0-{next}.ts"
-                }
-                data = decrypted_data
-            } :: segments
-        }
-
-    let private tryParseDateTime (segment: ChunklistParser.Segment) = Seq.tryHead (seq {
-        let prefix = "#EXT-X-PROGRAM-DATE-TIME:"
-        for headerTag in segment.segmentTags do
-            if headerTag.StartsWith(prefix) then
-                match headerTag.Substring(prefix.Length) |> DateTimeOffset.TryParse with
-                | true, dt -> yield dt
-                | false, _ -> ()
-    })
-
+    /// Checks the newest upstream chunklist, downloads any new segments, and builds a client-facing `chunklist.m3u8`.
     let getChunklistAsync index cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
         match currentChunklist with
         | None -> ()
         | Some chunklistUri ->
+            // Get the chunklist data.
+
             let! data = SiriusXMClient.getFileAsync chunklistUri cancellationToken
+
+            // Parse the file and remove any segments that are already cached,
+            // or that are known to be older than an already-cached segment.
 
             let chunks =
                 data.content
                 |> Encoding.UTF8.GetString
                 |> ChunklistParser.parse
+                |> Seq.where (not << SegmentCache.exists)
+                |> Seq.where (not << SegmentCache.isOld)
 
-            let relevantChunks = [
-                let lastDate =
-                    SegmentCache.segments
-                    |> Seq.map (fun s -> s.original)
-                    |> Seq.choose tryParseDateTime
-                    |> Seq.tryHead
+            // Only keep the last three segments from the resulting list.
+            let newChunks =
+                chunks
+                |> Seq.rev
+                |> Seq.truncate 3
+                |> Seq.rev
 
-                for chunk in chunks do
-                    match (lastDate, tryParseDateTime chunk) with
-                    | (Some last, Some this) when this <= last -> ()
-                    | _ -> yield chunk
-            ]
+            // Add any remaining segments to the cache.
 
-            for x in relevantChunks do
-                match SegmentCache.tryFindByOriginal x with
-                | Some _ -> ()
-                | None ->
-                    let uri = new Uri(chunklistUri, x.path)
-                    do! SegmentCache.addAsync x uri cancellationToken
+            for chunk in newChunks do
+                let uri = new Uri(chunklistUri, chunk.path)
+                do! SegmentCache.addAsync chunk uri cancellationToken
+
+            // Remove old segments from the cache as needed.
+
+            SegmentCache.evictStale ()
 
         let content = String.concat "\n" [
+            // Build the chunklist.
+
             ChunklistParser.write [
-                for x in SegmentCache.segments |> Seq.truncate 3 |> Seq.rev do
+                for x in SegmentCache.getRecent () |> Seq.truncate 3 |> Seq.rev do
                     yield x.proxied
             ]
+
+            // If there is no currently tuned channel, we don't expect any more segments, so end the stream here.
+            // In the future, this might be changed to either hang or append silent segments.
 
             if currentChunklist = None then
                 "#EXT-X-ENDLIST"
@@ -254,15 +183,21 @@ module TunerProxy =
         return content
     })
 
-    // Gets a single segment.
-    // TODO: this probably doesn't need to be behind the semaphore?
+    /// Builds a client-facing `playlist.m3u8`.
+    let getPlaylist () = String.concat "\n" [
+        "#EXTM3U"
+        "#EXT-X-ALLOW-CACHE:NO"
+        "#EXT-X-VERSION:1"
 
-    let getChunkAsync index sequenceNumber cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
-        let data =
-            SegmentCache.segments
-            |> Seq.where (fun s -> s.proxied.mediaSequence = sequenceNumber)
-            |> Seq.map (fun s -> s.data)
-            |> Seq.head
+        String.concat "" [
+            "#EXT-X-STREAM-INF:"
 
-        return data
-    })
+            match bandwidth with
+            | Some bps -> $"BANDWIDTH={bps},"
+            | None -> ()
+
+            "CODECS=\"mp4a.40.2\""
+        ]
+
+        "chunklist.m3u8"
+    ]

@@ -10,6 +10,9 @@ module ChunklistParser =
         /// Any miscellaneous tags that apply to the entire chunklist.
         headerTags: string list
 
+        /// The value of the EXT-X-PROGRAM-DATE-TIME tag for this segment.
+        dateTime: DateTimeOffset option
+
         /// The value of the EXT-X-MEDIA-SEQUENCE tag for this segment.
         mediaSequence: UInt128
 
@@ -38,6 +41,7 @@ module ChunklistParser =
         let mutable headerTags = []
         let mutable segmentTags = []
 
+        let mutable dateTime = None
         let mutable mediaSequence = zero
 
         for line in Utility.split '\n' text do
@@ -47,9 +51,10 @@ module ChunklistParser =
                 key <- value
             | Tag ("EXT-X-MEDIA-SEQUENCE", UInt128 value) ->
                 mediaSequence <- value
+            | Tag ("EXT-X-PROGRAM-DATE-TIME", DateTimeOffset value) ->
+                dateTime <- Some value
             | Tag ("EXTINF", _)
-            | Tag ("EXT-X-BYTERANGE", _)
-            | Tag ("EXT-X-PROGRAM-DATE-TIME", _) ->
+            | Tag ("EXT-X-BYTERANGE", _) ->
                 // These tags are associated with a specific segment.
                 segmentTags <- List.rev (line :: segmentTags)
             | Tag _ ->
@@ -60,11 +65,13 @@ module ChunklistParser =
                 {
                     key = key
                     headerTags = headerTags
+                    dateTime = dateTime
                     mediaSequence = mediaSequence
                     segmentTags = segmentTags
                     path = line
                 }
                 segmentTags <- []
+                dateTime <- None
                 mediaSequence <- mediaSequence + one
             | _ -> ()
     ]
@@ -86,6 +93,10 @@ module ChunklistParser =
             if segment.key <> lastKey then
                 yield $"EXT-X-KEY:{segment.key}"
                 lastKey <- segment.key
+
+            match segment.dateTime with
+            | None -> ()
+            | Some dateTime -> yield $"#EXT-X-PROGRAM-DATE-TIME:{dateTime:o}"
 
             yield! segment.segmentTags
 

@@ -11,8 +11,8 @@
     <Compile Include="Network.fs" />
     <Compile Include="Streaming\SiriusXMClient.fs" />
     <Compile Include="Streaming\ChunklistParser.fs" />
+    <Compile Include="streaming\SegmentCache.fs" />
     <Compile Include="streaming\TunerProxy.fs" />
-    <Compile Include="Streaming\MediaProxy.fs" />
     <Compile Include="Lyrion\LyrionCLI.fs" />
     <Compile Include="Lyrion\LyrionCLIService.fs" />
     <Compile Include="Lyrion\PlayerConnection.fs" />
