@@ -13,7 +13,6 @@ open System.Threading.Tasks
 
 /// Takes the audio streams from SiriusXMClient, decrypts segments, and exposes them to the user.
 module TunerProxy =
-    // This module has the concept of a "current channel".
     // Since SiriusXMClient emulates a single user agent, this application can only stream one channel at a time.
     // Therefore, we read individual media segments from whichever channel is current whenever the chunklist is updated,
     // and expose a single playlist and chunklist based on what we have cached.
@@ -148,14 +147,13 @@ module TunerProxy =
                 |> Seq.where (not << SegmentCache.exists)
                 |> Seq.where (not << SegmentCache.isOld)
 
-            // Only keep the last three segments from the resulting list.
+            // Only cache the last three segments from the resulting list.
+
             let newChunks =
                 chunks
                 |> Seq.rev
                 |> Seq.truncate 3
                 |> Seq.rev
-
-            // Add any remaining segments to the cache.
 
             for chunk in newChunks do
                 let uri = new Uri(chunklistUri, chunk.path)
@@ -167,10 +165,11 @@ module TunerProxy =
 
         let content = String.concat "\n" [
             // Build the chunklist.
+            // Only include the three most recent segments.
 
             ChunklistParser.write [
-                for x in SegmentCache.getRecent () |> Seq.truncate 3 |> Seq.rev do
-                    yield x.proxied
+                for cacheItem in SegmentCache.getRecent () |> Seq.truncate 3 |> Seq.rev do
+                    cacheItem.DownstreamSegment
             ]
 
             // If there is no currently tuned channel, we don't expect any more segments, so end the stream here.

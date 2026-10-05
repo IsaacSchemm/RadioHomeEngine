@@ -12,6 +12,7 @@ type PlaylistPosition =
 | Last
 
 type AtomicAction =
+| PlayCurrentChannel of PlaylistPosition
 | PlaySiriusXMChannel of int * PlaylistPosition
 | PlayPause
 | Replay
@@ -33,6 +34,15 @@ module AtomicActions =
 
     let performActionAsync player atomicAction = task {
         match atomicAction with
+        | PlayCurrentChannel position ->
+            let! address = Network.getAddressAsync ()
+            let url = $"http://{address}:{Config.port}/Proxy/playlist.m3u8"
+            let title = "SiriusXM"
+
+            match position with
+            | Now -> do! Playlist.playItemAsync player url title
+            | Last -> do! Playlist.addItemAsync player url title
+
         | PlaySiriusXMChannel (channelNumber, position) ->
             let! channels = SiriusXMClient.getChannelsAsync CancellationToken.None
             let name =
@@ -118,6 +128,21 @@ module AtomicActions =
 
     let performAlternateActionAsync player atomicAction = task {
         match atomicAction with
+        | PlayCurrentChannel _ ->
+            do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
+
+            let! playlist = TunerProxy.getCurrentChannelHistoryAsync CancellationToken.None
+            let song =
+                playlist
+                |> Seq.sortByDescending (fun cut -> cut.startTime)
+                |> Seq.tryHead
+
+            match song with
+            | None -> ()
+            | Some c ->
+                let artist = String.concat " / " c.artists
+                do! Players.setDisplayAsync player artist c.title (TimeSpan.FromSeconds(10.0))
+
         | PlaySiriusXMChannel (channelNumber, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
 

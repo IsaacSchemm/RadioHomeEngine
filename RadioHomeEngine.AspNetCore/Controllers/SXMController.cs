@@ -21,7 +21,8 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                         ChannelNumber = int.Parse(c.channelNumber),
                         Name = c.name
                     })
-                ]
+                ],
+                Players = PlayerConnections.GetAll()
             };
 
             return View(model);
@@ -39,6 +40,19 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         {
             await TunerProxy.clearCurrentChannelAsync(cancellationToken);
             return RedirectToAction(nameof(ViewChannel));
+        }
+
+        [HttpPost]
+        public async Task PlayOn(string macAddress, CancellationToken cancellationToken)
+        {
+            var playerConnection = PlayerConnections.GetAll()
+                .FirstOrDefault(player => player.MacAddress == macAddress);
+
+            if (playerConnection != null)
+                await AtomicActions.performActionAsync(
+                    playerConnection.Player,
+                    AtomicAction.NewPlayCurrentChannel(
+                        PlaylistPosition.Now));
         }
 
         public async Task<IActionResult> ChannelImage(int num, CancellationToken cancellationToken)

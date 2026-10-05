@@ -23,7 +23,7 @@
                 flex-direction: column;
             }
 
-            input[type=number], button {
+            .pad {
                 line-height: 2em;
                 margin: 0.5em;
                 padding-left: 1em;
@@ -32,29 +32,46 @@
     </style>
 </head>
 <body>
-    <section aria-label="Tuner" style="flex: 0 0 auto; display: flex; flex-direction: row">
-        <div style="flex: 0 0 auto">
-            <form asp-action="SetChannel" target="currentChannelFrame">
-                <input type="number"
-                       min="1"
-                       max="@Model.Channels.Select(c => c.ChannelNumber).DefaultIfEmpty(1).Max()"
-                       name="channelNumber"
-                       value="@Model.ChannelNumber" />
+    <section aria-label="Tuner" style="flex: 0 0 auto; text-align: start">
+        <form asp-action="SetChannel" style="display: inline" target="currentChannelFrame">
+            <input type="number"
+                    min="1"
+                    max="@Model.Channels.Select(c => c.ChannelNumber).DefaultIfEmpty(1).Max()"
+                    name="channelNumber"
+                    value="@Model.ChannelNumber"
+                    class="pad" />
 
-                <button type="submit">Tune</button>
-            </form>
-        </div>
+            <button type="submit" class="pad">Tune</button>
+        </form>
 
-        <div style="flex: 1 1 auto"></div>
-
-        <div style="flex: 0 0 auto">
-            <form asp-action="ClearChannel" target="currentChannelFrame">
-                <button type="submit">Untune</button>
-            </form>
-        </div>
+        <form asp-action="ClearChannel" style="display: inline" target="currentChannelFrame">
+            <button type="submit" class="pad">Untune</button>
+        </form>
     </section>
 
-    <iframe name="audioFrame" src="/SXM/Player" style="border: 0; flex: 0 0 auto" height="80"></iframe>
+    <section aria-label="Devices" style="flex: 0 0 auto">
+        <div>
+            Play on:
+        </div>
+
+        <form asp-action="Player" style="display: inline" target="_blank">
+            <button type="submit" class="pad">
+                This device
+            </button>
+        </form>
+
+        @foreach (var playerConnection in Model.Players)
+        {
+            <form asp-action="PlayOn" style="display: inline">
+                <input type="hidden" name="macAddress" value="@playerConnection.MacAddress" />
+                <button type="submit">
+                    @playerConnection.Name
+                </button>
+            </form>
+        }
+    </section>
+
+    @* <iframe name="audioFrame" src="/SXM/Player" style="border: 0; flex: 0 0 auto" height="80"></iframe> *@
 
     <iframe aria-label="Channel Information"
             name="currentChannelFrame"
