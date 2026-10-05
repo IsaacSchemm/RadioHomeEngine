@@ -14,6 +14,7 @@ type PlaylistPosition =
 type AtomicAction =
 | PlayCurrentChannel of PlaylistPosition
 | PlaySiriusXMChannel of int * PlaylistPosition
+| PlayBrownNoise
 | PlayPause
 | Replay
 | PlayCD of DiscDriveScope * PlaylistPosition
@@ -60,6 +61,10 @@ module AtomicActions =
                 match position with
                 | Now -> do! Playlist.playItemAsync player url title
                 | Last -> do! Playlist.addItemAsync player url title
+
+        | PlayBrownNoise ->
+            let! address = Network.getAddressAsync ()
+            do! Playlist.playItemAsync player $"http://{address}:{Config.port}/Noise/playlist.m3u8" "Noise"
 
         | PlayPause ->
             let! state = Playlist.getModeAsync player

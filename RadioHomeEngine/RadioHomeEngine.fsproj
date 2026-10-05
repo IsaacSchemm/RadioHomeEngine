@@ -10,6 +10,7 @@
     <Compile Include="ActivePatterns.fs" />
     <Compile Include="Network.fs" />
     <Compile Include="Streaming\SiriusXMClient.fs" />
+    <Compile Include="streaming\Noise.fs" />
     <Compile Include="Streaming\ChunklistParser.fs" />
     <Compile Include="streaming\SegmentCache.fs" />
     <Compile Include="streaming\TunerProxy.fs" />
