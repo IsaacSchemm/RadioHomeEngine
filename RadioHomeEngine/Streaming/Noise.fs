@@ -8,6 +8,8 @@ module Noise =
     let bitsPerSecond = 65536
     let color = "brown"
 
+    let mutable segments = []
+
     let getPlaylist () = String.concat "\n" [
         $"#EXTM3U"
         $"#EXT-X-ALLOW-CACHE:NO"
@@ -17,24 +19,33 @@ module Noise =
         $""
     ]
 
-    let segmentLengthSeconds = 60L
+    let segmentLengthSeconds = 10L
 
     let getChunklist () = String.concat "\n" [
-        let sequenceNumber = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / segmentLengthSeconds
+        let sequenceNumber = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 10L
+        let dateTime = DateTimeOffset.FromUnixTimeSeconds(sequenceNumber * 10L)
+
+        let newSegment = {| sequenceNumber = sequenceNumber; dateTime = dateTime |}
+
+        if not (segments |> List.contains newSegment) then
+            segments <- newSegment :: List.truncate 2 segments
 
         $"#EXTM3U"
         $"#EXT-X-TARGETDURATION:{segmentLengthSeconds}"
         $"#EXT-X-VERSION:1"
         $"#EXT-X-ALLOW-CACHE:NO"
-        $"#EXT-X-MEDIA-SEQUENCE:{sequenceNumber}"
-        for i in [0L .. 2L] do
+        $"#EXT-X-MEDIA-SEQUENCE:{(List.last segments).sequenceNumber}"
+
+        for segment in Seq.rev segments do
+            $"#EXT-X-PROGRAM-DATE-TIME:{segment.dateTime:o}"
             $"#EXTINF:{segmentLengthSeconds},"
-            $"chunk-{sequenceNumber + i}.ts"
+            $"chunk-{segment.sequenceNumber}.ts"
+
         ""
     ]
 
     let inputParameters = $"-f lavfi -i \"anoisesrc=sample_rate=44100:color={color}\""
-    let outputParameters = $"-f mpegts -c:a aac -ac 1 -b:a {bitsPerSecond} -"
+    let outputParameters = $"-f mpegts -c:a aac -ac 2 -b:a {bitsPerSecond} -"
 
     let segmentLengthBytes = lazy task {
         let psi = new ProcessStartInfo(

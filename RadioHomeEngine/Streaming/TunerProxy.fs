@@ -130,38 +130,48 @@ module TunerProxy =
 
     /// Checks the newest upstream chunklist, downloads any new segments, and builds a client-facing `chunklist.m3u8`.
     let getChunklistAsync index cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
-        match currentChunklist with
-        | None -> ()
-        | Some chunklistUri ->
-            // Get the chunklist data.
+        // Get the chunklist data.
+        // If there is no currently tuned channel, proxy this application's own noise generator stream (see Noise.fs).
 
-            let! data = SiriusXMClient.getFileAsync chunklistUri cancellationToken
+        let! chunklist = task {
+            match currentChunklist with
+            | Some chunklistUri ->
+                let! result = SiriusXMClient.getFileAsync chunklistUri cancellationToken
+                return {|
+                    uri = chunklistUri
+                    data = Encoding.UTF8.GetString(result.content)
+                |}
+            | None ->
+                return {|
+                    uri = new Uri($"http://localhost:{Config.port}/Noise/chunklist.m3u8")
+                    data = Noise.getChunklist ()
+                |}
+        }
 
-            // Parse the file and remove any segments that are already cached,
-            // or that are known to be older than an already-cached segment.
+        // Parse the file and remove any segments that are already cached,
+        // or that are known to be older than an already-cached segment.
 
-            let chunks =
-                data.content
-                |> Encoding.UTF8.GetString
-                |> ChunklistParser.parse
-                |> Seq.where (not << SegmentCache.exists)
-                |> Seq.where (not << SegmentCache.isOld)
+        let chunks =
+            chunklist.data
+            |> ChunklistParser.parse
+            |> Seq.where (not << SegmentCache.exists)
+            |> Seq.where (not << SegmentCache.isOld)
 
-            // Only cache the last three segments from the resulting list.
+        // Only cache the last three segments from the resulting list.
 
-            let newChunks =
-                chunks
-                |> Seq.rev
-                |> Seq.truncate 3
-                |> Seq.rev
+        let newChunks =
+            chunks
+            |> Seq.rev
+            |> Seq.truncate 3
+            |> Seq.rev
 
-            for chunk in newChunks do
-                let uri = new Uri(chunklistUri, chunk.path)
-                do! SegmentCache.addAsync chunk uri cancellationToken
+        for chunk in newChunks do
+            let uri = new Uri(chunklist.uri, chunk.path)
+            do! SegmentCache.addAsync chunk uri cancellationToken
 
-            // Remove old segments from the cache as needed.
+        // Remove old segments from the cache as needed.
 
-            SegmentCache.evictStale ()
+        SegmentCache.evictStale ()
 
         let content = String.concat "\n" [
             // Build the chunklist.
@@ -174,9 +184,6 @@ module TunerProxy =
 
             // If there is no currently tuned channel, we don't expect any more segments, so end the stream here.
             // In the future, this might be changed to either hang or append silent segments.
-
-            if currentChunklist = None then
-                "#EXT-X-ENDLIST"
         ]
 
         return content

@@ -426,35 +426,39 @@ module SiriusXMClient =
                 if not authenticated then
                     raise LoginFailedException
 
-            let token =
-                let split (char: char) (string: string) =
-                    let index = string.IndexOf(char)
-                    string.Substring(0, index), string.Substring(index + 1)
-
-                getCookie "SXMAKTOKEN"
-                |> Option.get
-                |> split '='
-                |> snd
-                |> split ','
-                |> fst
-
-            let sxmData =
-                getCookie "SXMDATA"
-                |> Option.get
-                |> Uri.UnescapeDataString
-                |> Utility.deserializeAs {|
-                    gupId = ""
-                |}
-
-            let parameters = [
-                "token", token
-                "consumer", "k2"
-                "gupId", sxmData.gupId
-            ]
-
             let queryString = String.concat "&" [
-                for key, value in parameters do
-                    $"{Uri.EscapeDataString(key)}={Uri.EscapeDataString(value)}"
+                match (getCookie "SXMAKTOKEN", getCookie "SXMDATA") with
+                | Some sxmaktoken, Some sxmdata ->
+                    let token =
+                        let split (char: char) (string: string) =
+                            let index = string.IndexOf(char)
+                            string.Substring(0, index), string.Substring(index + 1)
+
+                        getCookie "SXMAKTOKEN"
+                        |> Option.get
+                        |> split '='
+                        |> snd
+                        |> split ','
+                        |> fst
+
+                    let sxmData =
+                        getCookie "SXMDATA"
+                        |> Option.get
+                        |> Uri.UnescapeDataString
+                        |> Utility.deserializeAs {|
+                            gupId = ""
+                        |}
+
+                    let parameters = [
+                        "token", token
+                        "consumer", "k2"
+                        "gupId", sxmData.gupId
+                    ]
+
+                    for key, value in parameters do
+                        $"{Uri.EscapeDataString(key)}={Uri.EscapeDataString(value)}"
+
+                | _ -> ()
             ]
 
             use! finalResponse = client.GetAsync(
