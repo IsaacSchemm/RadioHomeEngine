@@ -9,11 +9,11 @@
     <Compile Include="Utility.fs" />
     <Compile Include="ActivePatterns.fs" />
     <Compile Include="Network.fs" />
-    <Compile Include="streaming\Noise.fs" />
-    <Compile Include="Streaming\SiriusXMClient.fs" />
-    <Compile Include="Streaming\ChunklistParser.fs" />
-    <Compile Include="streaming\SegmentCache.fs" />
-    <Compile Include="streaming\TunerProxy.fs" />
+    <Compile Include="Continuous Streaming\Noise.fs" />
+    <Compile Include="Tuner\SiriusXMClient.fs" />
+    <Compile Include="Tuner\ChunklistParser.fs" />
+    <Compile Include="Tuner\SegmentCache.fs" />
+    <Compile Include="Tuner\TunerProxy.fs" />
     <Compile Include="Lyrion\LyrionCLI.fs" />
     <Compile Include="Lyrion\LyrionCLIService.fs" />
     <Compile Include="Lyrion\PlayerConnection.fs" />

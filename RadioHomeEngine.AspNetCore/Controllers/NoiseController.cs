@@ -5,36 +5,30 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 {
     public class NoiseController : Controller
     {
-        [Route("Noise")]
-        public IActionResult Index()
+        [Route("Noise/{filename}")]
+        public async Task<IActionResult> Chunklist(string filename)
         {
-            return View();
-        }
+            if (filename == "playlist.m3u8")
+                return Content(
+                    Noise.getPlaylist(),
+                    "application/x-mpegURL",
+                    Encoding.UTF8);
 
-        [Route("Noise/playlist.m3u8")]
-        public IActionResult Playlist()
-        {
-            return Content(
-                Noise.getPlaylist(),
-                "application/x-mpegURL",
-                Encoding.UTF8);
-        }
+            Noise.init();
 
-        [Route("Noise/chunklist.m3u8")]
-        public IActionResult Chunklist()
-        {
-            return Content(
-                Noise.getChunklist(),
-                "application/x-mpegURL",
-                Encoding.UTF8);
-        }
+            var localPath = Path.Combine(Noise.path, filename);
+            while (!System.IO.File.Exists(localPath))
+            {
+                await Task.Delay(1000);
+            }
 
-        [Route("Noise/chunk-{_}.ts")]
-        public async Task<IActionResult> Chunk(long _, CancellationToken cancellationToken)
-        {
             return File(
-                await Noise.getChunkAsync(cancellationToken),
-                "video/mp2t");
+                System.IO.File.ReadAllBytes(localPath),
+                Path.GetExtension(localPath) switch {
+                    ".m3u8" => "application/x-mpegURL",
+                    ".ts" => "video/mp2t",
+                    _ => throw new Exception("Unrecognized file extension")
+                });
         }
     }
 }
