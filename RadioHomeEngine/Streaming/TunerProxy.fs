@@ -62,6 +62,9 @@ module TunerProxy =
         return buffer.ToArray()
     }
 
+    /// The fallback chunklist URI to use when no channel is tuned.
+    let private fallbackChunklist = new Uri($"http://localhost:{Config.port}/Noise/chunklist.m3u8")
+
     /// Returns the currently tuned channel number, if any.
     let getCurrentChannel() = Option.toNullable currentChannel
 
@@ -131,28 +134,19 @@ module TunerProxy =
     /// Checks the newest upstream chunklist, downloads any new segments, and builds a client-facing `chunklist.m3u8`.
     let getChunklistAsync index cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
         // Get the chunklist data.
-        // If there is no currently tuned channel, proxy this application's own noise generator stream (see Noise.fs).
 
-        let! chunklist = task {
-            match currentChunklist with
-            | Some chunklistUri ->
-                let! result = SiriusXMClient.getFileAsync chunklistUri cancellationToken
-                return {|
-                    uri = chunklistUri
-                    data = Encoding.UTF8.GetString(result.content)
-                |}
-            | None ->
-                return {|
-                    uri = new Uri($"http://localhost:{Config.port}/Noise/chunklist.m3u8")
-                    data = Noise.getChunklist ()
-                |}
-        }
+        let chunklistUri =
+            currentChunklist
+            |> Option.defaultValue fallbackChunklist
+
+        let! chunklist = SiriusXMClient.getFileAsync chunklistUri cancellationToken
 
         // Parse the file and remove any segments that are already cached,
         // or that are known to be older than an already-cached segment.
 
         let chunks =
-            chunklist.data
+            chunklist.content
+            |> Encoding.UTF8.GetString
             |> ChunklistParser.parse
             |> Seq.where (not << SegmentCache.exists)
             |> Seq.where (not << SegmentCache.isOld)
@@ -166,7 +160,7 @@ module TunerProxy =
             |> Seq.rev
 
         for chunk in newChunks do
-            let uri = new Uri(chunklist.uri, chunk.path)
+            let uri = new Uri(chunklistUri, chunk.path)
             do! SegmentCache.addAsync chunk uri cancellationToken
 
         // Remove old segments from the cache as needed.

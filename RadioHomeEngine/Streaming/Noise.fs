@@ -5,10 +5,7 @@ open System.Diagnostics
 open System.IO
 
 module Noise =
-    let bitsPerSecond = 65536
-    let color = "brown"
-
-    let mutable segments = []
+    let private bitsPerSecond = 65536
 
     let getPlaylist () = String.concat "\n" [
         $"#EXTM3U"
@@ -19,7 +16,9 @@ module Noise =
         $""
     ]
 
-    let segmentLengthSeconds = 10L
+    let private segmentLengthSeconds = 10L
+
+    let mutable private segments = []
 
     let getChunklist () = String.concat "\n" [
         let sequenceNumber = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 10L
@@ -44,10 +43,12 @@ module Noise =
         ""
     ]
 
-    let inputParameters = $"-f lavfi -i \"anoisesrc=sample_rate=44100:color={color}\""
-    let outputParameters = $"-f mpegts -c:a aac -ac 2 -b:a {bitsPerSecond} -"
+    let private color = "brown"
 
-    let segmentLengthBytes = lazy task {
+    let private inputParameters = $"-f lavfi -i \"anoisesrc=sample_rate=44100:color={color}\""
+    let private outputParameters = $"-f mpegts -c:a aac -ac 2 -b:a {bitsPerSecond} -"
+
+    let private estimatedSegmentSize = lazy task {
         let psi = new ProcessStartInfo(
             $"ffmpeg",
             $"{inputParameters} -t {segmentLengthSeconds} {outputParameters}",
@@ -59,16 +60,13 @@ module Noise =
         return int ms.Length
     }
 
-    let generatorProcess = lazy (
-        let psi = new ProcessStartInfo(
-            $"ffmpeg",
-            $"{inputParameters} {outputParameters}",
-            RedirectStandardOutput = true)
-        Process.Start(psi)
-    )
+    let private generatorProcess = lazy Process.Start(new ProcessStartInfo(
+        $"ffmpeg",
+        $"{inputParameters} {outputParameters}",
+        RedirectStandardOutput = true))
 
     let getChunkAsync cancellationToken = task {
-        let! length = segmentLengthBytes.Value
+        let! length = estimatedSegmentSize.Value
         let data = Array.create length 0uy
         do! generatorProcess.Value.StandardOutput.BaseStream.ReadExactlyAsync(data, cancellationToken)
         return data

@@ -427,8 +427,9 @@ module SiriusXMClient =
                     raise LoginFailedException
 
             let queryString = String.concat "&" [
-                match (getCookie "SXMAKTOKEN", getCookie "SXMDATA") with
-                | Some sxmaktoken, Some sxmdata ->
+                match getCookie "SXMAKTOKEN" with
+                | None -> ()
+                | Some sxmaktoken ->
                     let token =
                         let split (char: char) (string: string) =
                             let index = string.IndexOf(char)
@@ -441,6 +442,11 @@ module SiriusXMClient =
                         |> split ','
                         |> fst
 
+                    $"token={Uri.EscapeDataString(token)}"
+
+                match getCookie "SXMDATA" with
+                | None -> ()
+                | Some sxmdata ->
                     let sxmData =
                         getCookie "SXMDATA"
                         |> Option.get
@@ -449,23 +455,16 @@ module SiriusXMClient =
                             gupId = ""
                         |}
 
-                    let parameters = [
-                        "token", token
-                        "consumer", "k2"
-                        "gupId", sxmData.gupId
-                    ]
+                    $"gupId={Uri.EscapeDataString(sxmData.gupId)}"
 
-                    for key, value in parameters do
-                        $"{Uri.EscapeDataString(key)}={Uri.EscapeDataString(value)}"
-
-                | _ -> ()
+                "consumer=k2"
             ]
 
-            use! finalResponse = client.GetAsync(
+            use! response = client.GetAsync(
                 $"{uri.GetLeftPart(UriPartial.Path)}?{queryString}",
                 cancellationToken)
 
-            use! stream = finalResponse.EnsureSuccessStatusCode().Content.ReadAsStreamAsync(cancellationToken)
+            use! stream = response.EnsureSuccessStatusCode().Content.ReadAsStreamAsync(cancellationToken)
 
             use ms = new MemoryStream()
             do! stream.CopyToAsync(ms)
@@ -473,7 +472,7 @@ module SiriusXMClient =
 
             return {|
                 content = data
-                contentType = finalResponse.Content.Headers.ContentType.MediaType
+                contentType = response.Content.Headers.ContentType.MediaType
             |}
         }
 
