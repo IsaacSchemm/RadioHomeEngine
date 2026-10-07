@@ -6,7 +6,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient();
 
-builder.Services.AddHostedService<LyrionCLIService>();
+builder.Services.AddHostedService<NoiseGenerationService>();
+//builder.Services.AddHostedService<LyrionCLIService>();
 builder.Services.AddHostedService<WeatherService>();
 builder.Services.AddHostedService<LyrionPlayerDetectionService>();
 builder.Services.AddHostedService<DiscDriveChangeDetectionService>();
