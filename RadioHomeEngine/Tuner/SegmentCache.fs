@@ -22,22 +22,15 @@ module SegmentCache =
     type CacheItem = {
         cachedAt: DateTimeOffset
         data: byte array
-        downstreamSequenceNumber: UInt128
-        upstreamSegment: Segment
-    } with
-        member this.DownstreamSegment = {
-            this.upstreamSegment with
-                key = "NONE"
-                mediaSequence = this.downstreamSequenceNumber
-                path = $"/Proxy/chunk-{this.downstreamSequenceNumber}.ts"
-        }
+        segment: Segment
+    }
 
     type Encryption = Key1 | NoEncryption
 
     exception UnknownEncryptionException
 
-    /// All currently cached segments, in order from newest to oldest.
-    let mutable private segments = []
+    /// All currently cached segments and their data, in order from newest to oldest.
+    let mutable private cache = []
 
     /// The sequence number that will be used for the next segment.
     let mutable private nextSequenceNumber = UInt128.One
@@ -111,9 +104,9 @@ module SegmentCache =
     }
 
     // Stores a decrypted audio segment to the cache, along with the original metadata and its new sequence number.
-    let private add segment =
-        segments <- segment :: segments
-        nextSequenceNumber <- segment.downstreamSequenceNumber + UInt128.One
+    let private add cacheItem =
+        cache <- cacheItem :: cache
+        nextSequenceNumber <- cacheItem.segment.mediaSequence + UInt128.One
 
     /// Downloads and caches a segment, storing it as the new most recent segment in the cache.
     let addAsync (segment: Segment) uri cancellationToken = task {
@@ -125,39 +118,40 @@ module SegmentCache =
         add {
             cachedAt = DateTimeOffset.UtcNow
             data = segmentData
-            downstreamSequenceNumber = nextSequenceNumber
-            upstreamSegment = segment
+            segment = {
+                segment with
+                    key = "NONE"
+                    mediaSequence = nextSequenceNumber
+                    path = $"/Proxy/chunk-{nextSequenceNumber}.ts"
+            }
         }
     }
 
     /// Remove all but the ten most recent segments from the cache.
     let evictStale () =
-        segments <- segments |> List.truncate 10
-
-    /// Check whether an upstream segment exists in decrypted form in the cache.
-    let exists originalSegment =
-        segments
-        |> Seq.exists (fun s -> s.upstreamSegment = originalSegment)
-
-    /// Returns data for the most recent segments in the cache.
-    let getRecent () =
-        segments
-        |> Seq.truncate 5
+        cache <- cache |> List.truncate 10
 
     /// Determines whether an upstream segment is older than a cached segment (possibly from a different SiriusXM channel) and should be skipped.
     let isOld (segment: Segment) =
         let newestKnown =
-            segments
-            |> Seq.choose (fun s -> s.upstreamSegment.dateTime)
+            cache
+            |> Seq.choose (fun s -> s.segment.dateTime)
             |> Seq.tryHead
 
         match (newestKnown, segment.dateTime) with
         | (Some last, Some this) -> this <= last
         | _ -> false
 
+    /// List the most recent segments available to the user agent, in order from oldest to newest.
+    let list (count: int) =
+        cache
+        |> Seq.map (fun s -> s.segment)
+        |> Seq.truncate 3
+        |> Seq.rev
+
     /// Gets a segment's unencrypted audio data from the cache, if it exists, using its new sequence number.
     let tryGetData sequenceNumber =
-        segments
-        |> Seq.where (fun s -> s.downstreamSequenceNumber = sequenceNumber)
+        cache
+        |> Seq.where (fun s -> s.segment.mediaSequence = sequenceNumber)
         |> Seq.map (fun s -> s.data)
         |> Seq.tryHead

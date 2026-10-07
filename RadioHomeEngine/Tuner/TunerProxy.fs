@@ -148,7 +148,6 @@ module TunerProxy =
             chunklist.content
             |> Encoding.UTF8.GetString
             |> ChunklistParser.parse
-            |> Seq.where (not << SegmentCache.exists)
             |> Seq.where (not << SegmentCache.isOld)
 
         // Only cache the last three segments from the resulting list.
@@ -167,20 +166,8 @@ module TunerProxy =
 
         SegmentCache.evictStale ()
 
-        let content = String.concat "\n" [
-            // Build the chunklist.
-            // Only include the three most recent segments.
-
-            ChunklistParser.write [
-                for cacheItem in SegmentCache.getRecent () |> Seq.truncate 3 |> Seq.rev do
-                    cacheItem.DownstreamSegment
-            ]
-
-            // If there is no currently tuned channel, we don't expect any more segments, so end the stream here.
-            // In the future, this might be changed to either hang or append silent segments.
-        ]
-
-        return content
+        // Build the chunklist.
+        return ChunklistParser.write (SegmentCache.list 3)
     })
 
     /// Builds a client-facing `playlist.m3u8`.

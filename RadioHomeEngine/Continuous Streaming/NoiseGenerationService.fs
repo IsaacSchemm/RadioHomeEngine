@@ -93,7 +93,7 @@ type NoiseGenerationService() =
 
         use encoder = Process.Start(new ProcessStartInfo(
             $"ffmpeg",
-            $"-f f32le -i - {NoiseGenerationService.readSpeedParameters} {NoiseGenerationService.outputParameters}",
+            $"{NoiseGenerationService.readSpeedParameters} -f f32le -i - {NoiseGenerationService.outputParameters}",
             RedirectStandardInput = true,
             RedirectStandardOutput = true))
 
