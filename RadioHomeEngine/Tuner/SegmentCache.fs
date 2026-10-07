@@ -133,14 +133,9 @@ module SegmentCache =
 
     /// Determines whether an upstream segment is older than a cached segment (possibly from a different SiriusXM channel) and should be skipped.
     let isOld (segment: Segment) =
-        let newestKnown =
-            cache
-            |> Seq.choose (fun s -> s.segment.dateTime)
-            |> Seq.tryHead
-
-        match (newestKnown, segment.dateTime) with
-        | (Some last, Some this) -> this <= last
-        | _ -> false
+        match cache with
+        | [] -> false
+        | newest :: _ -> segment.dateTime <= newest.segment.dateTime
 
     /// List the most recent segments available to the user agent, in order from oldest to newest.
     let list (count: int) =

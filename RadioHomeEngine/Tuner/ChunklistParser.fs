@@ -11,7 +11,7 @@ module ChunklistParser =
         headerTags: string list
 
         /// The value of the EXT-X-PROGRAM-DATE-TIME tag for this segment.
-        dateTime: DateTimeOffset option
+        dateTime: DateTimeOffset
 
         /// The value of the EXT-X-MEDIA-SEQUENCE tag for this segment.
         mediaSequence: UInt128
@@ -49,27 +49,35 @@ module ChunklistParser =
             | Tag ("EXT-X-KEY", value) ->
                 // This tag usually applies to the whole chunklist, but theoretically, it can be changed between chunks.
                 key <- value
+
             | Tag ("EXT-X-MEDIA-SEQUENCE", UInt128 value) ->
                 mediaSequence <- value
+
             | Tag ("EXT-X-PROGRAM-DATE-TIME", DateTimeOffset value) ->
                 dateTime <- Some value
+
             | Tag ("EXTINF", _)
             | Tag ("EXT-X-BYTERANGE", _) ->
                 // These tags are associated with a specific segment.
                 segmentTags <- List.rev (line :: segmentTags)
+
             | Tag _ ->
                 // All other tags are associated with the entire chunklist.
                 headerTags <- List.rev (line :: headerTags)
+
             | _ when not (line.StartsWith('#')) ->
                 // This line is not a tag, so it represents an actual chunk.
-                {
+                match dateTime with
+                | None -> ()
+                | Some dt -> {
                     key = key
                     headerTags = headerTags
-                    dateTime = dateTime
+                    dateTime = dt
                     mediaSequence = mediaSequence
                     segmentTags = segmentTags
                     path = line
                 }
+
                 segmentTags <- []
                 dateTime <- None
                 mediaSequence <- mediaSequence + one
@@ -94,9 +102,7 @@ module ChunklistParser =
                 yield $"EXT-X-KEY:{segment.key}"
                 lastKey <- segment.key
 
-            match segment.dateTime with
-            | None -> ()
-            | Some dateTime -> yield $"#EXT-X-PROGRAM-DATE-TIME:{dateTime:o}"
+            yield $"#EXT-X-PROGRAM-DATE-TIME:{segment.dateTime:o}"
 
             yield! segment.segmentTags
 
