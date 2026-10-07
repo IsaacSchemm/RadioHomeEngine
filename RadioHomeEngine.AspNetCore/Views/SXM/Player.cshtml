@@ -11,6 +11,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
     <title>Radio Home Engine - SiriusXM</title>
     @await Html.PartialAsync("_Styles")
+    <style type="text/css">
+        audio {
+            width: min(640px, calc(100vw - 80px));
+        }
+    </style>
 </head>
 <body>
     <audio controls src="/Proxy/playlist.m3u8">
