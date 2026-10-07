@@ -20,7 +20,6 @@ module SegmentCache =
     type Segment = ChunklistParser.Segment
 
     type CacheItem = {
-        cachedAt: DateTimeOffset
         data: byte array
         segment: Segment
     }
@@ -116,7 +115,6 @@ module SegmentCache =
         let! segmentData = recontainerizeAsync decryptedData cancellationToken
 
         add {
-            cachedAt = DateTimeOffset.UtcNow
             data = segmentData
             segment = {
                 segment with
