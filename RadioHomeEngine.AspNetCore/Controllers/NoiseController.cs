@@ -8,7 +8,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         public async Task<IActionResult> GetFile(string filename)
         {
             var contents = NoiseGenerationServiceModule
-                .GetFiles([filename])
+                .getFiles([filename])
                 .SingleOrDefault();
 
             return contents == null
