@@ -131,11 +131,11 @@ module SegmentCache =
     let evictStale () =
         cache <- cache |> List.truncate 10
 
-    /// Determines whether an upstream segment is older than a cached segment (possibly from a different SiriusXM channel) and should be skipped.
-    let isOld (segment: Segment) =
-        match cache with
-        | [] -> false
-        | newest :: _ -> segment.dateTime <= newest.segment.dateTime
+    let getNewestTimestamp () =
+        cache
+        |> Seq.map (fun s -> s.segment.dateTime)
+        |> Seq.append [DateTimeOffset.MinValue]
+        |> Seq.max
 
     /// List the most recent segments available to the user agent, in order from oldest to newest.
     let list (count: int) =

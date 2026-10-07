@@ -141,24 +141,25 @@ module TunerProxy =
 
         let! chunklist = SiriusXMClient.getFileAsync chunklistUri cancellationToken
 
-        // Parse the file and remove any segments that are already cached,
-        // or that are known to be older than an already-cached segment.
+        // Parse the file and look for segments that have a timestamp at least 5 seconds newer than the newest cached segment.
+        // Ten seconds is the expected segment length, so this should keep the buffer from growing or shrinking too much when the channel is changed.
+        // Never take more than the three most recent segments, though.
+
+        let newestSegmentTimestamp =
+            SegmentCache.getNewestTimestamp ()
+
+        let threshold = newestSegmentTimestamp + TimeSpan.FromSeconds(5L)
 
         let chunks =
             chunklist.content
             |> Encoding.UTF8.GetString
             |> ChunklistParser.parse
-            |> Seq.where (not << SegmentCache.isOld)
-
-        // Only cache the last three segments from the resulting list.
-
-        let newChunks =
-            chunks
             |> Seq.rev
             |> Seq.truncate 3
+            |> Seq.takeWhile (fun s -> s.dateTime > threshold)
             |> Seq.rev
 
-        for chunk in newChunks do
+        for chunk in chunks do
             let uri = new Uri(chunklistUri, chunk.path)
             do! SegmentCache.addAsync chunk uri cancellationToken
 
@@ -167,6 +168,7 @@ module TunerProxy =
         SegmentCache.evictStale ()
 
         // Build the chunklist.
+
         return ChunklistParser.write (SegmentCache.list 3)
     })
 
