@@ -35,11 +35,33 @@
     <section aria-label="Tuner" style="flex: 0 0 auto; text-align: start">
         <form asp-action="SetChannel" style="display: inline" target="currentChannelFrame">
             <input type="number"
-                    min="1"
-                    max="@Model.Channels.Select(c => c.ChannelNumber).DefaultIfEmpty(1).Max()"
-                    name="channelNumber"
-                    value="@Model.ChannelNumber"
-                    class="pad" />
+                   min="1"
+                   max="@Model.Channels.Select(c => c.ChannelNumber).DefaultIfEmpty(1).Max()"
+                   name="channelNumber"
+                   value="@Model.ChannelNumber"
+                   class="pad" />
+
+            <button type="submit" class="pad">Tune</button>
+        </form>
+
+        <form asp-action="SetChannel" style="display: inline" target="currentChannelFrame">
+            <select name="channelNumber">
+                @foreach (var channel in Model.Channels)
+                {
+                    if (channel.ChannelNumber == Model.ChannelNumber)
+                    {
+                        <option value="@channel.ChannelNumber" selected>
+                            @channel.ChannelNumber | @channel.Name
+                        </option>
+                    }
+                    else
+                    {
+                        <option value="@channel.ChannelNumber">
+                            @channel.ChannelNumber | @channel.Name
+                        </option>
+                    }
+                }
+            </select>
 
             <button type="submit" class="pad">Tune</button>
         </form>
