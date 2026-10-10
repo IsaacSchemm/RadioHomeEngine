@@ -39,9 +39,14 @@ module NoiseGenerationService =
         "-readrate 1"
     ]
 
-    let mutable enabled = true
+    let mutable lastAccess = DateTimeOffset.UtcNow
+
+    let isActive () =
+        DateTimeOffset.UtcNow - lastAccess < TimeSpan.FromMinutes(1L)
 
     let getFiles (filenames: string seq) = [
+        lastAccess <- DateTimeOffset.UtcNow
+
         let utf8 str = Encoding.UTF8.GetBytes(String.concat "\n" str)
 
         for filename in filenames do
@@ -58,7 +63,7 @@ module NoiseGenerationService =
                 ]
                 contentType = "application/x-mpegURL"
             |}
-            else if filename = chunklistFile then  {|
+            else if filename = chunklistFile then {|
                 data =
                     if File.Exists(path)
                     then File.ReadAllBytes(path)
@@ -107,12 +112,13 @@ type NoiseGenerationService() =
 
             while not generator.HasExited && not encoder.HasExited && not cancellationToken.IsCancellationRequested do
                 try
-                    if NoiseGenerationService.enabled then
+                    if NoiseGenerationService.isActive () then
                         do! pipeIn.ReadExactlyAsync(buffer, cancellationToken)
                         do! pipeOut.WriteAsync(buffer, cancellationToken)
                     else
                         do! Task.Delay(TimeSpan.FromSeconds(5L), cancellationToken)
-                with _ when generator.HasExited || encoder.HasExited -> ()
+                with ex ->
+                    Console.Error.WriteLine(ex)
         }
 
         if not generator.HasExited then

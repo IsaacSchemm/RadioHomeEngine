@@ -160,8 +160,6 @@ module TunerProxy =
 
             dateTime + TimeSpan.FromSeconds(float duration / 2.0)
 
-        printfn "THRESHOLD: %A" threshold
-
         let chunks =
             chunklist.content
             |> Encoding.UTF8.GetString
@@ -175,7 +173,6 @@ module TunerProxy =
             |> Seq.rev
 
         for chunk in chunks do
-            printfn "ADDING   : %A" chunk.dateTime
             let uri = new Uri(chunklistUri, chunk.path)
             do! SegmentCache.addAsync chunk uri cancellationToken
 

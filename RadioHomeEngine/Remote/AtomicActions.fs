@@ -12,9 +12,9 @@ type PlaylistPosition =
 | Last
 
 type AtomicAction =
-| PlayCurrentChannel of PlaylistPosition
-| ViewCurrentChannel
 | ChangeChannel of int
+| ViewCurrentChannel
+| PlayCurrentChannel
 | PlayBrownNoise
 | PlayPause
 | Replay
@@ -36,14 +36,13 @@ module AtomicActions =
 
     let performActionAsync player atomicAction = task {
         match atomicAction with
-        | PlayCurrentChannel position ->
+        | ChangeChannel channelNumber ->
+            do! TunerProxy.setCurrentChannelAsync channelNumber CancellationToken.None
+
             let! address = Network.getAddressAsync ()
             let url = $"http://{address}:{Config.port}/Proxy/playlist.m3u8"
-            let title = "SiriusXM"
-
-            match position with
-            | Now -> do! Playlist.playItemAsync player url title
-            | Last -> do! Playlist.addItemAsync player url title
+            let title = $"RHE ({address}:{Config.port})"
+            do! Playlist.playItemAsync player url title
 
         | ViewCurrentChannel ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
@@ -61,12 +60,10 @@ module AtomicActions =
                 let artist = String.concat " / " c.artists
                 do! Players.setDisplayAsync player artist c.title (TimeSpan.FromSeconds(10.0))
 
-        | ChangeChannel channelNumber ->
-            do! TunerProxy.setCurrentChannelAsync channelNumber CancellationToken.None
-
+        | PlayCurrentChannel ->
             let! address = Network.getAddressAsync ()
             let url = $"http://{address}:{Config.port}/Proxy/playlist.m3u8"
-            let title = $"{nameof RadioHomeEngine}"
+            let title = $"RHE ({address}:{Config.port})"
             do! Playlist.playItemAsync player url title
 
         | PlayBrownNoise ->
@@ -136,37 +133,4 @@ module AtomicActions =
 
         | Stop ->
             do! Players.simulateButtonAsync player "stop"
-    }
-
-    let performAlternateActionAsync player atomicAction = task {
-        match atomicAction with
-        | ChangeChannel channelNumber ->
-            do! TunerProxy.setCurrentChannelAsync channelNumber CancellationToken.None
-
-        | PlayCD (scope, _) ->
-            do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
-
-            let drives = CD.getDriveInfo scope
-
-            let disc =
-                drives
-                |> Seq.map (fun drive -> drive.disc)
-                |> Seq.choose (fun disc -> disc.audio)
-                |> Seq.tryHead
-
-            match disc with
-            | None ->
-                do! Players.setDisplayAsync player "CD" "No disc found" (TimeSpan.FromSeconds(10.0))
-            | Some disc ->
-                let title =
-                    match disc.titles with
-                    | [] -> "Unknown album"
-                    | x -> String.concat ", " x
-                let artist =
-                    match disc.artists with
-                    | [] -> "Unknown artist"
-                    | x -> String.concat ", " x
-                do! Players.setDisplayAsync player artist title (TimeSpan.FromSeconds(10.0))
-
-        | _ -> ()
     }

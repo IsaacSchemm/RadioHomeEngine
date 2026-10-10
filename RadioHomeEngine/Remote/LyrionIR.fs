@@ -73,7 +73,6 @@ module LyrionIR =
     | Button of string
     | Atomic of AtomicAction
     | Number of int
-    | AlternateAction
     | NoAction
 
     let Mappings = Map.ofList [
@@ -87,7 +86,7 @@ module LyrionIR =
         0x00ff39c6, IR "voldown"
         0x00ff31ce, IR "volup"
         0x00ff6b94, Button "stop" // Flip
-        0x00ffe916, AlternateAction // Source
+        0x00ffe916, Atomic ViewCurrentChannel // Source
         0x00ff6996, IR "play" // Zoom
         0x00ff8976, IR "home" // Menu
         0x00ff25da, Button "exit_left"

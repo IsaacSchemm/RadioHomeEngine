@@ -104,18 +104,6 @@ type LyrionIRHandler(player: Player) =
             | Some action ->
                 do! AtomicActions.performActionAsync player action
 
-        | Some prompt, AlternateAction ->
-            do! clearAsync ()
-
-            let entry = prompt.Substring(2)
-
-            match AtomicActions.tryGetAction entry with
-            | None -> ()
-            | Some action ->
-                do! AtomicActions.performAlternateActionAsync player action
-
-        | None, AlternateAction -> ()
-
         | Some _, _ ->
             do! clearAsync()
     }
