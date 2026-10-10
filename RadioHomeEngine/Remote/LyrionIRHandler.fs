@@ -99,9 +99,7 @@ type LyrionIRHandler(player: Player) =
 
             let entry = prompt.Substring(2)
 
-            match AtomicActions.tryGetAction entry with
-            | None -> ()
-            | Some action ->
+            for action in AtomicActions.tryGetActions entry do
                 do! AtomicActions.performActionAsync player action
 
         | Some _, _ ->

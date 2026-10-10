@@ -112,6 +112,21 @@ module TunerProxy =
     })
 
     /// Gets a list of currently and recently playing songs or programs on the currently tuned channel.
+    let getCurrentChannelNameAsync cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
+        let mutable name = None
+
+        match currentChannel with
+        | Some ch ->
+            let! channels = SiriusXMClient.getChannelsAsync cancellationToken
+            for channel in channels do
+                if channel.channelNumber = $"{ch}" then
+                    name <- Some $"{ch} | {channel.name}"
+        | None -> ()
+
+        return name
+    })
+
+    /// Gets a list of currently and recently playing songs or programs on the currently tuned channel.
     let getCurrentChannelHistoryAsync cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
         let! playlist =
             match currentChannel with

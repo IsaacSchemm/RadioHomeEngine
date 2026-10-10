@@ -21,27 +21,24 @@ type AtomicAction =
 | Stop
 
 module AtomicActions =
-    let tryGetAction (entry: string) = Seq.tryHead (seq {
+    let tryGetActions (entry: string) = seq {
         match entry with
         | "000" -> Forecast
         | "00" -> PlayCD AllDrives
         | "0" -> Stop
-        | Int32 n when n > 0 -> ChangeChannel n
+        | Int32 n when n > 0 -> ChangeChannel n; PlayCurrentChannel
         | _ -> ()
-    })
+    }
 
     let performActionAsync player atomicAction = task {
         match atomicAction with
         | ChangeChannel channelNumber ->
             do! TunerProxy.setCurrentChannelAsync channelNumber CancellationToken.None
 
-            let! address = Network.getAddressAsync ()
-            let url = $"http://{address}:{Config.port}/Proxy/playlist.m3u8"
-            let title = $"RHE ({address}:{Config.port})"
-            do! Playlist.playItemAsync player url title
-
         | ViewCurrentChannel ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
+
+            let! channelName = TunerProxy.getCurrentChannelNameAsync CancellationToken.None
 
             let! playlist = TunerProxy.getCurrentChannelHistoryAsync CancellationToken.None
             let song =
@@ -49,17 +46,17 @@ module AtomicActions =
                 |> Seq.sortByDescending (fun cut -> cut.startTime)
                 |> Seq.tryHead
 
-            match song with
-            | None ->
+            match (channelName, song) with
+            | Some ch, Some s ->
+                let artist = String.concat " / " s.artists
+                do! Players.setDisplayAsync player ch $"{artist} - {s.title}" (TimeSpan.FromSeconds(20.0))
+            | _ ->
                 do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(0.1))
-            | Some c ->
-                let artist = String.concat " / " c.artists
-                do! Players.setDisplayAsync player artist c.title (TimeSpan.FromSeconds(10.0))
 
         | PlayCurrentChannel ->
             let! address = Network.getAddressAsync ()
             let url = $"http://{address}:{Config.port}/Proxy/playlist.m3u8"
-            let title = $"RHE ({address}:{Config.port})"
+            let title = $"{nameof(RadioHomeEngine)} ({address}:{Config.port})"
             do! Playlist.playItemAsync player url title
 
         | PlayBrownNoise ->
