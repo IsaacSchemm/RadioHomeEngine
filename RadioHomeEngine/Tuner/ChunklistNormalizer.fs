@@ -22,6 +22,9 @@ module ChunklistNormalizer =
         DateTimeOffset.UtcNow - upstreamDateTime
 
     let getOffset (uri: Uri) (segments: Segment list) = lock knownStreams (fun () -> Seq.head (seq {
+        if segments = [] then
+            yield TimeSpan.Zero
+
         for k in List.ofSeq knownStreams do
             if DateTimeOffset.UtcNow - k.LastSeen > TimeSpan.FromMinutes(1L) then
                 knownStreams.Remove(k) |> ignore

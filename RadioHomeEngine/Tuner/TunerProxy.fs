@@ -43,8 +43,7 @@ module TunerProxy =
         }
 
     /// The fallback chunklist URI to use when no channel is tuned.
-    // TODO: change this behavior to generate empty segments instead.
-    let private fallbackChunklist = new Uri($"http://localhost:{Config.port}/Noise/chunklist.m3u8")
+    let private fallbackChunklist = new Uri($"http://localhost:{Config.port}/Silence/chunklist.m3u8")
 
     let private httpClient = new HttpClient()
 
