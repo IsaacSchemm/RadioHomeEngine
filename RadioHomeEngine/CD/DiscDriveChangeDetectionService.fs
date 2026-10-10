@@ -18,31 +18,35 @@ type DiscDriveChangeDetectionService() =
         JsonSerializer.Deserialize<'T>(json)
 
     let waitForMediaChangeAsync cancellationToken = task {
-        use proc =
-            new ProcessStartInfo(
-                "udevadm",
-                "monitor --udev",
-                RedirectStandardOutput = true)
-            |> Process.Start
+        if Environment.OSVersion.Platform = PlatformID.Win32NT then
+            do! Task.Delay(-1, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
 
-        let changeDetectionTokenSource = new CancellationTokenSource()
+        if not cancellationToken.IsCancellationRequested then
+            use proc =
+                new ProcessStartInfo(
+                    "udevadm",
+                    "monitor --udev",
+                    RedirectStandardOutput = true)
+                |> Process.Start
 
-        ignore (task {
-            let cts = CancellationTokenSource.CreateLinkedTokenSource(
-                changeDetectionTokenSource.Token,
-                cancellationToken)
-            do! Task.Delay(-1, cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
-            proc.Kill()
-        })
+            let changeDetectionTokenSource = new CancellationTokenSource()
 
-        use sr = proc.StandardOutput
-        let mutable finished = false
-        while not finished do
-            let! line = sr.ReadLineAsync()
-            if isNull line then
-                finished <- true
-            else if changePattern.IsMatch(line) then
-                changeDetectionTokenSource.Cancel()
+            ignore (task {
+                let cts = CancellationTokenSource.CreateLinkedTokenSource(
+                    changeDetectionTokenSource.Token,
+                    cancellationToken)
+                do! Task.Delay(-1, cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
+                proc.Kill()
+            })
+
+            use sr = proc.StandardOutput
+            let mutable finished = false
+            while not finished do
+                let! line = sr.ReadLineAsync()
+                if isNull line then
+                    finished <- true
+                else if changePattern.IsMatch(line) then
+                    changeDetectionTokenSource.Cancel()
     }
 
     override _.ExecuteAsync(cancellationToken) = task {
