@@ -6,7 +6,7 @@ open System.IO
 open System.Text
 
 /// A disc drive on the system, identified by its device path (e.g. /dev/sr0).
-type DiscDrive = DiscDrive of string
+type DiscDrive = DiscDrive of int
 
 /// The scope of an operation that uses or affects one or more disc drives.
 type DiscDriveScope = SingleDrive of DiscDrive | AllDrives
@@ -14,28 +14,23 @@ type DiscDriveScope = SingleDrive of DiscDrive | AllDrives
 module DiscDrive =
     /// Gets the device path of a disc drive (e.g. /dev/sr0).
     let getPath dd =
-        match dd with DiscDrive x -> x
+        match dd with DiscDrive x -> sprintf "/dev/sr%d" x
 
     /// Gets a unique ID for the disc drive (derived from its path) which can be used in URL parameters and API calls.
     let getId dd =
-        dd
-        |> getPath
-        |> Encoding.UTF8.GetBytes
-        |> Convert.ToHexString
+        match dd with DiscDrive x -> sprintf "%02d" x
 
     /// Finds a disc drive from its unique ID (from a URL parameter or API call)
     let fromId (id: string) =
-        id
-        |> Convert.FromHexString
-        |> Encoding.UTF8.GetString
-        |> DiscDrive
+        match id with
+        | Int32 i -> DiscDrive i
+        | _ -> failwith "Invalid disc drive ID"
 
     /// Lists all disc drives on the system.
     let getAll () =
         seq { 0 .. 9 }
-        |> Seq.map (fun n -> $"/dev/sr{n}")
-        |> Seq.where File.Exists
         |> Seq.map DiscDrive
+        |> Seq.where (fun dd -> File.Exists(getPath dd))
         |> Seq.toList
 
     /// Determines whether a given disc drive (still) exists on the system.
