@@ -185,21 +185,13 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 AtomicAction.NewChangeChannel(
                     channelNumber));
 
-        private static async Task AddCDAsync(string playerId, PlaylistPosition playlistPosition, string driveId) =>
+        [HttpPost("players/{playerId}/play/cddrives/{driveId}")]
+        public async Task PlayCD(string playerId, string driveId) =>
             await AtomicActions.performActionAsync(
                 LyrionCLI.Player.NewPlayer(playerId),
                 AtomicAction.NewPlayCD(
                     DiscDriveScope.NewSingleDrive(
-                        DiscDriveModule.fromId(driveId)),
-                    playlistPosition));
-
-        [HttpPost("players/{playerId}/play/cddrives/{driveId}")]
-        public async Task PlaySXMChannel(string playerId, string driveId) =>
-            await AddCDAsync(playerId, PlaylistPosition.Now, driveId);
-
-        [HttpPost("players/{playerId}/append/cddrives/{driveId}")]
-        public async Task AppendSXMChannel(string playerId, string driveId) =>
-            await AddCDAsync(playerId, PlaylistPosition.Last, driveId);
+                        DiscDriveModule.fromId(driveId))));
 
         [HttpPost("players/{playerId}/play/forecast")]
         public async Task PlayForecast(string playerId) =>

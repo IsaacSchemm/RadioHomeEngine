@@ -18,8 +18,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 LyrionCLI.Player.NewPlayer(mac),
                 AtomicAction.NewPlayCD(
                     DiscDriveScope.NewSingleDrive(
-                        DiscDriveModule.fromId(id)),
-                    PlaylistPosition.Now));
+                        DiscDriveModule.fromId(id))));
 
         [HttpPost]
         public void RipCD(string id) =>

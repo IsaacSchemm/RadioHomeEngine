@@ -7,10 +7,6 @@ open FSharp.Control
 
 open LyrionCLI
 
-type PlaylistPosition =
-| Now
-| Last
-
 type AtomicAction =
 | ChangeChannel of int
 | ViewCurrentChannel
@@ -18,7 +14,7 @@ type AtomicAction =
 | PlayBrownNoise
 | PlayPause
 | Replay
-| PlayCD of DiscDriveScope * PlaylistPosition
+| PlayCD of DiscDriveScope
 | RipCD of DiscDriveScope
 | EjectCD of DiscDriveScope
 | Forecast
@@ -28,7 +24,7 @@ module AtomicActions =
     let tryGetAction (entry: string) = Seq.tryHead (seq {
         match entry with
         | "000" -> Forecast
-        | "00" -> PlayCD (AllDrives, Now)
+        | "00" -> PlayCD AllDrives
         | "0" -> Stop
         | Int32 n when n > 0 -> ChangeChannel n
         | _ -> ()
@@ -80,11 +76,8 @@ module AtomicActions =
         | Replay ->
             do! Playlist.setTimeAsync player SeekOrigin.Current -10m
 
-        | PlayCD (scope, position) ->
+        | PlayCD scope ->
             do! Players.simulateButtonAsync player "stop"
-
-            if position = Now then
-                do! Playlist.clearAsync player
 
             let! address = Network.getAddressAsync ()
 
