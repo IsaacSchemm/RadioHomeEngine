@@ -13,7 +13,8 @@ type PlaylistPosition =
 
 type AtomicAction =
 | PlayCurrentChannel of PlaylistPosition
-| PlaySiriusXMChannel of int * PlaylistPosition
+| ViewCurrentChannel
+| ChangeChannel of int
 | PlayBrownNoise
 | PlayPause
 | Replay
@@ -29,7 +30,7 @@ module AtomicActions =
         | "000" -> Forecast
         | "00" -> PlayCD (AllDrives, Now)
         | "0" -> Stop
-        | Int32 n when n > 0 -> PlaySiriusXMChannel (n, Now)
+        | Int32 n when n > 0 -> ChangeChannel n
         | _ -> ()
     })
 
@@ -44,23 +45,29 @@ module AtomicActions =
             | Now -> do! Playlist.playItemAsync player url title
             | Last -> do! Playlist.addItemAsync player url title
 
-        | PlaySiriusXMChannel (channelNumber, position) ->
-            let! channels = SiriusXMClient.getChannelsAsync CancellationToken.None
-            let name =
-                channels
-                |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
-                |> Seq.map (fun c -> c.name)
+        | ViewCurrentChannel ->
+            do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
+
+            let! playlist = TunerProxy.getCurrentChannelHistoryAsync CancellationToken.None
+            let song =
+                playlist
+                |> Seq.sortByDescending (fun cut -> cut.startTime)
                 |> Seq.tryHead
 
-            match name with
-            | None -> ()
-            | Some channelName ->
-                let! address = Network.getAddressAsync ()
-                let url = $"http://{address}:{Config.port}/SXM/PlayChannel?num={channelNumber}"
-                let title = $"[{channelNumber}] {channelName}"
-                match position with
-                | Now -> do! Playlist.playItemAsync player url title
-                | Last -> do! Playlist.addItemAsync player url title
+            match song with
+            | None ->
+                do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(0.1))
+            | Some c ->
+                let artist = String.concat " / " c.artists
+                do! Players.setDisplayAsync player artist c.title (TimeSpan.FromSeconds(10.0))
+
+        | ChangeChannel channelNumber ->
+            do! TunerProxy.setCurrentChannelAsync channelNumber CancellationToken.None
+
+            let! address = Network.getAddressAsync ()
+            let url = $"http://{address}:{Config.port}/Proxy/playlist.m3u8"
+            let title = $"{nameof RadioHomeEngine}"
+            do! Playlist.playItemAsync player url title
 
         | PlayBrownNoise ->
             let! address = Network.getAddressAsync ()
@@ -133,37 +140,8 @@ module AtomicActions =
 
     let performAlternateActionAsync player atomicAction = task {
         match atomicAction with
-        | PlayCurrentChannel _ ->
-            do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
-
-            let! playlist = TunerProxy.getCurrentChannelHistoryAsync CancellationToken.None
-            let song =
-                playlist
-                |> Seq.sortByDescending (fun cut -> cut.startTime)
-                |> Seq.tryHead
-
-            match song with
-            | None -> ()
-            | Some c ->
-                let artist = String.concat " / " c.artists
-                do! Players.setDisplayAsync player artist c.title (TimeSpan.FromSeconds(10.0))
-
-        | PlaySiriusXMChannel (channelNumber, _) ->
-            do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
-
-            let! playlist = SiriusXMClient.tryGetPlaylistAsync channelNumber CancellationToken.None
-            let song =
-                playlist
-                |> Option.map (fun p -> p.cuts)
-                |> Option.defaultValue []
-                |> Seq.sortByDescending (fun cut -> cut.startTime)
-                |> Seq.tryHead
-
-            match song with
-            | None -> ()
-            | Some c ->
-                let artist = String.concat " / " c.artists
-                do! Players.setDisplayAsync player artist c.title (TimeSpan.FromSeconds(10.0))
+        | ChangeChannel channelNumber ->
+            do! TunerProxy.setCurrentChannelAsync channelNumber CancellationToken.None
 
         | PlayCD (scope, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))

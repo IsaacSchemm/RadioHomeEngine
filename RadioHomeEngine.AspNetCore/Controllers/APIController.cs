@@ -178,20 +178,12 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         public APIPlayer GetPlayer(string playerId) =>
             GetPlayers().Single(p => p.Id == playerId);
 
-        private static async Task AddSXMChannelAsync(string playerId, PlaylistPosition playlistPosition, int channelNumber) =>
-            await AtomicActions.performActionAsync(
-                LyrionCLI.Player.NewPlayer(playerId),
-                AtomicAction.NewPlaySiriusXMChannel(
-                    channelNumber,
-                    playlistPosition));
-
         [HttpPost("players/{playerId}/play/sxm/{channelNumber}")]
         public async Task PlaySXMChannel(string playerId, int channelNumber) =>
-            await AddSXMChannelAsync(playerId, PlaylistPosition.Now, channelNumber);
-
-        [HttpPost("players/{playerId}/append/sxm/{channelNumber}")]
-        public async Task AppendSXMChannel(string playerId, int channelNumber) =>
-            await AddSXMChannelAsync(playerId, PlaylistPosition.Last, channelNumber);
+            await AtomicActions.performActionAsync(
+                LyrionCLI.Player.NewPlayer(playerId),
+                AtomicAction.NewChangeChannel(
+                    channelNumber));
 
         private static async Task AddCDAsync(string playerId, PlaylistPosition playlistPosition, string driveId) =>
             await AtomicActions.performActionAsync(

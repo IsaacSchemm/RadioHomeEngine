@@ -37,7 +37,6 @@ module NoiseGenerationService =
 
     let readSpeedParameters = String.concat " " [
         "-readrate 1"
-        "-readrate_catchup 2"
     ]
 
     let mutable enabled = true
@@ -117,7 +116,7 @@ type NoiseGenerationService() =
         }
 
         if not generator.HasExited then
-            inputControl.Write('q')
+            do! inputControl.WriteAsync('q')
             do! inputControl.DisposeAsync()
 
         do! generator.WaitForExitAsync()

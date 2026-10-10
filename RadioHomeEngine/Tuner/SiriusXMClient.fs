@@ -421,10 +421,11 @@ module SiriusXMClient =
 
         let getFileAsync (uri: Uri) (cancellationToken: CancellationToken) = task {
             if getCookie "SXMAKTOKEN" = None || getCookie "SXMDATA" = None then
-                let! authenticated = authenticateAsync cancellationToken
+                if not uri.IsLoopback then
+                    let! authenticated = authenticateAsync cancellationToken
 
-                if not authenticated then
-                    raise LoginFailedException
+                    if not authenticated then
+                        raise LoginFailedException
 
             let queryString = String.concat "&" [
                 match getCookie "SXMAKTOKEN" with
