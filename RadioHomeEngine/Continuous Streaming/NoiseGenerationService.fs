@@ -38,7 +38,6 @@ module NoiseGenerationService =
     let readSpeedParameters = String.concat " " [
         "-readrate 1"
         "-readrate_catchup 2"
-        $"-readrate_initial_burst {segmentTimeSeconds - 1}"
     ]
 
     let mutable enabled = true
@@ -93,7 +92,7 @@ type NoiseGenerationService() =
 
         use encoder = Process.Start(new ProcessStartInfo(
             $"ffmpeg",
-            $"{NoiseGenerationService.readSpeedParameters} -f f32le -i - {NoiseGenerationService.outputParameters}",
+            $"{NoiseGenerationService.readSpeedParameters} -nostats -f f32le -i - {NoiseGenerationService.outputParameters}",
             RedirectStandardInput = true,
             RedirectStandardOutput = true))
 

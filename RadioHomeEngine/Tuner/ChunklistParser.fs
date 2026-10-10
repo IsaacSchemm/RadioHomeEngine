@@ -10,14 +10,17 @@ module ChunklistParser =
         /// Any miscellaneous tags that apply to the entire chunklist.
         headerTags: string list
 
-        /// The value of the EXT-X-PROGRAM-DATE-TIME tag for this segment.
-        dateTime: DateTimeOffset
+        /// The absolute date and time of the start of this media segment.
+        dateTime: DateTimeOffset option
 
-        /// The value of the EXT-X-MEDIA-SEQUENCE tag for this segment.
+        /// The sequence number of this segment.
         mediaSequence: UInt128
 
-        /// Any miscellaneous tags for this segment.
-        segmentTags: string list
+        /// The duration of this chunk, in seconds.
+        duration: decimal option
+
+        /// The range of bytes in the file that constitute this chunk.
+        byteRange: string option
 
         /// The path to the chunk, relative to the chunklist.
         path: string
@@ -39,10 +42,11 @@ module ChunklistParser =
     let parse text = [
         let mutable key = "NONE"
         let mutable headerTags = []
-        let mutable segmentTags = []
 
         let mutable dateTime = None
         let mutable mediaSequence = zero
+        let mutable duration = None
+        let mutable byteRange = None
 
         for line in Utility.split '\n' text do
             match line with
@@ -56,10 +60,11 @@ module ChunklistParser =
             | Tag ("EXT-X-PROGRAM-DATE-TIME", DateTimeOffset value) ->
                 dateTime <- Some value
 
-            | Tag ("EXTINF", _)
-            | Tag ("EXT-X-BYTERANGE", _) ->
-                // These tags are associated with a specific segment.
-                segmentTags <- List.rev (line :: segmentTags)
+            | Tag ("EXTINF", CommaSeparated (Decimal value :: _)) ->
+                duration <- Some value
+
+            | Tag ("EXT-X-BYTERANGE", value) ->
+                byteRange <- Some value
 
             | Tag _ ->
                 // All other tags are associated with the entire chunklist.
@@ -67,20 +72,20 @@ module ChunklistParser =
 
             | _ when not (line.StartsWith('#')) ->
                 // This line is not a tag, so it represents an actual chunk.
-                match dateTime with
-                | None -> ()
-                | Some dt -> {
+                {
                     key = key
                     headerTags = headerTags
-                    dateTime = dt
+                    dateTime = dateTime
                     mediaSequence = mediaSequence
-                    segmentTags = segmentTags
+                    duration = duration
+                    byteRange = byteRange
                     path = line
                 }
 
-                segmentTags <- []
                 dateTime <- None
                 mediaSequence <- mediaSequence + one
+                duration <- None
+                byteRange <- None
             | _ -> ()
     ]
 
@@ -102,9 +107,17 @@ module ChunklistParser =
                 yield $"EXT-X-KEY:{segment.key}"
                 lastKey <- segment.key
 
-            yield $"#EXT-X-PROGRAM-DATE-TIME:{segment.dateTime:o}"
+            match segment.dateTime with
+            | Some dateTime -> yield $"#EXT-X-PROGRAM-DATE-TIME:{dateTime:o}"
+            | None -> ()
 
-            yield! segment.segmentTags
+            match segment.duration with
+            | Some duration -> yield $"#EXTINF:{duration},"
+            | None -> ()
+
+            match segment.byteRange with
+            | Some byteRange -> yield $"#EXT-X-BYTERANGE:{byteRange}"
+            | None -> ()
 
             yield segment.path
     ]

@@ -4,6 +4,11 @@ open System
 
 [<AutoOpen>]
 module ActivePatterns =
+    let (|CommaSeparated|_|) (str: string) =
+        str.Split(',')
+        |> List.ofArray
+        |> Some
+
     let (|Decimal|_|) (str: string) =
         match Decimal.TryParse(str) with
         | true, value -> Some value

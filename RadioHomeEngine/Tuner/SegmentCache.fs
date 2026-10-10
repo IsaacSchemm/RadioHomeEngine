@@ -82,7 +82,7 @@ module SegmentCache =
         use ffmpeg =
             new ProcessStartInfo(
                 "ffmpeg",
-                "-i - -f mpegts -c:a copy -",
+                "-nostats -hide_banner -loglevel warning -i - -f mpegts -c:a copy -",
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true)
             |> Process.Start
@@ -129,17 +129,11 @@ module SegmentCache =
     let evictStale () =
         cache <- cache |> List.truncate 10
 
-    let getNewestTimestamp () =
-        cache
-        |> Seq.map (fun s -> s.segment.dateTime)
-        |> Seq.append [DateTimeOffset.MinValue]
-        |> Seq.max
-
     /// List the most recent segments available to the user agent, in order from oldest to newest.
     let list (count: int) =
         cache
         |> Seq.map (fun s -> s.segment)
-        |> Seq.truncate 3
+        |> Seq.truncate count
         |> Seq.rev
 
     /// Gets a segment's unencrypted audio data from the cache, if it exists, using its new sequence number.

@@ -48,7 +48,7 @@ module TunerProxy =
         let ffmpeg =
             new ProcessStartInfo(
                 "ffmpeg",
-                "-f lavfi -i anullsrc=cl=stereo:sample_rate=44100 -t 10 -c:a aac -f mpegts -",
+                "-nostats -hide_banner -loglevel warning -f lavfi -i anullsrc=cl=stereo:sample_rate=44100 -t 10 -c:a aac -f mpegts -",
                 RedirectStandardOutput = true)
             |> Process.Start
 
@@ -141,14 +141,26 @@ module TunerProxy =
 
         let! chunklist = SiriusXMClient.getFileAsync chunklistUri cancellationToken
 
-        // Parse the file and look for segments that have a timestamp at least 5 seconds newer than the newest cached segment.
-        // Ten seconds is the expected segment length, so this should keep the buffer from growing or shrinking too much when the channel is changed.
+        // Parse the file and look for segments that have a timestamp at least [segment-length / 2] seconds newer than the newest cached segment.
         // Never take more than the three most recent segments, though.
 
-        let newestSegmentTimestamp =
-            SegmentCache.getNewestTimestamp ()
+        let newestSegment =
+            SegmentCache.list 1
+            |> Seq.tryHead
 
-        let threshold = newestSegmentTimestamp + TimeSpan.FromSeconds(5L)
+        let threshold =
+            let dateTime = 
+                newestSegment
+                |> Option.bind (fun s -> s.dateTime)
+                |> Option.defaultValue DateTimeOffset.MinValue
+            let duration = 
+                newestSegment
+                |> Option.bind (fun s -> s.duration)
+                |> Option.defaultValue 0.0m
+
+            dateTime + TimeSpan.FromSeconds(float duration / 2.0)
+
+        printfn "THRESHOLD: %A" threshold
 
         let chunks =
             chunklist.content
@@ -156,10 +168,14 @@ module TunerProxy =
             |> ChunklistParser.parse
             |> Seq.rev
             |> Seq.truncate 3
-            |> Seq.takeWhile (fun s -> s.dateTime > threshold)
+            |> Seq.takeWhile (fun s ->
+                match s.dateTime with
+                | Some dateTime -> dateTime > threshold
+                | None -> false)
             |> Seq.rev
 
         for chunk in chunks do
+            printfn "ADDING   : %A" chunk.dateTime
             let uri = new Uri(chunklistUri, chunk.path)
             do! SegmentCache.addAsync chunk uri cancellationToken
 

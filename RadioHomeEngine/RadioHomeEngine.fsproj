@@ -10,8 +10,8 @@
     <Compile Include="ActivePatterns.fs" />
     <Compile Include="Network.fs" />
     <Compile Include="Continuous Streaming\NoiseGenerationService.fs" />
-    <Compile Include="Tuner\SiriusXMClient.fs" />
     <Compile Include="Tuner\ChunklistParser.fs" />
+    <Compile Include="Tuner\SiriusXMClient.fs" />
     <Compile Include="Tuner\SegmentCache.fs" />
     <Compile Include="Tuner\TunerProxy.fs" />
     <Compile Include="Lyrion\LyrionCLI.fs" />
