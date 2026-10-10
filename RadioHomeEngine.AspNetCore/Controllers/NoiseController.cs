@@ -7,15 +7,20 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         [Route("Noise/{filename}")]
         public async Task<IActionResult> GetFile(string filename)
         {
-            var contents = NoiseGenerationServiceModule
-                .getFiles([filename])
-                .SingleOrDefault();
+            try
+            {
+                var contents = Noise.getFile(filename);
 
-            return contents == null
-                ? NotFound()
-                : File(
-                    contents.data,
-                    contents.contentType);
+                return contents == null
+                    ? NotFound()
+                    : File(
+                        contents.data,
+                        contents.contentType);
+            }
+            catch (Noise.InvalidFilenameException)
+            {
+                return NotFound();
+            }
         }
     }
 }
