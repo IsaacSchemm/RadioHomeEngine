@@ -82,7 +82,11 @@ module ChunklistParser =
                     path = line
                 }
 
-                dateTime <- None
+                dateTime <-
+                    match dateTime, duration with
+                    | Some dt, Some sec -> Some (dt + TimeSpan.FromSeconds(float sec))
+                    | _ -> None
+
                 mediaSequence <- mediaSequence + one
                 duration <- None
                 byteRange <- None

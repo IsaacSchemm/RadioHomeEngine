@@ -10,6 +10,7 @@ open System.Text
 open System.Text.RegularExpressions
 open System.Threading
 open System.Threading.Tasks
+open System.Net.Http
 
 /// Takes the audio streams from SiriusXMClient, decrypts segments, and exposes them to the user.
 module TunerProxy =
@@ -65,6 +66,26 @@ module TunerProxy =
     /// The fallback chunklist URI to use when no channel is tuned.
     let private fallbackChunklist = new Uri($"http://localhost:{Config.port}/Noise/chunklist.m3u8")
 
+    let private httpClient = new HttpClient()
+
+    /// Fetches a file over HTTP without authentication.
+    let private getFileAsync (uri: Uri) (cancellationToken: CancellationToken) = task {
+        use! response = httpClient.GetAsync(
+            uri,
+            cancellationToken)
+
+        use! stream = response.EnsureSuccessStatusCode().Content.ReadAsStreamAsync(cancellationToken)
+
+        use ms = new MemoryStream()
+        do! stream.CopyToAsync(ms)
+        let data = ms.ToArray()
+
+        return {|
+            content = data
+            contentType = response.Content.Headers.ContentType.MediaType
+        |}
+    }
+
     /// Returns the currently tuned channel number, if any.
     let getCurrentChannel() = Option.toNullable currentChannel
 
@@ -83,7 +104,10 @@ module TunerProxy =
 
             let playlistUri = new Uri(p.url)
 
-            let! data = SiriusXMClient.getFileAsync playlistUri cancellationToken
+            let! data =
+                match currentChannel with
+                | Some _ -> SiriusXMClient.getFileAsync playlistUri cancellationToken
+                | None -> getFileAsync playlistUri cancellationToken
 
             let text = Encoding.UTF8.GetString(data.content)
 
