@@ -64,27 +64,31 @@ module TunerProxy =
     }
 
     /// The fallback chunklist URI to use when no channel is tuned.
+    // TODO: change this behavior to generate empty segments instead.
     let private fallbackChunklist = new Uri($"http://localhost:{Config.port}/Noise/chunklist.m3u8")
 
     let private httpClient = new HttpClient()
 
     /// Fetches a file over HTTP without authentication.
-    let private getFileAsync (uri: Uri) (cancellationToken: CancellationToken) = task {
-        use! response = httpClient.GetAsync(
-            uri,
-            cancellationToken)
+    let private getFileAsync (uri: Uri) (cancellationToken: CancellationToken) = 
+        match currentChannel with
+        | Some _ -> SiriusXMClient.getFileAsync uri cancellationToken
+        | None -> task {
+            use! response = httpClient.GetAsync(
+                uri,
+                cancellationToken)
 
-        use! stream = response.EnsureSuccessStatusCode().Content.ReadAsStreamAsync(cancellationToken)
+            use! stream = response.EnsureSuccessStatusCode().Content.ReadAsStreamAsync(cancellationToken)
 
-        use ms = new MemoryStream()
-        do! stream.CopyToAsync(ms)
-        let data = ms.ToArray()
+            use ms = new MemoryStream()
+            do! stream.CopyToAsync(ms)
+            let data = ms.ToArray()
 
-        return {|
-            content = data
-            contentType = response.Content.Headers.ContentType.MediaType
-        |}
-    }
+            return {|
+                content = data
+                contentType = response.Content.Headers.ContentType.MediaType
+            |}
+        }
 
     /// Returns the currently tuned channel number, if any.
     let getCurrentChannel() = Option.toNullable currentChannel
@@ -104,10 +108,7 @@ module TunerProxy =
 
             let playlistUri = new Uri(p.url)
 
-            let! data =
-                match currentChannel with
-                | Some _ -> SiriusXMClient.getFileAsync playlistUri cancellationToken
-                | None -> getFileAsync playlistUri cancellationToken
+            let! data = getFileAsync playlistUri cancellationToken
 
             let text = Encoding.UTF8.GetString(data.content)
 
@@ -178,7 +179,7 @@ module TunerProxy =
             currentChunklist
             |> Option.defaultValue fallbackChunklist
 
-        let! chunklist = SiriusXMClient.getFileAsync chunklistUri cancellationToken
+        let! chunklist = getFileAsync chunklistUri cancellationToken
 
         // Parse the file and look for segments that have a timestamp at least [segment-length / 2] seconds newer than the newest cached segment.
         // Never take more than the three most recent segments, though.
@@ -203,6 +204,7 @@ module TunerProxy =
             chunklist.content
             |> Encoding.UTF8.GetString
             |> ChunklistParser.parse
+            |> ChunklistNormalizer.normalize chunklistUri
             |> Seq.rev
             |> Seq.truncate 3
             |> Seq.takeWhile (fun s ->
