@@ -9,6 +9,7 @@
     <Compile Include="Utility.fs" />
     <Compile Include="ActivePatterns.fs" />
     <Compile Include="Network.fs" />
+    <Compile Include="Continuous Streaming\Silence.fs" />
     <Compile Include="Continuous Streaming\Noise.fs" />
     <Compile Include="Tuner\ChunklistParser.fs" />
     <Compile Include="tuner\ChunklistNormalizer.fs" />

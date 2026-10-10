@@ -16,7 +16,7 @@ module Noise =
     let bitsPerSecond = 65536
     let color = "brown"
     let sampleRate = 44100
-    let segmentTimeSeconds = 10
+    let segmentTimeSeconds = 10.0
 
     let inputParameters = String.concat " " [
         "-f lavfi"
@@ -45,7 +45,7 @@ module Noise =
 
     exception InvalidFilenameException
 
-    let getFile (filename: string) =
+    let getFileAsync filename cancellationToken = task {
         lastAccess <- DateTimeOffset.UtcNow
 
         let utf8 str = Encoding.UTF8.GetBytes(String.concat "\n" str)
@@ -54,7 +54,7 @@ module Noise =
 
         match filename with
         | "playlist.m3u8" ->
-            {|
+            return {|
                 data = utf8 [
                     "#EXTM3U"
                     "#EXT-X-ALLOW-CACHE:NO"
@@ -65,27 +65,38 @@ module Noise =
                 ]
                 contentType = "application/x-mpegURL"
             |}
+        | "chunklist.m3u8" when File.Exists(path) ->
+            let! data = File.ReadAllBytesAsync(path, cancellationToken)
+            return {|
+                data = data
+                contentType = "application/x-mpegURL"
+            |}
         | "chunklist.m3u8" ->
-            {|
-                data =
-                    if File.Exists(path)
-                    then File.ReadAllBytes(path)
-                    else utf8 [
-                        "#EXTM3U"
-                        "#EXT-X-VERSION:3"
-                        $"#EXT-X-TARGETDURATION:{segmentTimeSeconds}"
-                        "#EXT-X-MEDIA-SEQUENCE:0"
-                        ""
-                    ]
+            return {|
+                data = utf8 [
+                    "#EXTM3U"
+                    "#EXT-X-VERSION:3"
+                    $"#EXT-X-TARGETDURATION:{segmentTimeSeconds}"
+                    "#EXT-X-MEDIA-SEQUENCE:0"
+                    ""
+                ]
                 contentType = "application/x-mpegURL"
             |}
         | _ when filename.EndsWith(".ts") && File.Exists(path) ->
-            {|
-                data = File.ReadAllBytes(path)
+            let! data = File.ReadAllBytesAsync(path, cancellationToken)
+            return {|
+                data = data
+                contentType = "video/mp2t"
+            |}
+        | _ when filename.EndsWith(".ts") ->
+            let! data = Silence.generateSegmentAsync (TimeSpan.FromSeconds(segmentTimeSeconds))
+            return {|
+                data = data
                 contentType = "video/mp2t"
             |}
         | _ ->
-            raise InvalidFilenameException
+            return raise InvalidFilenameException
+    }
 
 type NoiseGenerationService() =
     inherit BackgroundService()
@@ -121,7 +132,7 @@ type NoiseGenerationService() =
                         do! pipeIn.ReadExactlyAsync(buffer, cancellationToken)
                         do! pipeOut.WriteAsync(buffer, cancellationToken)
                     else
-                        do! Task.Delay(TimeSpan.FromSeconds(5L), cancellationToken)
+                        do! Task.Delay(TimeSpan.FromSeconds(Noise.segmentTimeSeconds / 2.0), cancellationToken)
                 with ex ->
                     Console.Error.WriteLine(ex)
         }

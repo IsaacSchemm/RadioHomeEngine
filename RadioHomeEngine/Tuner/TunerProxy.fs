@@ -42,27 +42,6 @@ module TunerProxy =
                 flag.Release() |> ignore
         }
 
-    // Here we generate a media segment of 10 seconds of silence.
-    // This will be used in place of any segment that is missing from the cache (e.g. too old).
-
-    let private silentSegment = lazy task {
-        let ffmpeg =
-            new ProcessStartInfo(
-                "ffmpeg",
-                "-nostats -hide_banner -loglevel warning -f lavfi -i anullsrc=cl=stereo:sample_rate=44100 -t 10 -c:a aac -f mpegts -",
-                RedirectStandardOutput = true)
-            |> Process.Start
-
-        use buffer = new MemoryStream()
-
-        let readTask = ffmpeg.StandardOutput.BaseStream.CopyToAsync(buffer)
-
-        do! readTask
-        do! ffmpeg.WaitForExitAsync()
-
-        return buffer.ToArray()
-    }
-
     /// The fallback chunklist URI to use when no channel is tuned.
     // TODO: change this behavior to generate empty segments instead.
     let private fallbackChunklist = new Uri($"http://localhost:{Config.port}/Noise/chunklist.m3u8")
@@ -168,7 +147,7 @@ module TunerProxy =
     let getChunkAsync index sequenceNumber cancellationToken = task {
         match SegmentCache.tryGetData sequenceNumber with
         | Some s -> return s
-        | None -> return! silentSegment.Value
+        | None -> return! Silence.generateSegmentAsync (TimeSpan.FromSeconds(10.0))
     }
 
     /// Checks the newest upstream chunklist, downloads any new segments, and builds a client-facing `chunklist.m3u8`.
