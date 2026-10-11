@@ -125,6 +125,24 @@ module SegmentCache =
         }
     }
 
+    /// Adds an internally generated segment to the cache.
+    let addGenerated (segment: GeneratedSegment) =
+        add {
+            data = segment.data
+            segment = {
+                key = "NONE"
+                headerTags = [
+                    "#EXT-X-VERSION:3"
+                    $"#EXT-X-TARGETDURATION:{segment.duration}"
+                ]
+                dateTime = Some segment.dateTime
+                mediaSequence = nextSequenceNumber
+                duration = Some (decimal segment.duration)
+                byteRange = None
+                path = $"/Proxy/chunk-{nextSequenceNumber}.ts"
+            }
+        }
+
     /// Remove all but the ten most recent segments from the cache.
     let evictStale () =
         cache <- cache |> List.truncate 10

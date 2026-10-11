@@ -11,7 +11,6 @@ type AtomicAction =
 | ChangeChannel of int
 | ViewCurrentChannel
 | PlayCurrentChannel
-| PlayBrownNoise
 | PlayPause
 | Replay
 | PlayCD of DiscDriveScope
@@ -58,10 +57,6 @@ module AtomicActions =
             let url = $"http://{address}:{Config.port}/Proxy/playlist.m3u8"
             let title = $"{nameof(RadioHomeEngine)} ({address}:{Config.port})"
             do! Playlist.playItemAsync player url title
-
-        | PlayBrownNoise ->
-            let! address = Network.getAddressAsync ()
-            do! Playlist.playItemAsync player $"http://{address}:{Config.port}/Noise/playlist.m3u8" "Noise"
 
         | PlayPause ->
             let! state = Playlist.getModeAsync player

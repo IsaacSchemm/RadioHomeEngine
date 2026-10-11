@@ -42,9 +42,6 @@ module TunerProxy =
                 flag.Release() |> ignore
         }
 
-    /// The fallback chunklist URI to use when no channel is tuned.
-    let private fallbackChunklist = new Uri($"http://localhost:{Config.port}/Noise/chunklist.m3u8")
-
     let private httpClient = new HttpClient()
 
     /// Fetches a file over HTTP without authentication.
@@ -151,15 +148,7 @@ module TunerProxy =
 
     /// Checks the newest upstream chunklist, downloads any new segments, and builds a client-facing `chunklist.m3u8`.
     let getChunklistAsync index cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
-        // Get the chunklist data.
-
-        let chunklistUri =
-            currentChunklist
-            |> Option.defaultValue fallbackChunklist
-
-        let! chunklist = getFileAsync chunklistUri cancellationToken
-
-        // Parse the file and look for segments that have a timestamp at least [segment-length / 2] seconds newer than the newest cached segment.
+        // Look for segments that have a timestamp at least [segment-length / 2] seconds newer than the newest cached segment.
         // Never take more than the three most recent segments, though.
 
         let newestSegment =
@@ -178,22 +167,39 @@ module TunerProxy =
 
             dateTime + TimeSpan.FromSeconds(float duration / 2.0)
 
-        let chunks =
-            chunklist.content
-            |> Encoding.UTF8.GetString
-            |> ChunklistParser.parse
-            |> ChunklistNormalizer.normalize chunklistUri
-            |> Seq.rev
-            |> Seq.truncate 3
-            |> Seq.takeWhile (fun s ->
-                match s.dateTime with
-                | Some dateTime -> dateTime > threshold
-                | None -> false)
-            |> Seq.rev
+        match currentChunklist with
+        | None ->
+            // Look for newly generated chunks.
 
-        for chunk in chunks do
-            let uri = new Uri(chunklistUri, chunk.path)
-            do! SegmentCache.addAsync chunk uri cancellationToken
+            let mutable more = true
+            while more do
+                match Noise.channel.Reader.TryRead() with
+                | true, segment ->
+                    if segment.dateTime > threshold then
+                        SegmentCache.addGenerated segment
+                | false, _ ->
+                    more <- false
+        | Some chunklistUri ->
+            // Get the chunklist data.
+
+            let! chunklist = getFileAsync chunklistUri cancellationToken
+
+            let chunks =
+                chunklist.content
+                |> Encoding.UTF8.GetString
+                |> ChunklistParser.parse
+                |> ChunklistNormalizer.normalize chunklistUri
+                |> Seq.rev
+                |> Seq.truncate 3
+                |> Seq.takeWhile (fun s ->
+                    match s.dateTime with
+                    | Some dateTime -> dateTime > threshold
+                    | None -> false)
+                |> Seq.rev
+
+            for chunk in chunks do
+                let uri = new Uri(chunklistUri, chunk.path)
+                do! SegmentCache.addAsync chunk uri cancellationToken
 
         // Remove old segments from the cache as needed.
 

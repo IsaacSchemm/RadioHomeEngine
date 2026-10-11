@@ -1,9 +1,11 @@
 namespace RadioHomeEngine
 
 open System
+open System.Collections.Generic
 open System.Diagnostics
 open System.IO
 open System.Text
+open System.Threading.Channels
 open System.Threading.Tasks
 open Microsoft.Extensions.Hosting
 open System.Threading
@@ -28,7 +30,7 @@ module Noise =
         "-f hls"
         $"-hls_time {segmentTimeSeconds}"
         "-hls_segment_type mpegts"
-        "-hls_flags delete_segments+program_date_time+temp_file"
+        "-hls_flags program_date_time+temp_file"
         "-c:a aac"
         "-ac 2"
         $"-b:a {bitsPerSecond}"
@@ -39,114 +41,67 @@ module Noise =
         "-readrate 1"
     ]
 
-    let mutable lastAccess = DateTimeOffset.MinValue
+    let channel = Channel.CreateBounded<GeneratedSegment>(5)
 
-    let isActive () =
-        DateTimeOffset.UtcNow - lastAccess < TimeSpan.FromSeconds(segmentTimeSeconds * 3.0)
+    exception ChannelFullException
 
-    exception InvalidFilenameException
+    let ingestSegmentsAsync cancellationToken = task {
+        let segments = [
+            for file in Directory.EnumerateFiles(path, "*.ts") do
+                let data = File.ReadAllBytes(file)
+                let info = new FileInfo(file)
 
-    let getFileAsync filename cancellationToken = task {
-        lastAccess <- DateTimeOffset.UtcNow
+                yield {
+                    dateTime = new DateTimeOffset(info.CreationTime)
+                    duration = segmentTimeSeconds
+                    data = data
+                    originalPath = file
+                }
+        ]
 
-        let utf8 str = Encoding.UTF8.GetBytes(String.concat "\n" str)
+        for segment in segments |> Seq.sortBy (fun s -> s.dateTime) do
+            File.Delete(segment.originalPath)
+            if not (channel.Writer.TryWrite(segment)) then
+                raise ChannelFullException
+    }
 
-        let path = Path.Combine(path, filename)
+    let streamAsync (cancellationToken: CancellationToken) = task {
+        Directory.CreateDirectory(path) |> ignore
 
-        match filename with
-        | "playlist.m3u8" ->
-            return {|
-                data = utf8 [
-                    "#EXTM3U"
-                    "#EXT-X-ALLOW-CACHE:NO"
-                    "#EXT-X-VERSION:1"
-                    $"#EXT-X-STREAM-INF:BANDWIDTH={bitsPerSecond},CODECS=\"mp4a.40.5\""
-                    "chunklist.m3u8"
-                    ""
-                ]
-                contentType = "application/x-mpegURL"
-            |}
-        | "chunklist.m3u8" when File.Exists(path) ->
-            let! data = File.ReadAllBytesAsync(path, cancellationToken)
-            return {|
-                data = data
-                contentType = "application/x-mpegURL"
-            |}
-        | "chunklist.m3u8" ->
-            return {|
-                data = utf8 [
-                    "#EXTM3U"
-                    "#EXT-X-VERSION:3"
-                    $"#EXT-X-TARGETDURATION:{segmentTimeSeconds}"
-                    "#EXT-X-MEDIA-SEQUENCE:0"
-                    ""
-                ]
-                contentType = "application/x-mpegURL"
-            |}
-        | _ when filename.EndsWith(".ts") && File.Exists(path) ->
-            let! data = File.ReadAllBytesAsync(path, cancellationToken)
-            return {|
-                data = data
-                contentType = "video/mp2t"
-            |}
-        | _ when filename.EndsWith(".ts") ->
-            let! data = Silence.generateSegmentAsync (TimeSpan.FromSeconds(segmentTimeSeconds))
-            return {|
-                data = data
-                contentType = "video/mp2t"
-            |}
-        | _ ->
-            return raise InvalidFilenameException
+        use encoder = Process.Start(new ProcessStartInfo(
+            $"ffmpeg",
+            $"{readSpeedParameters} {inputParameters} {outputParameters}",
+            RedirectStandardInput = true))
+
+        let mutable available = true
+
+        while available && not encoder.HasExited do
+            try
+                do! ingestSegmentsAsync cancellationToken
+                do! Task.Delay(TimeSpan.FromSeconds(2L), cancellationToken)
+            with :? ChannelFullException ->
+                available <- false
+
+        if not encoder.HasExited then
+            use inputControl = encoder.StandardInput
+            do! inputControl.WriteAsync('q')
+
+        do! encoder.WaitForExitAsync(cancellationToken)
+
+        Directory.Delete(path, recursive = true)
     }
 
 type NoiseGenerationService() =
     inherit BackgroundService()
 
     override _.ExecuteAsync(cancellationToken) = task {
-        Directory.CreateDirectory(Noise.path) |> ignore
+        let mutable active = true
 
-        use generator = Process.Start(new ProcessStartInfo(
-            $"ffmpeg",
-            $"{Noise.inputParameters} -nostats -hide_banner -loglevel warning -f f32le -",
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true))
+        while active && not cancellationToken.IsCancellationRequested do
+            do! Noise.streamAsync cancellationToken
 
-        use encoder = Process.Start(new ProcessStartInfo(
-            $"ffmpeg",
-            $"{Noise.readSpeedParameters} -nostats -hide_banner -loglevel warning -f f32le -i - {Noise.outputParameters}",
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true))
+            printfn "[Noise] Waiting"
 
-        let inputControl = generator.StandardInput
-
-        do! task {
-            use pipeIn = generator.StandardOutput.BaseStream
-            use pipeOut = encoder.StandardInput.BaseStream
-
-            let bufferTime = TimeSpan.FromSeconds(10L)
-            let bufferSize = Noise.sampleRate * 4 * int bufferTime.TotalSeconds
-            let buffer = Array.create bufferSize 0uy
-            let empty = Array.create bufferSize 0uy
-
-            while not generator.HasExited && not encoder.HasExited && not cancellationToken.IsCancellationRequested do
-                try
-                    if Noise.isActive () then
-                        printfn "[Noise] Generating noise"
-                        do! pipeIn.ReadExactlyAsync(buffer, cancellationToken)
-                        do! pipeOut.WriteAsync(buffer, cancellationToken)
-                    else
-                        printfn "[Noise] Generating silence"
-                        do! pipeOut.WriteAsync(empty, cancellationToken)
-                with ex ->
-                    Console.Error.WriteLine(ex)
-        }
-
-        if not generator.HasExited then
-            do! inputControl.WriteAsync('q')
-            do! inputControl.DisposeAsync()
-
-        do! generator.WaitForExitAsync()
-        do! encoder.WaitForExitAsync()
-
-        Directory.Delete(Noise.path, recursive = true)
+            let! writable = Noise.channel.Writer.WaitToWriteAsync(cancellationToken)
+            active <- writable
     }
