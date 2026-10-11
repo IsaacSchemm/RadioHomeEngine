@@ -6,6 +6,7 @@ open System.IO
 open System.Text
 open System.Threading.Tasks
 open Microsoft.Extensions.Hosting
+open System.Threading
 
 module Noise =
     let path = Path.Combine([|
@@ -38,10 +39,10 @@ module Noise =
         "-readrate 1"
     ]
 
-    let mutable lastAccess = DateTimeOffset.UtcNow
+    let mutable lastAccess = DateTimeOffset.MinValue
 
     let isActive () =
-        DateTimeOffset.UtcNow - lastAccess < TimeSpan.FromMinutes(1L)
+        DateTimeOffset.UtcNow - lastAccess < TimeSpan.FromSeconds(segmentTimeSeconds * 3.0)
 
     exception InvalidFilenameException
 
@@ -125,14 +126,17 @@ type NoiseGenerationService() =
             let bufferTime = TimeSpan.FromSeconds(10L)
             let bufferSize = Noise.sampleRate * 4 * int bufferTime.TotalSeconds
             let buffer = Array.create bufferSize 0uy
+            let empty = Array.create bufferSize 0uy
 
             while not generator.HasExited && not encoder.HasExited && not cancellationToken.IsCancellationRequested do
                 try
                     if Noise.isActive () then
+                        printfn "[Noise] Generating noise"
                         do! pipeIn.ReadExactlyAsync(buffer, cancellationToken)
                         do! pipeOut.WriteAsync(buffer, cancellationToken)
                     else
-                        do! Task.Delay(TimeSpan.FromSeconds(Noise.segmentTimeSeconds / 2.0), cancellationToken)
+                        printfn "[Noise] Generating silence"
+                        do! pipeOut.WriteAsync(empty, cancellationToken)
                 with ex ->
                     Console.Error.WriteLine(ex)
         }

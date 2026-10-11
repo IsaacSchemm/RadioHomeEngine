@@ -30,7 +30,7 @@ module Silence =
 
     let segmentTimeSeconds = 10.0
 
-    let zeroTime = DateTimeOffset.UtcNow
+    let zeroTime = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(30.0)
 
     exception InvalidFilenameException
 
