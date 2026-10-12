@@ -111,7 +111,7 @@ module TunerProxy =
         currentChunklist <- None
     })
 
-    /// Gets a list of currently and recently playing songs or programs on the currently tuned channel.
+    /// Gets a string describing the current channel.
     let getCurrentChannelNameAsync cancellationToken = Lock.doAsync cancellationToken (fun () -> task {
         let mutable name = None
 
@@ -189,15 +189,23 @@ module TunerProxy =
                 |> Encoding.UTF8.GetString
                 |> ChunklistParser.parse
                 |> ChunklistNormalizer.normalize chunklistUri
+
+            let newChunks =
+                seq {
+                    let mutable newThreshold = threshold
+                    for chunk in chunks do
+                        match chunk.dateTime with
+                        | Some dt when dt > newThreshold ->
+                            yield chunk
+                            newThreshold <- dt
+                        | _ -> ()
+                }
                 |> Seq.rev
                 |> Seq.truncate 3
-                |> Seq.takeWhile (fun s ->
-                    match s.dateTime with
-                    | Some dateTime -> dateTime > threshold
-                    | None -> false)
                 |> Seq.rev
 
-            for chunk in chunks do
+            for chunk in newChunks do
+                printfn "[TunerProxy] [%O] Adding from SXM: %s" DateTime.Now chunk.path
                 let uri = new Uri(chunklistUri, chunk.path)
                 do! SegmentCache.addAsync chunk uri cancellationToken
 
