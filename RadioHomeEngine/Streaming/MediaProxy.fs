@@ -10,6 +10,8 @@ open System.Text
 open System.Threading.Tasks
 
 module MediaProxy =
+    let sxm = new SiriusXMClient()
+
     type Chunklist = {
         channelNumber: int
         index: int
@@ -84,11 +86,11 @@ module MediaProxy =
         }
 
     let getPlaylistAsync channelNumber cancellationToken = task {
-        let! playlist = SiriusXMClient.getPlaylistAsync channelNumber cancellationToken
+        let! playlist = sxm.GetPlaylistAsync(channelNumber, cancellationToken)
 
         let playlistUri = new Uri(playlist.url)
 
-        let! data = SiriusXMClient.getFileAsync playlistUri cancellationToken
+        let! data = sxm.GetFileAsync(playlistUri, cancellationToken)
 
         let lines =
             data.content
@@ -119,7 +121,7 @@ module MediaProxy =
             onRetryAsync = fun () -> getPlaylistAsync channelNumber cancellationToken
         }
 
-        let! data = SiriusXMClient.getFileAsync chunklist.uri cancellationToken
+        let! data = sxm.GetFileAsync(chunklist.uri, cancellationToken)
 
         let list =
             data.content
@@ -153,7 +155,7 @@ module MediaProxy =
             onRetryAsync = fun () -> getChunklistAsync channelNumber index cancellationToken
         }
 
-        let! encryptedData = SiriusXMClient.getFileAsync chunk.uri cancellationToken
+        let! encryptedData = sxm.GetFileAsync(chunk.uri, cancellationToken)
 
         let! data = task {
             match chunk.encryption with
@@ -166,7 +168,7 @@ module MediaProxy =
                 algorithm.KeySize <- 128
                 algorithm.BlockSize <- 128
 
-                algorithm.Key <- SiriusXMClient.getKey ()
+                algorithm.Key <- sxm.GetKey()
 
                 algorithm.IV <-
                     let iv = Array.zeroCreate 16

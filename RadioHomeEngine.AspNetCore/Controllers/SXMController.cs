@@ -8,7 +8,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
     {
         public async Task<IActionResult> ChannelImage(int num, CancellationToken cancellationToken)
         {
-            var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
+            var channels = await MediaProxy.sxm.GetChannelsAsync(cancellationToken);
 
             var imageUrl = channels
                 .Where(c => c.channelNumber == $"{num}")
@@ -42,12 +42,12 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 
         public async Task<IActionResult> ViewChannel(int num, CancellationToken cancellationToken)
         {
-            var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
+            var channels = await MediaProxy.sxm.GetChannelsAsync(cancellationToken);
             var channel = channels
                 .Where(c => c.channelNumber == $"{num}")
                 .First();
 
-            var playlist = await SiriusXMClient.getPlaylistAsync(
+            var playlist = await MediaProxy.sxm.GetPlaylistAsync(
                 num,
                 cancellationToken);
 

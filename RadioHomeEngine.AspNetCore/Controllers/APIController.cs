@@ -21,7 +21,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             var address = await Network.getAddressAsync();
-            var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
+            var channels = await MediaProxy.sxm.GetChannelsAsync(cancellationToken);
             foreach (var channel in channels)
             {
                 yield return new APISXMChannel(
@@ -59,10 +59,10 @@ namespace RadioHomeEngine.AspNetCore.Controllers
             int channelNumber,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            var channels = await SiriusXMClient.getChannelsAsync(cancellationToken);
+            var channels = await MediaProxy.sxm.GetChannelsAsync(cancellationToken);
             var channel = channels.First(c => c.channelNumber == "${channelNumber}");
 
-            var playlist = await SiriusXMClient.getPlaylistAsync(
+            var playlist = await MediaProxy.sxm.GetPlaylistAsync(
                 channelNumber,
                 cancellationToken);
 
