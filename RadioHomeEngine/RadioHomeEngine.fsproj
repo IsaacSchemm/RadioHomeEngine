@@ -13,6 +13,11 @@
     <Compile Include="Streaming\ChunklistParser.fs" />
     <Compile Include="streaming\ChunklistNormalizer.fs" />
     <Compile Include="Streaming\MediaProxy.fs" />
+    <Folder Include="Channeling\" />
+    <Compile Include="channeling\ISegmentSource.fs" />
+    <Compile Include="channeling\Silence.fs" />
+    <Compile Include="channeling\SegmentCache.fs" />
+    <Compile Include="channeling\TunerProxy.fs" />
     <Compile Include="Lyrion\LyrionCLI.fs" />
     <Compile Include="Lyrion\LyrionCLIService.fs" />
     <Compile Include="Lyrion\PlayerConnection.fs" />
@@ -51,5 +56,7 @@
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="10.1.401" />
   </ItemGroup>
+
+  <ItemGroup />
 
 </Project>
