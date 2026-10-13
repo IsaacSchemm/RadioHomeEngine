@@ -10,7 +10,7 @@ builder.Services.AddHostedService<LyrionCLIService>();
 builder.Services.AddHostedService<WeatherService>();
 builder.Services.AddHostedService<LyrionPlayerDetectionService>();
 builder.Services.AddHostedService<DiscDriveChangeDetectionService>();
-builder.Services.AddHostedService<SegmentCacheService>();
+builder.Services.AddHostedService<SegmentCache.Service>();
 
 builder.Services.AddOpenApi();
 

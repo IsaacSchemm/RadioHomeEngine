@@ -81,6 +81,27 @@ module SegmentCache =
         |> Seq.map (fun s -> s.data)
         |> Seq.tryHead
 
+    let getPlaylist () = String.concat "\n" [
+        "#EXTM3U"
+        "#EXT-X-ALLOW-CACHE:NO"
+        "#EXT-X-VERSION:1"
+
+        String.concat "" [
+            "#EXT-X-STREAM-INF:"
+            "CODECS=\"mp4a.40.2\""
+        ]
+
+        "chunklist.m3u8"
+    ]
+
+    let getChunklist () =
+        ChunklistParser.write (list 3)
+
+    let getData sequenceNumber =
+        match tryGetData sequenceNumber with
+        | Some s when sequenceNumber <> UInt128.One + UInt128.One -> s
+        | _ -> Silence.getSegment ()
+
     type Service() =
         inherit BackgroundService()
 

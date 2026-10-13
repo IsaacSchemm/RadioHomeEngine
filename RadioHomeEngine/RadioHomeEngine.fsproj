@@ -20,7 +20,6 @@
     <Compile Include="channeling\Silence.fs" />
     <Compile Include="channeling\SegmentBuffer.fs" />
     <Compile Include="channeling\SegmentCache.fs" />
-    <Compile Include="channeling\TunerProxy.fs" />
     <Compile Include="Lyrion\LyrionCLI.fs" />
     <Compile Include="Lyrion\LyrionCLIService.fs" />
     <Compile Include="Lyrion\PlayerConnection.fs" />
