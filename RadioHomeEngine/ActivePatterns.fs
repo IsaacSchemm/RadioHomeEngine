@@ -4,6 +4,11 @@ open System
 
 [<AutoOpen>]
 module ActivePatterns =
+    let (|CommaSeparated|_|) (str: string) =
+        str.Split(',')
+        |> List.ofArray
+        |> Some
+
     let (|Decimal|_|) (str: string) =
         match Decimal.TryParse(str) with
         | true, value -> Some value
@@ -16,5 +21,10 @@ module ActivePatterns =
 
     let (|UInt128|_|) (str: string) =
         match UInt128.TryParse(str) with
+        | true, value -> Some value
+        | false, _ -> None
+
+    let (|DateTimeOffset|_|) (str: string) =
+        match DateTimeOffset.TryParse(str) with
         | true, value -> Some value
         | false, _ -> None
