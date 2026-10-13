@@ -99,7 +99,7 @@ module SegmentCache =
 
     let getData sequenceNumber =
         match tryGetData sequenceNumber with
-        | Some s when sequenceNumber <> UInt128.One + UInt128.One -> s
+        | Some s -> s
         | _ -> Silence.getSegment ()
 
     type Service() =

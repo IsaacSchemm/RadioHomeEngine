@@ -22,6 +22,8 @@ type NoiseSource() =
         $"-i \"anoisesrc=sample_rate={sampleRate}:color={color}\""
     ]
 
+    let pipeFormat = "-f f64le -ac 1"
+
     let outputParameters = String.concat " " [
         "-f hls"
         $"-hls_time {segmentTimeSeconds}"
@@ -37,15 +39,31 @@ type NoiseSource() =
         "-readrate 1"
     ]
 
-    let mutable encoder = null
+    let mutable generator = null
+    let mutable reencoder = null
+    let mutable pipe = Task.CompletedTask
 
     let startTask = lazy task {
         Directory.CreateDirectory(path) |> ignore
 
-        encoder <- Process.Start(new ProcessStartInfo(
+        generator <- Process.Start(new ProcessStartInfo(
             $"ffmpeg",
-            $"{readSpeedParameters} {inputParameters} {outputParameters}",
+            $"-nostats -hide_banner -loglevel warning {inputParameters} {pipeFormat} -",
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true))
+
+        reencoder <- Process.Start(new ProcessStartInfo(
+            $"ffmpeg",
+            $"{readSpeedParameters} {pipeFormat} -i - {outputParameters}",
             RedirectStandardInput = true))
+
+        pipe <- task {
+            try
+                use input = generator.StandardOutput.BaseStream
+                use output = reencoder.StandardInput.BaseStream
+                do! input.CopyToAsync(output)
+            with :? IOException when generator.HasExited -> ()
+        }
     }
 
     interface ISegmentSource with
@@ -76,14 +94,23 @@ type NoiseSource() =
 
     interface IAsyncDisposable with
         member _.DisposeAsync() = new ValueTask(task {
-            if not (isNull encoder) then
-                printfn "[NoiseSource] Disposing"
+            printfn "[NoiseSource] Disposing"
 
-                if not encoder.HasExited then
-                    use inputControl = encoder.StandardInput
+            if not (isNull generator) then
+                printfn "[NoiseSource] A"
+                if not generator.HasExited then
+                    use inputControl = generator.StandardInput
                     do! inputControl.WriteAsync('q')
 
-                do! encoder.WaitForExitAsync()
+                printfn "[NoiseSource] B"
+                do! generator.WaitForExitAsync()
 
+                printfn "[NoiseSource] C"
+                do! pipe
+
+                printfn "[NoiseSource] D"
+                do! reencoder.WaitForExitAsync()
+
+                printfn "[NoiseSource] E"
                 Directory.Delete(path, recursive = true)
         })
