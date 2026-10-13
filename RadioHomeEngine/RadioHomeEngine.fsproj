@@ -14,8 +14,11 @@
     <Compile Include="streaming\ChunklistNormalizer.fs" />
     <Compile Include="Streaming\MediaProxy.fs" />
     <Folder Include="Channeling\" />
+    <Compile Include="channeling\ChanneledSegment.fs" />
     <Compile Include="channeling\ISegmentSource.fs" />
+    <Compile Include="channeling\NoiseSource.fs" />
     <Compile Include="channeling\Silence.fs" />
+    <Compile Include="channeling\SegmentBuffer.fs" />
     <Compile Include="channeling\SegmentCache.fs" />
     <Compile Include="channeling\TunerProxy.fs" />
     <Compile Include="Lyrion\LyrionCLI.fs" />

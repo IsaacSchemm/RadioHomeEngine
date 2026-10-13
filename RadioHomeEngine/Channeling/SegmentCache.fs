@@ -37,7 +37,7 @@ module SegmentCache =
     let mutable private lastRequested = DateTimeOffset.UtcNow
 
     // Stores a decrypted audio segment to the cache, along with the metadata and its new sequence number.
-    let private add (segment: GeneratedSegment) =
+    let private add (segment: ChanneledSegment) =
         let cacheItem = {
             data = segment.data
             segment = {
