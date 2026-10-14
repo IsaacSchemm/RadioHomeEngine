@@ -29,6 +29,9 @@ module SegmentCache =
     /// The last date and time at which the cache was accessed. Cache population is paused when not in use.
     let mutable private lastRequested = DateTimeOffset.UtcNow
 
+    /// A callback that triggers the service loop to unpause cache population.
+    let mutable private stopWaiting = fun () -> ()
+
     // Stores a decrypted audio segment to the cache, along with the metadata and its new sequence number.
     let private add (segment: DownstreamSegment) =
         let cacheItem = {
@@ -60,17 +63,10 @@ module SegmentCache =
                 add segment
                 threshold <- segment.dateTime
 
-    /// List the most recent segments available to the user agent, in order from oldest to newest.
-    let list (count: int) =
-        lastRequested <- DateTimeOffset.UtcNow
-
-        cache
-        |> Seq.truncate count
-        |> Seq.rev
-
     /// Gets a segment's unencrypted audio data from the cache, if it exists, using its new sequence number.
     let tryGetData sequenceNumber =
         lastRequested <- DateTimeOffset.UtcNow
+        stopWaiting ()
 
         cache
         |> Seq.where (fun s -> s.mediaSequence = sequenceNumber)
@@ -129,8 +125,10 @@ module SegmentCache =
                     while isInUse () do
                         readFrom segmentBuffer
                         evictStale ()
-
                         do! Task.Delay(TimeSpan.FromSeconds(1.0), cancellationToken)
-
-                do! Task.Delay(TimeSpan.FromSeconds(5.0), cancellationToken)
+                else
+                    use cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                    stopWaiting <- fun () -> cts.Cancel()
+                    do! Task.Delay(-1, cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
+                    stopWaiting <- fun () -> ()
         }
