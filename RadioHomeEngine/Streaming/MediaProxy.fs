@@ -9,6 +9,7 @@ open System.Security.Cryptography
 open System.Text
 open System.Threading.Tasks
 
+[<Obsolete>]
 module MediaProxy =
     let sxm = new SiriusXMClient()
 

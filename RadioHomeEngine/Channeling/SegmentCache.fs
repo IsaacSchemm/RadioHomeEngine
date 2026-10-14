@@ -16,13 +16,6 @@ open Microsoft.Extensions.Hosting
 // This happens during a chunklist request, when new segments are found in the upstream chunklist.
 
 module SegmentCache =
-    type Segment = UpstreamSegment
-
-    type CacheItem = {
-        data: byte array
-        segment: Segment
-    }
-
     type Encryption = Key1 | NoEncryption
 
     exception UnknownEncryptionException
@@ -39,31 +32,39 @@ module SegmentCache =
     // Stores a decrypted audio segment to the cache, along with the metadata and its new sequence number.
     let private add (segment: DownstreamSegment) =
         let cacheItem = {
-            data = segment.data
-            segment = {
-                encryption = Clear
-                dateTime = Some segment.dateTime
-                mediaSequence = nextSequenceNumber
-                duration = Some segment.duration
-                path = $"/Proxy/chunk-{nextSequenceNumber}.ts"
-            }
+            segment with mediaSequence = nextSequenceNumber
         }
         cache <- cacheItem :: cache
-        nextSequenceNumber <- cacheItem.segment.mediaSequence + UInt128.One
+        nextSequenceNumber <- nextSequenceNumber + UInt128.One
 
     /// Remove all but the ten most recent segments from the cache.
     let private evictStale () =
         cache <- cache |> List.truncate 10
 
     let private isInUse () =
-        DateTimeOffset.UtcNow - lastRequested < TimeSpan.FromSeconds(30.0)
+        DateTimeOffset.UtcNow - lastRequested < TimeSpan.FromMinutes(1.0)
+
+    let private readFrom (segmentBuffer: SegmentBuffer) =
+        // Look for segments that have a timestamp at least [segment-length / 2] seconds newer than the newest cached segment.
+        // Never take more than the three most recent segments, though.
+
+        let mutable threshold =
+            match Seq.tryHead cache with
+            | Some segment -> segment.dateTime + TimeSpan.FromSeconds(float segment.duration / 2.0)
+            | None -> DateTimeOffset.MinValue
+
+        // Add any newly generated chunks.
+
+        for segment in segmentBuffer.ReadAll() do
+            if segment.dateTime > threshold then
+                add segment
+                threshold <- segment.dateTime
 
     /// List the most recent segments available to the user agent, in order from oldest to newest.
     let list (count: int) =
         lastRequested <- DateTimeOffset.UtcNow
 
         cache
-        |> Seq.map (fun s -> s.segment)
         |> Seq.truncate count
         |> Seq.rev
 
@@ -72,7 +73,7 @@ module SegmentCache =
         lastRequested <- DateTimeOffset.UtcNow
 
         cache
-        |> Seq.where (fun s -> s.segment.mediaSequence = sequenceNumber)
+        |> Seq.where (fun s -> s.mediaSequence = sequenceNumber)
         |> Seq.map (fun s -> s.data)
         |> Seq.tryHead
 
@@ -89,8 +90,29 @@ module SegmentCache =
         "chunklist.m3u8"
     ]
 
-    let getChunklist () =
-        ChunklistParser.write (list 3)
+    let getChunklist () = String.concat "\n" [
+        "#EXTM3U"
+
+        match cache with
+        | [] -> ()
+        | segment :: _ -> $"#EXT-X-TARGETDURATION:{int (round segment.duration)}"
+
+        "#EXT-X-VERSION:1"
+        "#EXT-X-ALLOW-CACHE:NO"
+
+        let segments = cache |> List.truncate 3 |> List.rev
+
+        match segments with
+        | [] -> ()
+        | segment :: _ -> $"#EXT-X-MEDIA-SEQUENCE:{segment.mediaSequence}"
+
+        let mutable encryption = Clear
+
+        for segment in segments do
+            $"#EXT-X-PROGRAM-DATE-TIME:{segment.dateTime:o}"
+            $"#EXTINF:{segment.duration},"
+            $"/Stream/chunk-{segment.mediaSequence}.ts"
+    ]
 
     let getData sequenceNumber =
         match tryGetData sequenceNumber with
@@ -105,36 +127,7 @@ module SegmentCache =
                 if isInUse () then
                     use segmentBuffer = new SegmentBuffer((fun () -> new NoiseSource()), cancellationToken)
                     while isInUse () do
-                        // Look for segments that have a timestamp at least [segment-length / 2] seconds newer than the newest cached segment.
-                        // Never take more than the three most recent segments, though.
-
-                        let newestSegment = Seq.tryHead cache
-
-                        let threshold =
-                            let dateTime =
-                                newestSegment
-                                |> Option.bind (fun cacheItem -> cacheItem.segment.dateTime)
-                                |> Option.defaultValue DateTimeOffset.MinValue
-                            let duration =
-                                newestSegment
-                                |> Option.bind (fun cacheItem -> cacheItem.segment.duration)
-                                |> Option.defaultValue 0.0
-
-                            dateTime + TimeSpan.FromSeconds(float duration / 2.0)
-
-                        // Look for newly generated chunks.
-
-                        let mutable more = true
-                        while more do
-                            match segmentBuffer.TryRead() with
-                            | Some segment ->
-                                if segment.dateTime > threshold then
-                                    add segment
-                            | None ->
-                                more <- false
-
-                        // Remove old segments from the cache as needed.
-
+                        readFrom segmentBuffer
                         evictStale ()
 
                         do! Task.Delay(TimeSpan.FromSeconds(1.0), cancellationToken)

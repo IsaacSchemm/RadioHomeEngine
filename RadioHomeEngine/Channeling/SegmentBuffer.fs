@@ -26,6 +26,16 @@ type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: Cancellat
         | (true, segment) -> Some segment
         | (false, _) -> None
 
+    member this.ReadAll() = [
+        let mutable more = true
+        while more do
+            match this.TryRead() with
+            | Some segment ->
+                yield segment
+            | None ->
+                more <- false
+    ]
+
     interface IAsyncDisposable with
         member this.DisposeAsync() = new ValueTask(task {
             printfn "Disposing SegmentBuffer"

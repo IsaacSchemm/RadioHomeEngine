@@ -40,8 +40,10 @@ type NoiseSource() =
     ]
 
     let mutable generator = null
+    let mutable stopGenerator = fun () -> ()
     let mutable reencoder = null
     let mutable pipe = Task.CompletedTask
+    let mutable disposing = false
 
     let startTask = lazy task {
         Directory.CreateDirectory(path) |> ignore
@@ -62,7 +64,7 @@ type NoiseSource() =
                 use input = generator.StandardOutput.BaseStream
                 use output = reencoder.StandardInput.BaseStream
                 do! input.CopyToAsync(output)
-            with :? IOException when generator.HasExited -> ()
+            with :? IOException when disposing -> ()
         }
     }
 
@@ -82,6 +84,7 @@ type NoiseSource() =
                         dateTime = new DateTimeOffset(info.CreationTime)
                         duration = segmentTimeSeconds
                         data = data
+                        mediaSequence = UInt128.Zero
                     }
                     segments <- segment :: segments
                     files <- file :: files
@@ -94,23 +97,19 @@ type NoiseSource() =
 
     interface IAsyncDisposable with
         member _.DisposeAsync() = new ValueTask(task {
-            printfn "[NoiseSource] Disposing"
+            disposing <- true
+
+            if not (isNull generator) && not generator.HasExited then
+                use inputControl = generator.StandardInput
+                do! inputControl.WriteAsync('q')
 
             if not (isNull generator) then
-                printfn "[NoiseSource] A"
-                if not generator.HasExited then
-                    use inputControl = generator.StandardInput
-                    do! inputControl.WriteAsync('q')
-
-                printfn "[NoiseSource] B"
                 do! generator.WaitForExitAsync()
 
-                printfn "[NoiseSource] C"
-                do! pipe
+            do! pipe
 
-                printfn "[NoiseSource] D"
+            if not (isNull reencoder) then
                 do! reencoder.WaitForExitAsync()
 
-                printfn "[NoiseSource] E"
-                Directory.Delete(path, recursive = true)
+            Directory.Delete(path, recursive = true)
         })

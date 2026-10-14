@@ -71,6 +71,7 @@ module ChunklistParser =
             | _ -> ()
     ]
 
+    [<Obsolete>]
     let write segments = String.concat "\n" [
         "#EXTM3U"
 

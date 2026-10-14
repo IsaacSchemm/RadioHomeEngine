@@ -6,6 +6,7 @@ type DownstreamSegment = {
     dateTime: DateTimeOffset
     duration: float
     data: byte array
+    mediaSequence: UInt128
 }
 
 module DownstreamSegment =
@@ -16,6 +17,7 @@ module DownstreamSegment =
                 dateTime = dateTime
                 duration = duration
                 data = unencryptedData
+                mediaSequence = segment.mediaSequence
             }
         | _ ->
             None
