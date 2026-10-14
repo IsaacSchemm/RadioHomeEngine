@@ -6,9 +6,11 @@ namespace RadioHomeEngine.AspNetCore.Controllers
     public class ProxyController : Controller
     {
         [Route("Proxy/playlist-{channelNumber}.m3u8")]
-        public IActionResult Playlist(int channelNumber, CancellationToken cancellationToken)
+        public async Task<IActionResult> Playlist(int channelNumber, CancellationToken cancellationToken)
         {
-            string contents = SegmentCache.getPlaylist();
+            string contents = await MediaProxy.getPlaylistAsync(
+                channelNumber,
+                cancellationToken);
 
             return Content(
                 contents,
@@ -16,10 +18,10 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 Encoding.UTF8);
         }
 
-        [Route("Proxy/chunklist.m3u8")]
-        public IActionResult Chunklist(CancellationToken cancellationToken)
+        [Route("Proxy/chunklist-{channelNumber}-{index}.m3u8")]
+        public async Task<IActionResult> Chunklist(int channelNumber, int index, CancellationToken cancellationToken)
         {
-            string contents = SegmentCache.getChunklist();
+            string contents = await MediaProxy.getChunklistAsync(channelNumber, index, cancellationToken);
 
             return Content(
                 contents,
@@ -27,10 +29,10 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 Encoding.UTF8);
         }
 
-        [Route("Proxy/chunk-{sequenceNumber}.ts")]
-        public IActionResult Chunk(UInt128 sequenceNumber, CancellationToken cancellationToken)
+        [Route("Proxy/chunk-{channelNumber}-{index}-{sequenceNumber}.ts")]
+        public async Task<IActionResult> Chunk(int channelNumber, int index, UInt128 sequenceNumber, CancellationToken cancellationToken)
         {
-            var data = SegmentCache.getData(sequenceNumber);
+            var data = await MediaProxy.getChunkAsync(channelNumber, index, sequenceNumber, cancellationToken);
 
             return File(
                 data,

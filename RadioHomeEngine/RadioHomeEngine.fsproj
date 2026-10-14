@@ -9,12 +9,13 @@
     <Compile Include="Utility.fs" />
     <Compile Include="ActivePatterns.fs" />
     <Compile Include="Network.fs" />
+    <Compile Include="UpstreamSegment.fs" />
     <Compile Include="Streaming\SiriusXMClient.fs" />
     <Compile Include="Streaming\ChunklistParser.fs" />
     <Compile Include="streaming\ChunklistNormalizer.fs" />
     <Compile Include="Streaming\MediaProxy.fs" />
     <Folder Include="Channeling\" />
-    <Compile Include="channeling\ChanneledSegment.fs" />
+    <Compile Include="channeling\DownstreamSegment.fs" />
     <Compile Include="channeling\ISegmentSource.fs" />
     <Compile Include="channeling\NoiseSource.fs" />
     <Compile Include="channeling\Silence.fs" />

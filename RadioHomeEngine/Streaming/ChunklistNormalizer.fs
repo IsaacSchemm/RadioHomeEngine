@@ -3,7 +3,7 @@ namespace RadioHomeEngine
 open System
 
 module ChunklistNormalizer =
-    type Segment = ChunklistParser.Segment
+    type Segment = UpstreamSegment
 
     type KnownStream(uri: Uri, offset: TimeSpan) =
         member _.Uri = uri

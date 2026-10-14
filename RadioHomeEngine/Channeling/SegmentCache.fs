@@ -16,7 +16,7 @@ open Microsoft.Extensions.Hosting
 // This happens during a chunklist request, when new segments are found in the upstream chunklist.
 
 module SegmentCache =
-    type Segment = ChunklistParser.Segment
+    type Segment = UpstreamSegment
 
     type CacheItem = {
         data: byte array
@@ -37,19 +37,14 @@ module SegmentCache =
     let mutable private lastRequested = DateTimeOffset.UtcNow
 
     // Stores a decrypted audio segment to the cache, along with the metadata and its new sequence number.
-    let private add (segment: ChanneledSegment) =
+    let private add (segment: DownstreamSegment) =
         let cacheItem = {
             data = segment.data
             segment = {
-                key = "NONE"
-                headerTags = [
-                    "#EXT-X-VERSION:3"
-                    $"#EXT-X-TARGETDURATION:{segment.duration}"
-                ]
+                encryption = Clear
                 dateTime = Some segment.dateTime
                 mediaSequence = nextSequenceNumber
-                duration = Some (decimal segment.duration)
-                byteRange = None
+                duration = Some segment.duration
                 path = $"/Proxy/chunk-{nextSequenceNumber}.ts"
             }
         }
@@ -123,7 +118,7 @@ module SegmentCache =
                             let duration =
                                 newestSegment
                                 |> Option.bind (fun cacheItem -> cacheItem.segment.duration)
-                                |> Option.defaultValue 0.0m
+                                |> Option.defaultValue 0.0
 
                             dateTime + TimeSpan.FromSeconds(float duration / 2.0)
 

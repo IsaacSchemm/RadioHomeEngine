@@ -3,29 +3,6 @@
 open System
 
 module ChunklistParser =
-    type Segment = {
-        /// The value of the EXT-X-KEY tag that applies to this segment. May be inherited from the previous segment.
-        key: string
-
-        /// Any miscellaneous tags that apply to the entire chunklist.
-        headerTags: string list
-
-        /// The absolute date and time of the start of this media segment.
-        dateTime: DateTimeOffset option
-
-        /// The sequence number of this segment.
-        mediaSequence: UInt128
-
-        /// The duration of this chunk, in seconds.
-        duration: decimal option
-
-        /// The range of bytes in the file that constitute this chunk.
-        byteRange: string option
-
-        /// The path to the chunk, relative to the chunklist.
-        path: string
-    }
-
     let zero = UInt128.Zero
     let one = UInt128.One
 
@@ -40,9 +17,7 @@ module ChunklistParser =
             Some (name, value)
 
     let parse text = [
-        let mutable key = "NONE"
-        let mutable headerTags = []
-
+        let mutable encryption = Clear
         let mutable dateTime = None
         let mutable mediaSequence = zero
         let mutable duration = None
@@ -50,9 +25,16 @@ module ChunklistParser =
 
         for line in Utility.split '\n' text do
             match line with
-            | Tag ("EXT-X-KEY", value) ->
+            | Tag ("EXT-X-KEY", CommaSeparated attributes) ->
                 // This tag usually applies to the whole chunklist, but theoretically, it can be changed between chunks.
-                key <- value
+                encryption <-
+                    match List.sort attributes with
+                    | [HLSAttribute ("METHOD", "NONE")] ->
+                        Clear
+                    | [HLSAttribute ("METHOD", "AES-128"); HLSAttribute ("URI", HLSQuotedString uri)] ->
+                        Aes128 uri
+                    | _ ->
+                        Unknown
 
             | Tag ("EXT-X-MEDIA-SEQUENCE", UInt128 value) ->
                 mediaSequence <- value
@@ -60,25 +42,21 @@ module ChunklistParser =
             | Tag ("EXT-X-PROGRAM-DATE-TIME", DateTimeOffset value) ->
                 dateTime <- Some value
 
-            | Tag ("EXTINF", CommaSeparated (Decimal value :: _)) ->
+            | Tag ("EXTINF", CommaSeparated (Float64 value :: _)) ->
                 duration <- Some value
 
             | Tag ("EXT-X-BYTERANGE", value) ->
-                byteRange <- Some value
+                raise (new NotImplementedException())
 
-            | Tag _ ->
-                // All other tags are associated with the entire chunklist.
-                headerTags <- List.rev (line :: headerTags)
+            | Tag _ -> ()
 
             | _ when not (line.StartsWith('#')) ->
                 // This line is not a tag, so it represents an actual chunk.
                 {
-                    key = key
-                    headerTags = headerTags
+                    encryption = encryption
                     dateTime = dateTime
                     mediaSequence = mediaSequence
                     duration = duration
-                    byteRange = byteRange
                     path = line
                 }
 
@@ -94,34 +72,35 @@ module ChunklistParser =
     ]
 
     let write segments = String.concat "\n" [
-        yield "#EXTM3U"
+        "#EXTM3U"
 
         match Seq.tryHead segments with
         | None -> ()
         | Some segment ->
-            yield! segment.headerTags
+            match segment.duration with
+            | Some duration -> $"#EXT-X-TARGETDURATION:{int (round duration)}"
+            | None -> ()
+
+            "#EXT-X-VERSION:1"
+            "#EXT-X-ALLOW-CACHE:NO"
 
             if segment.mediaSequence <> zero then
-                yield $"#EXT-X-MEDIA-SEQUENCE:{segment.mediaSequence}"
+                $"#EXT-X-MEDIA-SEQUENCE:{segment.mediaSequence}"
 
-        let mutable lastKey = "NONE"
+        let mutable encryption = Clear
 
         for segment in segments do
-            if segment.key <> lastKey then
-                yield $"EXT-X-KEY:{segment.key}"
-                lastKey <- segment.key
+            if segment.encryption <> encryption then
+                $"EXT-X-KEY:{encryption}"
+                encryption <- segment.encryption
 
             match segment.dateTime with
-            | Some dateTime -> yield $"#EXT-X-PROGRAM-DATE-TIME:{dateTime:o}"
+            | Some dateTime -> $"#EXT-X-PROGRAM-DATE-TIME:{dateTime:o}"
             | None -> ()
 
             match segment.duration with
-            | Some duration -> yield $"#EXTINF:{duration},"
+            | Some duration -> $"#EXTINF:{duration},"
             | None -> ()
 
-            match segment.byteRange with
-            | Some byteRange -> yield $"#EXT-X-BYTERANGE:{byteRange}"
-            | None -> ()
-
-            yield segment.path
+            segment.path
     ]

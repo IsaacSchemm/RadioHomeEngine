@@ -7,7 +7,7 @@ open System.Threading.Tasks
 open FSharp.Control
 
 type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: CancellationToken) =
-    let channel = Channel.CreateBounded<ChanneledSegment>(5)
+    let channel = Channel.CreateBounded<DownstreamSegment>(5)
 
     let localTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
     let localToken = localTokenSource.Token

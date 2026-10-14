@@ -137,13 +137,13 @@ module MediaProxy =
                     uri = uri
                     sequenceNumber = segment.mediaSequence
                     encryption =
-                        match segment.key with
-                        | "METHOD=AES-128,URI=\"key/1\"" -> Key1
-                        | "NONE" -> NoEncryption
+                        match segment.encryption with
+                        | Aes128 "key/1" -> Key1
+                        | Clear -> NoEncryption
                         | _ -> raise UnknownEncryptionException
                 }
 
-                { segment with key = "NONE"; path = $"chunk-{channelNumber}-{chunklist.index}-{segment.mediaSequence}.ts" }
+                { segment with encryption = Clear; path = $"chunk-{channelNumber}-{chunklist.index}-{segment.mediaSequence}.ts" }
         ]
 
         return content
