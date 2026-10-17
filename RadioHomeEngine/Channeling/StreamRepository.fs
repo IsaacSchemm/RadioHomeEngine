@@ -9,7 +9,7 @@ open FSharp.Control
 module StreamRepository =
     let noise = new Stream({
         channelNumber = 0
-        factory = fun () -> new NoiseSource()
+        source = new NoiseSource()
         mode = Pausable
     })
 
@@ -17,7 +17,7 @@ module StreamRepository =
 
     [<Obsolete>]
     let pushToChannelZeroAsync channelNumber =
-        noise.PushAsync(fun () -> new SiriusXMSource(channelNumber))
+        noise.PushAsync(new SiriusXMSource(channelNumber))
 
     [<Obsolete>]
     let restoreChannelZeroAsync () =
@@ -25,18 +25,16 @@ module StreamRepository =
 
     let getStream channelNumber = lock streams (fun () ->
         match streams |> Seq.where (fun s -> s.ChannelNumber = channelNumber) |> Seq.tryHead with
-        | Some c ->
-            printfn "[SegmentCacheRepository] Finding [%d]" channelNumber
-            c
+        | Some stream ->
+            stream
         | None ->
-            printfn "[SegmentCacheRepository] Creating [%d]" channelNumber
-            let s = new Stream({
+            let stream = new Stream({
                 channelNumber = channelNumber
-                factory = fun () -> new SiriusXMSource(channelNumber)
+                source = new SiriusXMSource(channelNumber)
                 mode = Ephemeral
             })
-            streams.Add(s)
-            s)
+            streams.Add(stream)
+            stream)
 
     let forgetStreamAsync stream = task {
         let _ = lock streams (fun () -> streams.Remove(stream))

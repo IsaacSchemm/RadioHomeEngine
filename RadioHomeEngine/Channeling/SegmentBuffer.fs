@@ -6,7 +6,7 @@ open System.Threading.Channels
 open System.Threading.Tasks
 open FSharp.Control
 
-type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: CancellationToken) =
+type SegmentBuffer(source: ISegmentSource, cancellationToken: CancellationToken) =
     let guid = Guid.NewGuid()
 
     let mutable disposed = false
@@ -17,7 +17,7 @@ type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: Cancellat
     let localToken = localTokenSource.Token
 
     let ingestionTask = task {
-        use segmentSource = factory ()
+        use segmentSource = source
         while not localToken.IsCancellationRequested do
             let! segments = segmentSource.ScanAsync(localToken)
 

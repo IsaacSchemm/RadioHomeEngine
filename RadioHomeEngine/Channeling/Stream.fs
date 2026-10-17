@@ -10,7 +10,7 @@ type StreamMode =
 
 type StreamDefinition = {
     channelNumber: int
-    factory: unit -> ISegmentSource
+    source: ISegmentSource
     mode: StreamMode
 }
 
@@ -29,12 +29,12 @@ type Stream(definition: StreamDefinition) =
         | _ :: _ -> ()
         | [] ->
             printfn "[Stream] Starting new buffer for %d" definition.channelNumber
-            bufferStack <- new SegmentBuffer(definition.factory, cancellationToken) :: bufferStack
+            bufferStack <- new SegmentBuffer(definition.source, cancellationToken) :: bufferStack
             lastToken <- cancellationToken
     }
 
-    member _.PushAsync(factory: unit -> ISegmentSource) = task {
-        bufferStack <- new SegmentBuffer(factory, lastToken) :: bufferStack
+    member _.PushAsync(source: ISegmentSource) = task {
+        bufferStack <- new SegmentBuffer(source, lastToken) :: bufferStack
     }
 
     member _.PopAsync() = task {
