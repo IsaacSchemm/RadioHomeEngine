@@ -43,6 +43,7 @@ type SiriusXMSource(channelNumber: int) =
                 chunklistData.content
                 |> Encoding.UTF8.GetString
                 |> ChunklistParser.parse
+                |> ChunklistNormalizer.normalize chunklistUri
                 |> Seq.rev
                 |> Seq.truncate 3
                 |> Seq.rev
@@ -89,10 +90,34 @@ type SiriusXMSource(channelNumber: int) =
                                 return failwithf "Unrecogznied stream encryption: %A" x
                         }
 
+                        let ffmpeg =
+                            new ProcessStartInfo(
+                                "ffmpeg",
+                                "-i - -f mpegts -c:a copy -",
+                                RedirectStandardInput = true,
+                                RedirectStandardOutput = true)
+                            |> Process.Start
+
+                        let! recontainerized_data = task {
+                            use buffer = new MemoryStream()
+
+                            let writeTask = ffmpeg.StandardInput.BaseStream.WriteAsync(data)
+                            let readTask = ffmpeg.StandardOutput.BaseStream.CopyToAsync(buffer)
+
+                            do! writeTask
+
+                            ffmpeg.StandardInput.BaseStream.Close()
+
+                            do! readTask
+                            do! ffmpeg.WaitForExitAsync()
+
+                            return buffer.ToArray()
+                        }
+
                         let segment = {
                             dateTime = dateTime
                             duration = duration
-                            data = data
+                            data = recontainerized_data
                             mediaSequence = chunk.mediaSequence
                         }
 
