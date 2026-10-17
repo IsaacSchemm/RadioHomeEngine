@@ -7,13 +7,21 @@ open Microsoft.Extensions.Hosting
 open FSharp.Control
 
 module StreamRepository =
-    let streams = ResizeArray [
-        new Stream({
-            channelNumber = 0
-            factory = fun () -> new NoiseSource()
-            mode = Pausable
-        })
-    ]
+    let noise = new Stream({
+        channelNumber = 0
+        factory = fun () -> new NoiseSource()
+        mode = Pausable
+    })
+
+    let streams = ResizeArray [noise]
+
+    [<Obsolete>]
+    let pushToChannelZeroAsync channelNumber =
+        noise.PushAsync(fun () -> new SiriusXMSource(channelNumber))
+
+    [<Obsolete>]
+    let restoreChannelZeroAsync () =
+        noise.PopAsync()
 
     let getStream channelNumber = lock streams (fun () ->
         match streams |> Seq.where (fun s -> s.ChannelNumber = channelNumber) |> Seq.tryHead with
