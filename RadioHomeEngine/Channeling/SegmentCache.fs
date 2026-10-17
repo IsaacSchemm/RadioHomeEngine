@@ -121,7 +121,7 @@ module SegmentCache =
         override _.ExecuteAsync(cancellationToken) = task {
             while not cancellationToken.IsCancellationRequested do
                 if isInUse () then
-                    use segmentBuffer = new SegmentBuffer((fun () -> new NoiseSource()), cancellationToken)
+                    use segmentBuffer = new SegmentBuffer((fun () -> new SiriusXMSource(4)), cancellationToken)
                     while isInUse () do
                         readFrom segmentBuffer
                         evictStale ()
