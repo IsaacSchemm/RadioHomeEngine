@@ -9,8 +9,7 @@ open FSharp.Control
 module StreamRepository =
     let noise = new Stream({
         channelNumber = 0
-        source = new NoiseSource()
-        mode = Pausable
+        mode = Resumable (fun () -> new NoiseSource())
     })
 
     let streams = ResizeArray [noise]
@@ -41,17 +40,10 @@ module StreamRepository =
         | None ->
             let stream = new Stream({
                 channelNumber = channelNumber
-                source = new SiriusXMSource(channelNumber)
-                mode = Ephemeral
+                mode = Ephemeral (new SiriusXMSource(channelNumber))
             })
             streams.Add(stream)
             stream)
-
-    let forgetStreamAsync stream = task {
-        let _ = lock streams (fun () -> streams.Remove(stream))
-        printfn "[SegmentCacheRepository] Forgetting [%d]" stream.ChannelNumber
-        do! stream.StopAsync()
-    }
 
     let getPlaylist channelNumber = String.concat "\n" [
         let stream = getStream channelNumber
@@ -97,10 +89,11 @@ module StreamRepository =
         stream.Cache.GetSegmentData(sequenceNumber)
 
     let waitForSegmentsAsync channelNumber (cancellationToken: CancellationToken) = task {
-        let stream = getStream channelNumber
-        while stream.Cache.GetSegments() = [] && not cancellationToken.IsCancellationRequested do
-            printfn "[SegmentCacheRepository] Waiting for segments [%d]" channelNumber
-            do! Task.Delay(TimeSpan.FromSeconds(0.5), cancellationToken)
+        try
+            let stream = getStream channelNumber
+            while stream.Cache.GetSegments() = [] && not cancellationToken.IsCancellationRequested do
+                do! Task.Delay(TimeSpan.FromSeconds(0.5), cancellationToken)
+        with :? OperationCanceledException -> ()
     }
 
     type Service() =
@@ -110,7 +103,7 @@ module StreamRepository =
             while not cancellationToken.IsCancellationRequested do
                 let active =
                     streams
-                    |> Seq.where (fun s -> s.Mode = Permanent || s.Cache.IsInUse())
+                    |> Seq.where (fun s -> s.Cache.IsInUse())
                     |> Seq.toList
 
                 let inactive =
@@ -118,16 +111,18 @@ module StreamRepository =
                     |> Seq.except active
                     |> Seq.toList
 
-                for channel in inactive do
-                    if channel.Mode = Pausable then
-                        do! channel.StopAsync()
-                    else
-                        do! forgetStreamAsync channel
+                for stream in inactive do
+                    match stream.Mode with
+                    | Ephemeral _ ->
+                        printfn "[SegmentCacheRepository] Dropping [%d]" stream.ChannelNumber
+                        let _ = lock streams (fun () -> streams.Remove(stream))
+                        do! stream.StopAsync()
+                    | Resumable _ ->
+                        do! stream.StopAsync()
 
-                for channel in active do
-                    printfn "[SegmentCacheRepository] Checking [%d]" channel.ChannelNumber
-                    do! channel.StartAsync(cancellationToken)
-                    channel.Read()
+                for stream in active do
+                    do! stream.StartAsync(cancellationToken)
+                    stream.Read()
 
                 do! Task.WhenAll [
                     Task.Delay(TimeSpan.FromSeconds(1.0), cancellationToken)

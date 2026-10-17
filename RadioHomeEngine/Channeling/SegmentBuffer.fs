@@ -22,7 +22,6 @@ type SegmentBuffer(source: ISegmentSource, cancellationToken: CancellationToken)
             let! segments = segmentSource.ScanAsync(localToken)
 
             for segment in segments do
-                printfn "[SegmentBuffer] Adding segment %A [%A]" segment.mediaSequence guid
                 do! channel.Writer.WriteAsync(segment, localToken)
 
             if segments <> [] then
@@ -48,7 +47,6 @@ type SegmentBuffer(source: ISegmentSource, cancellationToken: CancellationToken)
 
     interface IAsyncDisposable with
         member this.DisposeAsync() = new ValueTask(task {
-            printfn "[SegmentBuffer] Disposing %A" guid
             if not disposed then
                 disposed <- true
 
@@ -60,6 +58,4 @@ type SegmentBuffer(source: ISegmentSource, cancellationToken: CancellationToken)
 
                 let! leftoverSegments = channel.Reader.ReadAllAsync() |> AsyncSeq.toListAsync
                 ignore leftoverSegments
-
-                printfn "[SegmentBuffer] Disposed %A" guid
         })

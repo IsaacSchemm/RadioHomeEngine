@@ -93,7 +93,7 @@ type SiriusXMSource(channelNumber: int) =
                         let ffmpeg =
                             new ProcessStartInfo(
                                 "ffmpeg",
-                                "-i - -f mpegts -c:a copy -",
+                                "-nostats -hide_banner -loglevel warning -i - -f mpegts -c:a copy -",
                                 RedirectStandardInput = true,
                                 RedirectStandardOutput = true)
                             |> Process.Start

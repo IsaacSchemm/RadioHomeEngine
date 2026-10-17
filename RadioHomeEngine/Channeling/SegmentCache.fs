@@ -38,9 +38,7 @@ type SegmentCache() =
 
         // Add any newly generated chunks.
 
-        printfn "[SegmentCache] Reading all segments"
         for segment in segmentBuffer.ReadAll() do
-            printfn "[SegmentCache] Found segment %A" segment.mediaSequence
             if segment.dateTime > threshold then
                 add segment
                 threshold <- segment.dateTime

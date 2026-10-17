@@ -4,13 +4,11 @@ open System
 open System.Threading
 
 type StreamMode =
-| Permanent
-| Pausable
-| Ephemeral
+| Resumable of (unit -> ISegmentSource)
+| Ephemeral of ISegmentSource
 
 type StreamDefinition = {
     channelNumber: int
-    source: ISegmentSource
     mode: StreamMode
 }
 
@@ -29,18 +27,25 @@ type Stream(definition: StreamDefinition) =
         | _ :: _ -> ()
         | [] ->
             printfn "[Stream] Starting new buffer for %d" definition.channelNumber
-            bufferStack <- new SegmentBuffer(definition.source, cancellationToken) :: bufferStack
+
+            let source =
+                match definition.mode with
+                | Ephemeral source -> source
+                | Resumable factory -> factory ()
+
+            bufferStack <- new SegmentBuffer(source, cancellationToken) :: bufferStack
             lastToken <- cancellationToken
     }
 
     member _.PushAsync(source: ISegmentSource) = task {
+        printfn "[Stream] Adding to stack [%d]" definition.channelNumber
         bufferStack <- new SegmentBuffer(source, lastToken) :: bufferStack
     }
 
     member _.PopAsync() = task {
         match bufferStack with
         | a :: b :: tail ->
-            printfn "[Stream] Stopping top of stack [%d]" definition.channelNumber
+            printfn "[Stream] Removing from stack [%d]" definition.channelNumber
             bufferStack <- b :: tail
             do! (a :> IAsyncDisposable).DisposeAsync()
             return true
@@ -55,7 +60,7 @@ type Stream(definition: StreamDefinition) =
 
         cache.EvictStale()
 
-    member _.StopAsync() = task {
+    member this.StopAsync() = task {
         for buffer in bufferStack do
             printfn "[Stream] Stopping [%d]" definition.channelNumber
             bufferStack <- List.tail bufferStack

@@ -56,7 +56,7 @@ type NoiseSource() =
 
         reencoder <- Process.Start(new ProcessStartInfo(
             $"ffmpeg",
-            $"{readSpeedParameters} {pipeFormat} -i - {outputParameters}",
+            $"-nostats -hide_banner -loglevel warning {readSpeedParameters} {pipeFormat} -i - {outputParameters}",
             RedirectStandardInput = true))
 
         pipe <- task {
@@ -70,6 +70,9 @@ type NoiseSource() =
 
     interface ISegmentSource with
         member _.ScanAsync(cancellationToken) = task {
+            if disposing then
+                failwith "[NoiseSource] Already disposed"
+
             do! startTask.Value
 
             let mutable segments = []
@@ -97,6 +100,8 @@ type NoiseSource() =
 
     interface IAsyncDisposable with
         member _.DisposeAsync() = new ValueTask(task {
+            printfn "[NoiseSource] Disposing"
+
             disposing <- true
 
             if not (isNull generator) && not generator.HasExited then
