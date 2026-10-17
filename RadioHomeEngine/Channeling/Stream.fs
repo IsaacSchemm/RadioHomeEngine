@@ -36,15 +36,6 @@ type Stream(definition: StreamDefinition) =
 
         cache.EvictStale()
 
-    member _.WaitToReadAsync(cancellationToken) = task {
-        match buffer with
-        | Some b ->
-            return! b.WaitToReadAsync(cancellationToken)
-        | None ->
-            do! System.Threading.Tasks.Task.Delay(99999)
-            return false
-    }
-
     member _.StopAsync() = task {
         match buffer with
         | Some b ->

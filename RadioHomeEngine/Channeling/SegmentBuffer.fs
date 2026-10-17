@@ -20,9 +20,14 @@ type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: Cancellat
         use segmentSource = factory ()
         while not localToken.IsCancellationRequested do
             let! segments = segmentSource.ScanAsync(localToken)
+
             for segment in segments do
                 printfn "[SegmentBuffer] Adding segment %A [%A]" segment.mediaSequence guid
                 do! channel.Writer.WriteAsync(segment, localToken)
+
+            if segments <> [] then
+                SegmentCacheActivityIndicator.notify ()
+
             do! Task.Delay(TimeSpan.FromSeconds(1.0))
     }
 
@@ -30,9 +35,6 @@ type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: Cancellat
         match channel.Reader.TryRead() with
         | (true, segment) -> Some segment
         | (false, _) -> None
-
-    member this.WaitToReadAsync(cancellationToken) =
-        channel.Reader.WaitToReadAsync(cancellationToken)
 
     member this.ReadAll() = [
         let mutable more = true
@@ -46,10 +48,9 @@ type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: Cancellat
 
     interface IAsyncDisposable with
         member this.DisposeAsync() = new ValueTask(task {
+            printfn "[SegmentBuffer] Disposing %A" guid
             if not disposed then
                 disposed <- true
-
-                printfn "[SegmentBuffer] Disposing %A" guid
 
                 localTokenSource.Cancel()
 
@@ -59,4 +60,6 @@ type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: Cancellat
 
                 let! leftoverSegments = channel.Reader.ReadAllAsync() |> AsyncSeq.toListAsync
                 ignore leftoverSegments
+
+                printfn "[SegmentBuffer] Disposed %A" guid
         })

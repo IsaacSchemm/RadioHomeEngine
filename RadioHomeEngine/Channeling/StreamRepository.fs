@@ -112,15 +112,8 @@ module StreamRepository =
                     do! channel.StartAsync(cancellationToken)
                     channel.Read()
 
-                let tasks = [
-                    for c in active do
-                        c.WaitToReadAsync(cancellationToken) :> Task
-
-                    SegmentCacheActivityIndicator.waitForNotifyAsync cancellationToken
-                ]
-
                 do! Task.WhenAll [
                     Task.Delay(TimeSpan.FromSeconds(1.0), cancellationToken)
-                    Task.WhenAny(tasks) :> Task
+                    SegmentCacheActivityIndicator.waitForNotifyAsync cancellationToken
                 ]
         }
