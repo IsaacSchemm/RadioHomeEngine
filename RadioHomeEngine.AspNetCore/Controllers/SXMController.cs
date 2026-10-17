@@ -10,7 +10,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         {
             var channelNumber = StreamRepository.getChannelZero();
 
-            var channels = await MediaProxy.sxm.GetChannelsAsync(cancellationToken);
+            var channels = await SiriusXMClientModule.GetChannelsAsync(cancellationToken);
 
             var model = new SiriusXMIndexModel
             {
@@ -58,7 +58,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 
         public async Task<IActionResult> ChannelImage(int num, CancellationToken cancellationToken)
         {
-            var channels = await MediaProxy.sxm.GetChannelsAsync(cancellationToken);
+            var channels = await SiriusXMClientModule.GetChannelsAsync(cancellationToken);
 
             var imageUrl = channels
                 .Where(c => c.channelNumber == $"{num}")
@@ -96,12 +96,12 @@ namespace RadioHomeEngine.AspNetCore.Controllers
             if ((num ?? StreamRepository.getChannelZero()) is not int channelNumber)
                 return NotFound();
 
-            var channels = await MediaProxy.sxm.GetChannelsAsync(cancellationToken);
+            var channels = await SiriusXMClientModule.GetChannelsAsync(cancellationToken);
             var channel = channels
                 .Where(c => c.channelNumber == $"{channelNumber}")
                 .First();
 
-            var playlist = await MediaProxy.sxm.GetPlaylistAsync(
+            var playlist = await SiriusXMClientModule.GetPlaylistAsync(
                 channelNumber,
                 cancellationToken);
 

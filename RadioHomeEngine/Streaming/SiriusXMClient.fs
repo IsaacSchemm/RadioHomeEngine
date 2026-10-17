@@ -496,3 +496,12 @@ type SiriusXMClient() =
 
     member _.GetFileAsync(uri, cancellationToken) =
         getFileAsync uri cancellationToken
+
+module SiriusXMClient =
+    let private sxm = lazy new SiriusXMClient()
+
+    let GetChannelsAsync(cancellationToken) =
+        sxm.Value.GetChannelsAsync(cancellationToken)
+
+    let GetPlaylistAsync(channelNumber, cancellationToken) =
+        sxm.Value.GetPlaylistAsync(channelNumber, cancellationToken)

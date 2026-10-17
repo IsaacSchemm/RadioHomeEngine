@@ -34,7 +34,7 @@ module AtomicActions =
     let performActionAsync player atomicAction = task {
         match atomicAction with
         | PlaySiriusXMChannel (channelNumber, position) ->
-            let! channels = MediaProxy.sxm.GetChannelsAsync(CancellationToken.None)
+            let! channels = SiriusXMClient.GetChannelsAsync(CancellationToken.None)
             let name =
                 channels
                 |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
@@ -121,7 +121,7 @@ module AtomicActions =
         | PlaySiriusXMChannel (channelNumber, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
 
-            let! playlist = MediaProxy.sxm.GetPlaylistAsync(channelNumber, CancellationToken.None)
+            let! playlist = SiriusXMClient.GetPlaylistAsync(channelNumber, CancellationToken.None)
             let song =
                 playlist.cuts
                 |> Seq.sortByDescending (fun cut -> cut.startTime)

@@ -12,7 +12,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 
             try
             {
-                var list = await MediaProxy.sxm.GetChannelsAsync(cancellationToken);
+                var list = await SiriusXMClientModule.GetChannelsAsync(cancellationToken);
 
                 return [
                     .. list.Select(c => new ChannelsModel.Channel
