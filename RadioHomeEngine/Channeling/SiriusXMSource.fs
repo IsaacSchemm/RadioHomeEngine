@@ -43,6 +43,9 @@ type SiriusXMSource(channelNumber: int) =
                 chunklistData.content
                 |> Encoding.UTF8.GetString
                 |> ChunklistParser.parse
+                |> Seq.rev
+                |> Seq.truncate 3
+                |> Seq.rev
 
             let mutable segments = []
 

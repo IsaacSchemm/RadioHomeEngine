@@ -7,6 +7,10 @@ open System.Threading.Tasks
 open FSharp.Control
 
 type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: CancellationToken) =
+    let guid = Guid.NewGuid()
+
+    let mutable disposed = false
+
     let channel = Channel.CreateBounded<DownstreamSegment>(5)
 
     let localTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
@@ -17,6 +21,7 @@ type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: Cancellat
         while not localToken.IsCancellationRequested do
             let! segments = segmentSource.ScanAsync(localToken)
             for segment in segments do
+                printfn "[SegmentBuffer] Adding segment %A [%A]" segment.mediaSequence guid
                 do! channel.Writer.WriteAsync(segment, localToken)
             do! Task.Delay(TimeSpan.FromSeconds(1.0))
     }
@@ -25,6 +30,9 @@ type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: Cancellat
         match channel.Reader.TryRead() with
         | (true, segment) -> Some segment
         | (false, _) -> None
+
+    member this.WaitToReadAsync(cancellationToken) =
+        channel.Reader.WaitToReadAsync(cancellationToken)
 
     member this.ReadAll() = [
         let mutable more = true
@@ -38,14 +46,17 @@ type SegmentBuffer(factory: unit -> ISegmentSource, cancellationToken: Cancellat
 
     interface IAsyncDisposable with
         member this.DisposeAsync() = new ValueTask(task {
-            printfn "Disposing SegmentBuffer"
+            if not disposed then
+                disposed <- true
 
-            localTokenSource.Cancel()
+                printfn "[SegmentBuffer] Disposing %A" guid
 
-            do! ingestionTask
+                localTokenSource.Cancel()
 
-            channel.Writer.Complete()
+                do! ingestionTask
 
-            let! leftoverSegments = channel.Reader.ReadAllAsync() |> AsyncSeq.toListAsync
-            ignore leftoverSegments
+                channel.Writer.Complete()
+
+                let! leftoverSegments = channel.Reader.ReadAllAsync() |> AsyncSeq.toListAsync
+                ignore leftoverSegments
         })

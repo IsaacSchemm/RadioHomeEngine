@@ -5,10 +5,11 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 {
     public class StreamController : Controller
     {
-        [Route("Stream/playlist.m3u8")]
-        public IActionResult Playlist()
+        [Route("Stream/playlist-{channelNumber}.m3u8")]
+        public async Task<IActionResult> Playlist(int channelNumber, CancellationToken cancellationToken)
         {
-            var contents = SegmentCache.getPlaylist();
+            var contents = StreamRepository.getPlaylist(channelNumber);
+            await StreamRepository.waitForSegmentsAsync(channelNumber, cancellationToken);
 
             return Content(
                 contents,
@@ -16,10 +17,11 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 Encoding.UTF8);
         }
 
-        [Route("Stream/chunklist.m3u8")]
-        public IActionResult Chunklist()
+        [Route("Stream/chunklist-{channelNumber}.m3u8")]
+        public async Task<IActionResult> Chunklist(int channelNumber, CancellationToken cancellationToken)
         {
-            var contents = SegmentCache.getChunklist();
+            var contents = StreamRepository.getChunklist(channelNumber);
+            await StreamRepository.waitForSegmentsAsync(channelNumber, cancellationToken);
 
             return Content(
                 contents,
@@ -27,10 +29,10 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 Encoding.UTF8);
         }
 
-        [Route("Stream/chunk-{sequenceNumber}.ts")]
-        public IActionResult Chunk(UInt128 sequenceNumber)
+        [Route("Stream/chunk-{channelNumber}-{sequenceNumber}.ts")]
+        public IActionResult Chunk(int channelNumber, UInt128 sequenceNumber)
         {
-            var data = SegmentCache.getData(sequenceNumber);
+            var data = StreamRepository.getChunk(channelNumber, sequenceNumber);
 
             return File(
                 data,
