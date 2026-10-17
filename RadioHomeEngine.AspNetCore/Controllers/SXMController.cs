@@ -6,6 +6,56 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 {
     public class SXMController(IHttpClientFactory httpClientFactory) : Controller
     {
+        public async Task<IActionResult> Index(CancellationToken cancellationToken)
+        {
+            var channelNumber = StreamRepository.getChannelZero();
+
+            var channels = await MediaProxy.sxm.GetChannelsAsync(cancellationToken);
+
+            var model = new SiriusXMIndexModel
+            {
+                ChannelNumber = channelNumber,
+                Channels = [
+                    .. channels.Select(c => new SiriusXMIndexModel.Channel
+                    {
+                        ChannelNumber = int.Parse(c.channelNumber),
+                        Name = c.name
+                    })
+                ],
+                Players = PlayerConnections.GetAll()
+            };
+
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SetChannel(int channelNumber)
+        {
+            await StreamRepository.setChannelZeroAsync(channelNumber);
+            return RedirectToAction(nameof(ViewChannel));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ClearChannel()
+        {
+            await StreamRepository.setChannelZeroAsync(null);
+            return RedirectToAction(nameof(ViewChannel));
+        }
+
+        [HttpPost]
+        public async Task PlayOn(string macAddress, CancellationToken cancellationToken)
+        {
+            var playerConnection = PlayerConnections.GetAll()
+                .FirstOrDefault(player => player.MacAddress == macAddress);
+
+            //if (playerConnection != null)
+            //    await AtomicActions.performActionAsync(
+            //        playerConnection.Player,
+            //        AtomicAction.PlayCurrentChannel);
+
+            throw new NotImplementedException();
+        }
+
         public async Task<IActionResult> ChannelImage(int num, CancellationToken cancellationToken)
         {
             var channels = await MediaProxy.sxm.GetChannelsAsync(cancellationToken);
@@ -35,28 +85,33 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 resp.Content.Headers.ContentType?.MediaType ?? "application/octet-stream");
         }
 
+        [Obsolete]
         public async Task<IActionResult> PlayChannel(int num, CancellationToken cancellationToken)
         {
-            return Redirect($"/Proxy/playlist-{num}.m3u8");
+            return Redirect($"/Stream/playlist-{num}.m3u8");
         }
 
-        public async Task<IActionResult> ViewChannel(int num, CancellationToken cancellationToken)
+        public async Task<IActionResult> ViewChannel(int? num, CancellationToken cancellationToken)
         {
+            if ((num ?? StreamRepository.getChannelZero()) is not int channelNumber)
+                return NotFound();
+
             var channels = await MediaProxy.sxm.GetChannelsAsync(cancellationToken);
             var channel = channels
-                .Where(c => c.channelNumber == $"{num}")
+                .Where(c => c.channelNumber == $"{channelNumber}")
                 .First();
 
             var playlist = await MediaProxy.sxm.GetPlaylistAsync(
-                num,
+                channelNumber,
                 cancellationToken);
 
             return View(new RecentlyPlayingModel
             {
+                ShowPlayer = num != null,
                 Channel = new PlayingChannelModel
                 {
                     Name = channel.name,
-                    Number = num,
+                    Number = channelNumber,
                     Description = channel.mediumDescription
                 },
                 Songs = [
@@ -73,5 +128,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 ]
             });
         }
+
+        public ActionResult Player() => View();
     }
 }

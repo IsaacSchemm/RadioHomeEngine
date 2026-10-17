@@ -15,13 +15,24 @@ module StreamRepository =
 
     let streams = ResizeArray [noise]
 
-    [<Obsolete>]
-    let pushToChannelZeroAsync channelNumber =
-        noise.PushAsync(new SiriusXMSource(channelNumber))
+    let mutable channelZero: int option = None
 
-    [<Obsolete>]
-    let restoreChannelZeroAsync () =
-        noise.PopAsync()
+    let getChannelZero () =
+        Option.toNullable channelZero
+
+    let setChannelZeroAsync channelNumber = task {
+        channelZero <- Option.ofNullable channelNumber
+
+        let mutable at_root = false
+        while not at_root do
+            let! popped = noise.PopAsync()
+            at_root <- not popped
+
+        match channelZero with
+        | None -> ()
+        | Some num ->
+            do! noise.PushAsync(new SiriusXMSource(num))
+    }
 
     let getStream channelNumber = lock streams (fun () ->
         match streams |> Seq.where (fun s -> s.ChannelNumber = channelNumber) |> Seq.tryHead with
