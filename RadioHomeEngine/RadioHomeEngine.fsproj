@@ -19,6 +19,7 @@
     <Compile Include="channeling\ISegmentSource.fs" />
     <Compile Include="channeling\NoiseSource.fs" />
     <Compile Include="channeling\Silence.fs" />
+    <Compile Include="channeling\SilenceSource.fs" />
     <Compile Include="channeling\SiriusXMSource.fs" />
     <Compile Include="channeling\StreamActivityIndicator.fs" />
     <Compile Include="channeling\SegmentBuffer.fs" />

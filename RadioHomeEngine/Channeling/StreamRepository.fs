@@ -7,12 +7,17 @@ open Microsoft.Extensions.Hosting
 open FSharp.Control
 
 module StreamRepository =
-    let noise = new Stream({
+    let zeroChannel = new Stream({
         channelNumber = 0
+        mode = Resumable (fun () -> new SilenceSource())
+    })
+
+    let noise = new Stream({
+        channelNumber = 8000
         mode = Resumable (fun () -> new NoiseSource())
     })
 
-    let streams = ResizeArray [noise]
+    let streams = ResizeArray [zeroChannel; noise]
 
     let mutable channelZero: int option = None
 
@@ -84,9 +89,9 @@ module StreamRepository =
             $"/Stream/chunk-{channelNumber}-{segment.mediaSequence}.ts"
     ]
 
-    let getChunk channelNumber sequenceNumber =
+    let getChunkAsync channelNumber sequenceNumber =
         let stream = getStream channelNumber
-        stream.Cache.GetSegmentData(sequenceNumber)
+        stream.Cache.GetSegmentDataAsync(sequenceNumber)
 
     let waitForSegmentsAsync channelNumber (cancellationToken: CancellationToken) = task {
         try
@@ -115,10 +120,10 @@ module StreamRepository =
                     match stream.Mode with
                     | Ephemeral _ ->
                         printfn "[SegmentCacheRepository] Dropping [%d]" stream.ChannelNumber
-                        let _ = lock streams (fun () -> streams.Remove(stream))
-                        do! stream.StopAsync()
-                    | Resumable _ ->
-                        do! stream.StopAsync()
+                        ignore (lock streams (fun () -> streams.Remove(stream)))
+                    | Resumable _ -> ()
+
+                    do! stream.StopAsync()
 
                 for stream in active do
                     do! stream.StartAsync(cancellationToken)

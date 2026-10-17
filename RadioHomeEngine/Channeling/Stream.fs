@@ -2,6 +2,7 @@ namespace RadioHomeEngine
 
 open System
 open System.Threading
+open System.Threading.Tasks
 
 type StreamMode =
 | Resumable of (unit -> ISegmentSource)
@@ -23,21 +24,22 @@ type Stream(definition: StreamDefinition) =
     member _.Mode = definition.mode
 
     member _.StartAsync(cancellationToken) = task {
-        match bufferStack with
-        | _ :: _ -> ()
-        | [] ->
+        if bufferStack = [] then
             printfn "[Stream] Starting new buffer for %d" definition.channelNumber
 
             let source =
                 match definition.mode with
-                | Ephemeral source -> source
                 | Resumable factory -> factory ()
+                | Ephemeral source -> source
 
             bufferStack <- new SegmentBuffer(source, cancellationToken) :: bufferStack
             lastToken <- cancellationToken
     }
 
     member _.PushAsync(source: ISegmentSource) = task {
+        if bufferStack = [] then
+            raise (new NotImplementedException())
+
         printfn "[Stream] Adding to stack [%d]" definition.channelNumber
         bufferStack <- new SegmentBuffer(source, lastToken) :: bufferStack
     }
@@ -62,7 +64,12 @@ type Stream(definition: StreamDefinition) =
 
     member this.StopAsync() = task {
         for buffer in bufferStack do
-            printfn "[Stream] Stopping [%d]" definition.channelNumber
+            printfn "[Stream] Stopping [%d]; disposing buffer %A" definition.channelNumber buffer
             bufferStack <- List.tail bufferStack
             do! (buffer :> IAsyncDisposable).DisposeAsync()
     }
+
+    interface IAsyncDisposable with
+        member this.DisposeAsync() = ValueTask (task {
+            do! this.StopAsync()
+        })

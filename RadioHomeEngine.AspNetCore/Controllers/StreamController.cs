@@ -30,9 +30,9 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         }
 
         [Route("Stream/chunk-{channelNumber}-{sequenceNumber}.ts")]
-        public IActionResult Chunk(int channelNumber, UInt128 sequenceNumber)
+        public async Task<IActionResult> Chunk(int channelNumber, UInt128 sequenceNumber)
         {
-            var data = StreamRepository.getChunk(channelNumber, sequenceNumber);
+            var data = await StreamRepository.getChunkAsync(channelNumber, sequenceNumber);
 
             return File(
                 data,

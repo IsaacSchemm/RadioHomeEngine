@@ -16,9 +16,13 @@ type SegmentBuffer(source: ISegmentSource, cancellationToken: CancellationToken)
     let localTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
     let localToken = localTokenSource.Token
 
+    let mutable interval = TimeSpan.FromSeconds(2.0)
+
     let ingestionTask = task {
         use segmentSource = source
         while not localToken.IsCancellationRequested do
+            printfn "[SegmentBuffer] Scanning: %A" segmentSource
+
             let! segments = segmentSource.ScanAsync(localToken)
 
             for segment in segments do
@@ -27,7 +31,14 @@ type SegmentBuffer(source: ISegmentSource, cancellationToken: CancellationToken)
             if segments <> [] then
                 SegmentCacheActivityIndicator.notify ()
 
-            do! Task.Delay(TimeSpan.FromSeconds(1.0))
+                let averageDuration =
+                    segments
+                    |> Seq.map (fun s -> s.duration)
+                    |> Seq.average
+
+                interval <- TimeSpan.FromSeconds(averageDuration) / 2.0
+
+            do! Task.Delay(interval)
     }
 
     member this.TryRead() =

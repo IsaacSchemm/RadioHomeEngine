@@ -58,10 +58,13 @@ type SegmentCache() =
         |> List.truncate 3
         |> List.rev
 
-    member _.GetSegmentData(sequenceNumber) =
+    member _.GetSegmentDataAsync(sequenceNumber) = task {
         match tryGetData sequenceNumber with
-        | Some s -> s
-        | _ -> Silence.getSegment ()
+        | Some s ->
+            return s
+        | _ ->
+            return! Silence.segmentTask.Value
+    }
 
     member _.IsInUse() =
         isInUse ()
