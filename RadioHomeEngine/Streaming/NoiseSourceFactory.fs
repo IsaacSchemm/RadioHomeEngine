@@ -5,6 +5,7 @@ open System.Diagnostics
 open System.IO
 open System.Threading
 open System.Threading.Tasks
+open System.Threading.Channels
 
 type NoiseSourceFactory() =
     let path = Path.Combine([|
@@ -41,7 +42,7 @@ type NoiseSourceFactory() =
 
     interface ISegmentSourceFactory with
         member _.CreateAsync() = task {
-            let mutable segments = []
+            let channel = Channel.CreateBounded(1)
             let mutable disposing = false
 
             Directory.CreateDirectory(path) |> ignore
@@ -54,7 +55,7 @@ type NoiseSourceFactory() =
 
             let reencoder = Process.Start(new ProcessStartInfo(
                 $"ffmpeg",
-                $"-nostats -hide_banner -loglevel warning {readSpeedParameters} {pipeFormat} -i - {outputParameters}",
+                $"{readSpeedParameters} {pipeFormat} -i - {outputParameters}",
                 RedirectStandardInput = true))
 
             let pipe = task {
@@ -86,29 +87,29 @@ type NoiseSourceFactory() =
                                         data = data
                                         mediaSequence = UInt128.Zero
                                     }
-                                    lock segments (fun () -> segments <- segment :: segments)
+                                    do! channel.Writer.WriteAsync(segment)
                                     files <- file :: files
 
                             for file in files do
                                 File.Delete(file)
                 with :? IOException when disposing -> ()
+
+                channel.Writer.Complete()
             }
 
-            return RemoteSegmentSource {
-                new IRemoteSegmentSource with
-                    member _.ScanAsync(cancellationToken) = task {
-                        if disposing then
-                            failwith "[NoiseSource] Already disposed"
-
-                        return lock segments (fun () ->
-                            let list = segments |> Seq.sortBy (fun s -> s.dateTime) |> Seq.toList
-                            segments <- []
-                            list)
+            return LocalSegmentSource {
+                new ILocalSegmentSource with
+                    member _.ReadNextAsync(cancellationToken) = task {
+                        try
+                            let! readable = channel.Reader.WaitToReadAsync(cancellationToken)
+                            if readable then
+                                let! segment = channel.Reader.ReadAsync(cancellationToken)
+                                return NextSegment segment
+                            else
+                                return NoMoreSegments
+                        with :? OperationCanceledException when disposing ->
+                            return NoMoreSegments
                     }
-
-                    member _.IsComplete = reencoder.HasExited
-
-                    member _.RecommendedInterval = TimeSpan.FromSeconds(1.0)
 
                     member _.DisposeAsync() = new ValueTask(task {
                         printfn "[NoiseSource] Disposing"

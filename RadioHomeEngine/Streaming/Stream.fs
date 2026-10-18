@@ -24,6 +24,8 @@ type Stream(definition: StreamDefinition) =
     }
 
     member _.ReadFromBufferAsync() = task {
+        // TODO: can we use a LocalSegmentSource here directly and bypass SegmentBuffer? (This method shouldn't block if no new segments are available yet.)
+
         match buffer with
         | None -> ()
         | Some buffer -> cache.ReadFrom(buffer)

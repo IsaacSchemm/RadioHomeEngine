@@ -29,7 +29,17 @@ type SegmentBuffer(primaryFactory: ISegmentSourceFactory, cancellationToken: Can
 
             match createdSegmentSource with
             | LocalSegmentSource segmentSource ->
-                raise (new NotImplementedException())
+                let mutable isComplete = false
+
+                while factory = getCurrentFactory () && not localToken.IsCancellationRequested && not isComplete do
+                    let! r = segmentSource.ReadNextAsync(localToken)
+                    match r with
+                    | NextSegment segment ->
+                        printfn "[SegmentBuffer] Writing: %A" segment.mediaSequence
+                        do! channel.Writer.WriteAsync(segment, localToken)
+                        printfn "[SegmentBuffer] Written: %A" segment.mediaSequence
+                    | NoMoreSegments ->
+                        isComplete <- true
             | RemoteSegmentSource segmentSource ->
                 while factory = getCurrentFactory () && not localToken.IsCancellationRequested do
                     let isComplete = segmentSource.IsComplete

@@ -4,7 +4,7 @@ open System
 open System.Threading
 open System.Threading.Tasks
 
-type SegmentReadResult = Segment of DownstreamSegment | Complete
+type SegmentReadResult = NextSegment of DownstreamSegment | NoMoreSegments
 
 type ILocalSegmentSource =
     inherit IAsyncDisposable
