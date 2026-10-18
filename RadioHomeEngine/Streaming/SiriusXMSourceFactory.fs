@@ -31,7 +31,7 @@ type SiriusXMSourceFactory(channelNumber: int) =
 
             let chunklistUri = new Uri(playlistUri, chunklistPath)
 
-            return RemoteSegmentSource {
+            return LocalSegmentSource (RemoteSegmentSourceAdapter {
                 new IRemoteSegmentSource with
                     member _.ScanAsync(cancellationToken) = task {
                         let! chunklistData = sxm.GetFileAsync(chunklistUri, cancellationToken)
@@ -129,5 +129,5 @@ type SiriusXMSourceFactory(channelNumber: int) =
                     member _.RecommendedInterval = TimeSpan.FromSeconds(5.0)
 
                     member _.DisposeAsync() = ValueTask.CompletedTask
-            }
+            })
         }

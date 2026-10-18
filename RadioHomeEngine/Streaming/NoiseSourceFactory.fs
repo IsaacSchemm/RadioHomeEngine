@@ -107,7 +107,7 @@ type NoiseSourceFactory() =
                                 return NextSegment segment
                             else
                                 return NoMoreSegments
-                        with :? OperationCanceledException when disposing ->
+                        with :? OperationCanceledException when cancellationToken.IsCancellationRequested ->
                             return NoMoreSegments
                     }
 

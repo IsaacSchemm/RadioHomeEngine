@@ -60,7 +60,7 @@ type SegmentBuffer(primaryFactory: ISegmentSourceFactory, cancellationToken: Can
                     | (true, _ :: tail) -> interruptions <- tail
                     | _ -> ()
 
-            printfn "[SegmentBuffer] Complete: %A" createdSegmentSource
+            printfn "[SegmentBuffer] Done reading from source: %A" createdSegmentSource
 
         channel.Writer.Complete()
 
@@ -100,7 +100,10 @@ type SegmentBuffer(primaryFactory: ISegmentSourceFactory, cancellationToken: Can
 
                 localTokenSource.Cancel()
 
-                do! ingestionTask
+                try
+                    do! ingestionTask
+                with :? OperationCanceledException as ex ->
+                    printfn "%A" ex
 
                 let! leftoverSegments = channel.Reader.ReadAllAsync() |> AsyncSeq.toListAsync
                 ignore leftoverSegments
