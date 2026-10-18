@@ -95,6 +95,8 @@ type NoiseSourceFactory() =
 
                     member _.IsComplete = reencoder.HasExited
 
+                    member _.RecommendedInterval = TimeSpan.FromSeconds(1.0)
+
                     member _.DisposeAsync() = new ValueTask(task {
                         printfn "[NoiseSource] Disposing"
 

@@ -126,6 +126,8 @@ type SiriusXMSourceFactory(channelNumber: int) =
 
                     member _.IsComplete = false
 
+                    member _.RecommendedInterval = TimeSpan.FromSeconds(5.0)
+
                     member _.DisposeAsync() = ValueTask.CompletedTask
             }
         }

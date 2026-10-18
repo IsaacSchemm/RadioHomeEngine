@@ -41,6 +41,8 @@ type SilenceSourceFactory() =
 
                     member _.IsComplete = false
 
+                    member _.RecommendedInterval = TimeSpan.FromSeconds(1.0)
+
                     member _.DisposeAsync() = new ValueTask(task {
                         timer.Dispose()
                     })

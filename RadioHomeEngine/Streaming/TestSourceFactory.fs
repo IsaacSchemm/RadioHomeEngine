@@ -18,7 +18,7 @@ type TestSourceFactory() =
     let segmentTimeSeconds = 10.0
 
     let inputParameters = String.concat " " [
-        $"-i \"K:/Documents/Music/Lisa_Stansfield-Lisa_Stansfield/02.The_Real_Thing.flac\" -ss 215"
+        $"-i \"K:/Documents/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac\""
     ]
 
     let pipeFormat = "-f f64le -ac 1"
@@ -93,6 +93,8 @@ type TestSourceFactory() =
                     }
 
                     member _.IsComplete = reencoder.HasExited
+
+                    member _.RecommendedInterval = TimeSpan.FromSeconds(1.0)
 
                     member _.DisposeAsync() = new ValueTask(task {
                         printfn "[NoiseSource] Disposing"

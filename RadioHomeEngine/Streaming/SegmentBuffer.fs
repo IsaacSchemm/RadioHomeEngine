@@ -24,28 +24,19 @@ type SegmentBuffer(factory: ISegmentSourceFactory, cancellationToken: Cancellati
         let mutable lastLoop = false
 
         while not localToken.IsCancellationRequested && not lastLoop do
-            printfn "[SegmentBuffer] Scanning: %A" segmentSource
-
             lastLoop <- segmentSource.IsComplete
 
             let! segments = segmentSource.ScanAsync(localToken)
 
             for segment in segments do
+                printfn "[SegmentBuffer] Writing: %A" segment.mediaSequence
                 do! channel.Writer.WriteAsync(segment, localToken)
+                printfn "[SegmentBuffer] Written: %A" segment.mediaSequence
 
             if segments <> [] then
                 SegmentCacheActivityIndicator.notify ()
 
-                let averageDuration =
-                    segments
-                    |> Seq.map (fun s -> s.duration)
-                    |> Seq.average
-
-                interval <- TimeSpan.FromSeconds(averageDuration) / 2.0
-
-            printfn "[SegmentBuffer] Scanning interval: %A" interval
-
-            do! Task.Delay(interval)
+            do! Task.Delay(segmentSource.RecommendedInterval, localToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
 
         printfn "[SegmentBuffer] Complete: %A" segmentSource
 
