@@ -60,6 +60,10 @@ module StreamRepository =
                 factory = new SiriusXMSourceFactory(channelNumber)
             })
             Streams.sxm.Add(stream)
+            //let _ = task {
+            //    do! Task.Delay(10000)
+            //    do! stream.PushAsync(new TestSourceFactory())
+            //}
             stream
 
     let getPlaylist channelNumber = String.concat "\n" [
@@ -89,9 +93,9 @@ module StreamRepository =
         "#EXT-X-VERSION:1"
         "#EXT-X-ALLOW-CACHE:NO"
 
-        match finalSegment with
-        | None -> ()
-        | Some segment -> $"#EXT-X-MEDIA-SEQUENCE:{segment.mediaSequence}"
+        match segments with
+        | [] -> ()
+        | segment :: _ -> $"#EXT-X-MEDIA-SEQUENCE:{segment.mediaSequence}"
 
         let mutable encryption = Clear
 
@@ -99,6 +103,9 @@ module StreamRepository =
             $"#EXT-X-PROGRAM-DATE-TIME:{segment.dateTime:o}"
             $"#EXTINF:{segment.duration},"
             $"/Stream/chunk-{channelNumber}-{segment.mediaSequence}.ts"
+
+        if stream.IsComplete then
+            "#EXT-X-ENDLIST"
     ]
 
     let getChunkAsync channelNumber sequenceNumber =

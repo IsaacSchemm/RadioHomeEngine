@@ -6,4 +6,5 @@ open System.Threading.Tasks
 
 type ISegmentSource =
     inherit IAsyncDisposable
+    abstract member IsComplete: bool
     abstract member ScanAsync: cancellationToken: CancellationToken -> Task<DownstreamSegment list>

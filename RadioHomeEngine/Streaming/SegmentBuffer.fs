@@ -17,11 +17,17 @@ type SegmentBuffer(factory: ISegmentSourceFactory, cancellationToken: Cancellati
     let localToken = localTokenSource.Token
 
     let mutable interval = TimeSpan.FromSeconds(2.0)
+    let mutable isComplete = false
 
     let ingestionTask = task {
         use! segmentSource = factory.CreateAsync()
-        while not localToken.IsCancellationRequested do
+
+        let mutable lastLoop = false
+
+        while not localToken.IsCancellationRequested && not lastLoop do
             printfn "[SegmentBuffer] Scanning: %A" segmentSource
+
+            lastLoop <- segmentSource.IsComplete
 
             let! segments = segmentSource.ScanAsync(localToken)
 
@@ -38,7 +44,16 @@ type SegmentBuffer(factory: ISegmentSourceFactory, cancellationToken: Cancellati
 
                 interval <- TimeSpan.FromSeconds(averageDuration) / 2.0
 
+            printfn "[SegmentBuffer] Scanning interval: %A" interval
+
             do! Task.Delay(interval)
+
+        printfn "[SegmentBuffer] Complete: %A" segmentSource
+
+        channel.Writer.Complete()
+
+        isComplete <- true
+        SegmentCacheActivityIndicator.notify ()
     }
 
     member this.TryRead() =
@@ -56,6 +71,8 @@ type SegmentBuffer(factory: ISegmentSourceFactory, cancellationToken: Cancellati
                 more <- false
     ]
 
+    member this.IsComplete = channel.Reader.Count = 0 && isComplete
+
     interface IAsyncDisposable with
         member this.DisposeAsync() = new ValueTask(task {
             if not disposed then
@@ -64,8 +81,6 @@ type SegmentBuffer(factory: ISegmentSourceFactory, cancellationToken: Cancellati
                 localTokenSource.Cancel()
 
                 do! ingestionTask
-
-                channel.Writer.Complete()
 
                 let! leftoverSegments = channel.Reader.ReadAllAsync() |> AsyncSeq.toListAsync
                 ignore leftoverSegments

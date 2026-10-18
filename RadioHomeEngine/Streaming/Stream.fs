@@ -47,10 +47,20 @@ type Stream(definition: StreamDefinition) =
 
     member _.Read() =
         match bufferStack with
-        | buffer :: _ -> cache.ReadFrom(buffer)
+        | buffer :: nextBuffer :: tail ->
+            cache.ReadFrom(buffer)
+
+            if buffer.IsComplete then
+                printfn "[Stream] Removing completed buffer from stack [%d]" definition.channelNumber
+                bufferStack <- nextBuffer :: tail
+        | [buffer] ->
+            cache.ReadFrom(buffer)
         | [] -> ()
 
         cache.EvictStale()
+
+    member this.IsComplete =
+        bufferStack |> List.forall (fun buffer -> buffer.IsComplete)
 
     member this.StopAsync() = task {
         for buffer in bufferStack do

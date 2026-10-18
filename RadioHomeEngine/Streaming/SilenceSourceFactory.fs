@@ -39,7 +39,8 @@ type SilenceSourceFactory() =
                         return List.rev list
                     }
 
-                interface IAsyncDisposable with
+                    member _.IsComplete = false
+
                     member _.DisposeAsync() = new ValueTask(task {
                         timer.Dispose()
                     })

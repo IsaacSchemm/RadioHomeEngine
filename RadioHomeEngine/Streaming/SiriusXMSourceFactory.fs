@@ -124,7 +124,8 @@ type SiriusXMSourceFactory(channelNumber: int) =
                         return segments |> List.sortBy (fun s -> s.dateTime)
                     }
 
-                interface IAsyncDisposable with
+                    member _.IsComplete = false
+
                     member _.DisposeAsync() = ValueTask.CompletedTask
             }
         }

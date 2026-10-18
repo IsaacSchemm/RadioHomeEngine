@@ -93,7 +93,8 @@ type NoiseSourceFactory() =
                         return segments |> List.sortBy (fun s -> s.dateTime)
                     }
 
-                interface IAsyncDisposable with
+                    member _.IsComplete = reencoder.HasExited
+
                     member _.DisposeAsync() = new ValueTask(task {
                         printfn "[NoiseSource] Disposing"
 

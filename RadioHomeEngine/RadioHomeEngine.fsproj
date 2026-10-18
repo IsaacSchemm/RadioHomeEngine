@@ -16,6 +16,7 @@
     <Compile Include="Streaming\ISegmentSource.fs" />
     <Compile Include="streaming\ISegmentSourceFactory.fs" />
     <Compile Include="Streaming\NoiseSourceFactory.fs" />
+    <Compile Include="Streaming\TestSourceFactory.fs" />
     <Compile Include="Streaming\Silence.fs" />
     <Compile Include="Streaming\SilenceSourceFactory.fs" />
     <Compile Include="Streaming\SiriusXMClient.fs" />
