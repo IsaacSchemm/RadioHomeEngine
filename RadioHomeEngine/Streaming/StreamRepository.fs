@@ -38,7 +38,7 @@ module StreamRepository =
             do! noise.PushAsync(new SiriusXMSource(num))
     }
 
-    let getStream channelNumber = lock streams (fun () ->
+    let private getStream channelNumber = lock streams (fun () ->
         match streams |> Seq.where (fun s -> s.ChannelNumber = channelNumber) |> Seq.tryHead with
         | Some stream ->
             stream
@@ -106,31 +106,20 @@ module StreamRepository =
 
         override _.ExecuteAsync(cancellationToken) = task {
             while not cancellationToken.IsCancellationRequested do
-                let active =
-                    streams
-                    |> Seq.where (fun s -> s.Cache.IsInUse())
-                    |> Seq.toList
+                let waitForNotify = SegmentCacheActivityIndicator.waitForNotifyAsync cancellationToken
 
-                let inactive =
-                    streams
-                    |> Seq.except active
-                    |> Seq.toList
+                for stream in streams do
+                    if stream.Cache.IsInUse() then
+                        do! stream.StartAsync(cancellationToken)
+                        stream.Read()
+                    else
+                        do! stream.StopAsync()
 
-                for stream in inactive do
-                    match stream.Mode with
-                    | Ephemeral _ ->
-                        printfn "[SegmentCacheRepository] Dropping [%d]" stream.ChannelNumber
-                        ignore (lock streams (fun () -> streams.Remove(stream)))
-                    | Resumable _ -> ()
+                        match stream.Mode with
+                        | Ephemeral _ ->
+                            printfn "[SegmentCacheRepository] Dropping [%d]" stream.ChannelNumber
+                            ignore (lock streams (fun () -> streams.Remove(stream)))
+                        | Resumable _ -> ()
 
-                    do! stream.StopAsync()
-
-                for stream in active do
-                    do! stream.StartAsync(cancellationToken)
-                    stream.Read()
-
-                do! Task.WhenAll [
-                    Task.Delay(TimeSpan.FromSeconds(1.0), cancellationToken)
-                    SegmentCacheActivityIndicator.waitForNotifyAsync cancellationToken
-                ]
+                do! waitForNotify
         }
