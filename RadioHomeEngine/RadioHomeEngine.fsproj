@@ -14,11 +14,12 @@
     <Compile Include="streaming\ChunklistNormalizer.fs" />
     <Compile Include="Streaming\DownstreamSegment.fs" />
     <Compile Include="Streaming\ISegmentSource.fs" />
-    <Compile Include="Streaming\NoiseSource.fs" />
+    <Compile Include="streaming\ISegmentSourceFactory.fs" />
+    <Compile Include="Streaming\NoiseSourceFactory.fs" />
     <Compile Include="Streaming\Silence.fs" />
-    <Compile Include="Streaming\SilenceSource.fs" />
+    <Compile Include="Streaming\SilenceSourceFactory.fs" />
     <Compile Include="Streaming\SiriusXMClient.fs" />
-    <Compile Include="Streaming\SiriusXMSource.fs" />
+    <Compile Include="Streaming\SiriusXMSourceFactory.fs" />
     <Compile Include="Streaming\StreamActivityIndicator.fs" />
     <Compile Include="Streaming\SegmentBuffer.fs" />
     <Compile Include="Streaming\SegmentCache.fs" />

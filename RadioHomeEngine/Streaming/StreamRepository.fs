@@ -9,12 +9,14 @@ open FSharp.Control
 module StreamRepository =
     let zeroChannel = new Stream({
         channelNumber = 0
-        mode = Resumable (fun () -> new SilenceSource())
+        factory = new SilenceSourceFactory()
+        mode = Resumable
     })
 
     let noise = new Stream({
         channelNumber = 8000
-        mode = Resumable (fun () -> new NoiseSource())
+        factory = new NoiseSourceFactory()
+        mode = Resumable
     })
 
     let streams = ResizeArray [zeroChannel; noise]
@@ -35,7 +37,7 @@ module StreamRepository =
         match channelZero with
         | None -> ()
         | Some num ->
-            do! noise.PushAsync(new SiriusXMSource(num))
+            do! noise.PushAsync(new SiriusXMSourceFactory(num))
     }
 
     let private getStream channelNumber = lock streams (fun () ->
@@ -45,7 +47,8 @@ module StreamRepository =
         | None ->
             let stream = new Stream({
                 channelNumber = channelNumber
-                mode = Ephemeral (new SiriusXMSource(channelNumber))
+                factory = new SiriusXMSourceFactory(channelNumber)
+                mode = Ephemeral
             })
             streams.Add(stream)
             stream)
@@ -116,10 +119,10 @@ module StreamRepository =
                         do! stream.StopAsync()
 
                         match stream.Mode with
-                        | Ephemeral _ ->
+                        | Ephemeral ->
                             printfn "[SegmentCacheRepository] Dropping [%d]" stream.ChannelNumber
                             ignore (lock streams (fun () -> streams.Remove(stream)))
-                        | Resumable _ -> ()
+                        | Resumable -> ()
 
                 do! waitForNotify
         }

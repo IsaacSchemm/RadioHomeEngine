@@ -4,12 +4,11 @@ open System
 open System.Threading
 open System.Threading.Tasks
 
-type StreamMode =
-| Resumable of (unit -> ISegmentSource)
-| Ephemeral of ISegmentSource
+type StreamMode = Resumable | Ephemeral
 
 type StreamDefinition = {
     channelNumber: int
+    factory: ISegmentSourceFactory
     mode: StreamMode
 }
 
@@ -27,21 +26,16 @@ type Stream(definition: StreamDefinition) =
         if bufferStack = [] then
             printfn "[Stream] Starting new buffer for %d" definition.channelNumber
 
-            let source =
-                match definition.mode with
-                | Resumable factory -> factory ()
-                | Ephemeral source -> source
-
-            bufferStack <- new SegmentBuffer(source, cancellationToken) :: bufferStack
+            bufferStack <- new SegmentBuffer(definition.factory, cancellationToken) :: bufferStack
             lastToken <- cancellationToken
     }
 
-    member _.PushAsync(source: ISegmentSource) = task {
+    member _.PushAsync(factory: ISegmentSourceFactory) = task {
         if bufferStack = [] then
             raise (new NotImplementedException())
 
-        printfn "[Stream] Adding to stack [%d]" definition.channelNumber
-        bufferStack <- new SegmentBuffer(source, lastToken) :: bufferStack
+        printfn "[Stream] Adding to stack [%d]: %A" definition.channelNumber factory
+        bufferStack <- new SegmentBuffer(factory, lastToken) :: bufferStack
     }
 
     member _.PopAsync() = task {
