@@ -12,60 +12,35 @@ type StreamDefinition = {
 type Stream(definition: StreamDefinition) =
     let cache = new SegmentCache()
 
-    let mutable bufferStack = []
+    let mutable buffer = None
     let mutable lastToken = CancellationToken.None
-
-    let popAsync () = task {
-        match bufferStack with
-        | [] -> ()
-        | buffer :: others ->
-            printfn "[Stream] Removing from stack [%d]" definition.channelNumber
-            bufferStack <- others
-            do! (buffer :> IAsyncDisposable).DisposeAsync()
-    }
 
     member _.Cache = cache
     member _.ChannelNumber = definition.channelNumber
 
     member _.StartAsync(cancellationToken) = task {
-        if bufferStack = [] then
+        if buffer = None then
             printfn "[Stream] Starting new buffer for %d" definition.channelNumber
-
-            bufferStack <- new SegmentBuffer(definition.factory, cancellationToken) :: bufferStack
-            lastToken <- cancellationToken
-    }
-
-    member _.PushAsync(factory: ISegmentSourceFactory) = task {
-        if bufferStack = [] then
-            raise (new NotImplementedException())
-
-        printfn "[Stream] Adding to stack [%d]: %A" definition.channelNumber factory
-        bufferStack <- new SegmentBuffer(factory, lastToken) :: bufferStack
-    }
-
-    member _.ReturnToRootAsync() = task {
-        while bufferStack.Length > 1 do
-            do! popAsync ()
+            buffer <- Some (new SegmentBuffer(definition.factory, cancellationToken))
     }
 
     member _.ReadFromBufferAsync() = task {
-        match bufferStack with
-        | [] -> ()
-        | buffer :: _ ->
-            cache.ReadFrom(buffer)
-
-            if buffer.IsComplete then
-                do! popAsync ()
+        match buffer with
+        | None -> ()
+        | Some buffer -> cache.ReadFrom(buffer)
 
         cache.EvictStale()
     }
 
     member this.IsComplete =
-        bufferStack |> List.forall (fun buffer -> buffer.IsComplete)
+        buffer |> Option.forall (fun buffer -> buffer.IsComplete)
 
     member this.StopAsync() = task {
-        while bufferStack.Length > 0 do
-            do! popAsync ()
+        match buffer with
+        | None -> ()
+        | Some oldBuffer ->
+            buffer <- None
+            do! (oldBuffer :> IAsyncDisposable).DisposeAsync()
     }
 
     interface IAsyncDisposable with

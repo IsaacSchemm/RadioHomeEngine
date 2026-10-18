@@ -34,17 +34,10 @@ module StreamRepository =
     let mutable channelZero: int option = None
 
     let getChannelZero () =
-        Option.toNullable channelZero
+        Nullable<int>()
 
     let setChannelZeroAsync channelNumber = task {
-        channelZero <- Option.ofNullable channelNumber
-
-        do! noise.ReturnToRootAsync()
-
-        match channelZero with
-        | None -> ()
-        | Some num ->
-            do! noise.PushAsync(new SiriusXMSourceFactory(num))
+        if channelNumber <> getChannelZero () then raise (new NotImplementedException())
     }
 
     let private getStream channelNumber =
@@ -57,10 +50,6 @@ module StreamRepository =
                 factory = new SiriusXMSourceFactory(channelNumber)
             })
             Streams.sxm.Add(stream)
-            //let _ = task {
-            //    do! Task.Delay(10000)
-            //    do! stream.PushAsync(new TestSourceFactory())
-            //}
             stream
 
     let getPlaylist channelNumber = String.concat "\n" [
