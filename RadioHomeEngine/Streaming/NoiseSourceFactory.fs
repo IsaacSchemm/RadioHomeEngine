@@ -41,6 +41,7 @@ type NoiseSourceFactory() =
 
     interface ISegmentSourceFactory with
         member _.CreateAsync() = task {
+            let mutable segments = []
             let mutable disposing = false
 
             Directory.CreateDirectory(path) |> ignore
@@ -60,37 +61,49 @@ type NoiseSourceFactory() =
                 try
                     use input = generator.StandardOutput.BaseStream
                     use output = reencoder.StandardInput.BaseStream
-                    do! input.CopyToAsync(output)
+
+                    let buffer = Array.zeroCreate<byte> 81920
+
+                    let mutable nextFileCheck = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1.0)
+
+                    while not disposing do
+                        let! len = input.ReadAsync(buffer)
+                        do! output.WriteAsync(buffer, 0, len)
+
+                        if nextFileCheck <= DateTimeOffset.UtcNow then
+                            nextFileCheck <- nextFileCheck + TimeSpan.FromSeconds(1.0)
+
+                            let mutable files = []
+
+                            for file in Directory.EnumerateFiles(path, "*.ts") do
+                                let info = new FileInfo(file)
+                                let time = new DateTimeOffset(info.CreationTime)
+                                if DateTimeOffset.UtcNow - time > TimeSpan.FromSeconds(0.25) then
+                                    let! data = File.ReadAllBytesAsync(file)
+                                    let segment = {
+                                        dateTime = new DateTimeOffset(info.CreationTime)
+                                        duration = segmentTimeSeconds
+                                        data = data
+                                        mediaSequence = UInt128.Zero
+                                    }
+                                    lock segments (fun () -> segments <- segment :: segments)
+                                    files <- file :: files
+
+                            for file in files do
+                                File.Delete(file)
                 with :? IOException when disposing -> ()
             }
 
-            return {
-                new ISegmentSource with
+            return RemoteSegmentSource {
+                new IRemoteSegmentSource with
                     member _.ScanAsync(cancellationToken) = task {
                         if disposing then
                             failwith "[NoiseSource] Already disposed"
 
-                        let mutable segments = []
-                        let mutable files = []
-
-                        for file in Directory.EnumerateFiles(path, "*.ts") do
-                            let info = new FileInfo(file)
-                            let time = new DateTimeOffset(info.CreationTime)
-                            if DateTimeOffset.UtcNow - time > TimeSpan.FromSeconds(0.25) then
-                                let! data = File.ReadAllBytesAsync(file, cancellationToken)
-                                let segment = {
-                                    dateTime = new DateTimeOffset(info.CreationTime)
-                                    duration = segmentTimeSeconds
-                                    data = data
-                                    mediaSequence = UInt128.Zero
-                                }
-                                segments <- segment :: segments
-                                files <- file :: files
-
-                        for file in files do
-                            File.Delete(file)
-
-                        return segments |> List.sortBy (fun s -> s.dateTime)
+                        return lock segments (fun () ->
+                            let list = segments |> Seq.sortBy (fun s -> s.dateTime) |> Seq.toList
+                            segments <- []
+                            list)
                     }
 
                     member _.IsComplete = reencoder.HasExited

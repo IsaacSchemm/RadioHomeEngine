@@ -25,28 +25,32 @@ type SegmentBuffer(primaryFactory: ISegmentSourceFactory, cancellationToken: Can
         while not localToken.IsCancellationRequested do
             let factory = getCurrentFactory ()
 
-            use! segmentSource = factory.CreateAsync()
+            use! createdSegmentSource = factory.CreateAsync()
 
-            while factory = getCurrentFactory () && not localToken.IsCancellationRequested do
-                let isComplete = segmentSource.IsComplete
+            match createdSegmentSource with
+            | LocalSegmentSource segmentSource ->
+                raise (new NotImplementedException())
+            | RemoteSegmentSource segmentSource ->
+                while factory = getCurrentFactory () && not localToken.IsCancellationRequested do
+                    let isComplete = segmentSource.IsComplete
 
-                let! segments = segmentSource.ScanAsync(localToken)
+                    let! segments = segmentSource.ScanAsync(localToken)
 
-                for segment in segments do
-                    printfn "[SegmentBuffer] Writing: %A" segment.mediaSequence
-                    do! channel.Writer.WriteAsync(segment, localToken)
-                    printfn "[SegmentBuffer] Written: %A" segment.mediaSequence
+                    for segment in segments do
+                        printfn "[SegmentBuffer] Writing: %A" segment.mediaSequence
+                        do! channel.Writer.WriteAsync(segment, localToken)
+                        printfn "[SegmentBuffer] Written: %A" segment.mediaSequence
 
-                if segments <> [] then
-                    SegmentCacheActivityIndicator.notify ()
+                    if segments <> [] then
+                        SegmentCacheActivityIndicator.notify ()
 
-                do! Task.Delay(segmentSource.RecommendedInterval, localToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
+                    do! Task.Delay(segmentSource.RecommendedInterval, localToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
 
-                match isComplete, interruptions with
-                | (true, _ :: tail) -> interruptions <- tail
-                | _ -> ()
+                    match isComplete, interruptions with
+                    | (true, _ :: tail) -> interruptions <- tail
+                    | _ -> ()
 
-            printfn "[SegmentBuffer] Complete: %A" segmentSource
+            printfn "[SegmentBuffer] Complete: %A" createdSegmentSource
 
         channel.Writer.Complete()
 

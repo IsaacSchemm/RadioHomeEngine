@@ -31,8 +31,8 @@ type SiriusXMSourceFactory(channelNumber: int) =
 
             let chunklistUri = new Uri(playlistUri, chunklistPath)
 
-            return {
-                new ISegmentSource with
+            return RemoteSegmentSource {
+                new IRemoteSegmentSource with
                     member _.ScanAsync(cancellationToken) = task {
                         let! chunklistData = sxm.GetFileAsync(chunklistUri, cancellationToken)
 

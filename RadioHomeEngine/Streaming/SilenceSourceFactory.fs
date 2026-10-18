@@ -31,8 +31,8 @@ type SilenceSourceFactory() =
 
             timer.Start()
 
-            return {
-                new ISegmentSource with
+            return RemoteSegmentSource {
+                new IRemoteSegmentSource with
                     member _.ScanAsync(cancellationToken) = task {
                         let list = buffer
                         buffer <- []

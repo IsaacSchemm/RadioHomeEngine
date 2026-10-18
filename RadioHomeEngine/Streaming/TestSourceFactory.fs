@@ -63,8 +63,8 @@ type TestSourceFactory() =
                 with :? IOException when disposing -> ()
             }
 
-            return {
-                new ISegmentSource with
+            return RemoteSegmentSource {
+                new IRemoteSegmentSource with
                     member _.ScanAsync(cancellationToken) = task {
                         if disposing then
                             failwith "[NoiseSource] Already disposed"
