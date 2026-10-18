@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Remove="Channeling\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="Config.fs" />
     <Compile Include="Utility.fs" />
     <Compile Include="ActivePatterns.fs" />
@@ -26,7 +30,6 @@
     <Compile Include="Streaming\SegmentCache.fs" />
     <Compile Include="Streaming\Stream.fs" />
     <Compile Include="Streaming\StreamRepository.fs" />
-    <Folder Include="Channeling\" />
     <Compile Include="Lyrion\LyrionCLI.fs" />
     <Compile Include="Lyrion\LyrionCLIService.fs" />
     <Compile Include="Lyrion\PlayerConnection.fs" />

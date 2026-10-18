@@ -6,44 +6,61 @@ open System.Threading.Channels
 open System.Threading.Tasks
 open FSharp.Control
 
-type SegmentBuffer(factory: ISegmentSourceFactory, cancellationToken: CancellationToken) =
-    let guid = Guid.NewGuid()
-
+type SegmentBuffer(primaryFactory: ISegmentSourceFactory, cancellationToken: CancellationToken) =
     let mutable disposed = false
 
-    let channel = Channel.CreateBounded<DownstreamSegment>(5)
+    let channel = Channel.CreateBounded<DownstreamSegment>(3)
 
     let localTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
     let localToken = localTokenSource.Token
 
-    let mutable interval = TimeSpan.FromSeconds(2.0)
+    let mutable interruptions = []
+
+    let getCurrentFactory () =
+        interruptions
+        |> List.tryHead
+        |> Option.defaultValue primaryFactory
 
     let ingestionTask = task {
-        use! segmentSource = factory.CreateAsync()
+        while not localToken.IsCancellationRequested do
+            let factory = getCurrentFactory ()
 
-        let mutable lastLoop = false
+            use! segmentSource = factory.CreateAsync()
 
-        while not localToken.IsCancellationRequested && not lastLoop do
-            lastLoop <- segmentSource.IsComplete
+            while factory = getCurrentFactory () && not localToken.IsCancellationRequested do
+                let isComplete = segmentSource.IsComplete
 
-            let! segments = segmentSource.ScanAsync(localToken)
+                let! segments = segmentSource.ScanAsync(localToken)
 
-            for segment in segments do
-                printfn "[SegmentBuffer] Writing: %A" segment.mediaSequence
-                do! channel.Writer.WriteAsync(segment, localToken)
-                printfn "[SegmentBuffer] Written: %A" segment.mediaSequence
+                for segment in segments do
+                    printfn "[SegmentBuffer] Writing: %A" segment.mediaSequence
+                    do! channel.Writer.WriteAsync(segment, localToken)
+                    printfn "[SegmentBuffer] Written: %A" segment.mediaSequence
 
-            if segments <> [] then
-                SegmentCacheActivityIndicator.notify ()
+                if segments <> [] then
+                    SegmentCacheActivityIndicator.notify ()
 
-            do! Task.Delay(segmentSource.RecommendedInterval, localToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
+                do! Task.Delay(segmentSource.RecommendedInterval, localToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
 
-        printfn "[SegmentBuffer] Complete: %A" segmentSource
+                match isComplete, interruptions with
+                | (true, _ :: tail) -> interruptions <- tail
+                | _ -> ()
+
+            printfn "[SegmentBuffer] Complete: %A" segmentSource
 
         channel.Writer.Complete()
 
         SegmentCacheActivityIndicator.notify ()
     }
+
+    member this.Interrupt(factory: ISegmentSourceFactory) =
+        interruptions <- factory :: interruptions
+
+    member this.IsInterrupted() =
+        interruptions <> []
+
+    member this.ClearAllInterruptions() =
+        interruptions <- []
 
     member this.TryRead() =
         match channel.Reader.TryRead() with

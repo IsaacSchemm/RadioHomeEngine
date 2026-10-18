@@ -34,10 +34,19 @@ module StreamRepository =
     let mutable channelZero: int option = None
 
     let getChannelZero () =
-        Nullable<int>()
+        Option.toNullable channelZero
 
     let setChannelZeroAsync channelNumber = task {
-        if channelNumber <> getChannelZero () then raise (new NotImplementedException())
+        channelZero <- Option.ofNullable channelNumber
+
+        match channelZero with
+        | None ->
+            zeroChannel.ClearAllInterruptions()
+        | Some 2 ->
+            zeroChannel.Interrupt(new SiriusXMSourceFactory(2))
+            zeroChannel.Interrupt(new TestSourceFactory())
+        | Some n ->
+            zeroChannel.Interrupt(new SiriusXMSourceFactory(n))
     }
 
     let private getStream channelNumber =
@@ -117,7 +126,7 @@ module StreamRepository =
                     if stream.Cache.IsInUse() then
                         do! stream.StartAsync(cancellationToken)
                         do! stream.ReadFromBufferAsync()
-                    else
+                    else if not (stream.IsInterrupted()) then
                         do! stream.StopAsync()
                         if Streams.sxm |> Seq.contains stream then
                             printfn "[SegmentCacheRepository] Dropping [%d]" stream.ChannelNumber

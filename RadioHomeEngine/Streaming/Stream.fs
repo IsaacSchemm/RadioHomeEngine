@@ -13,7 +13,6 @@ type Stream(definition: StreamDefinition) =
     let cache = new SegmentCache()
 
     let mutable buffer = None
-    let mutable lastToken = CancellationToken.None
 
     member _.Cache = cache
     member _.ChannelNumber = definition.channelNumber
@@ -31,6 +30,16 @@ type Stream(definition: StreamDefinition) =
 
         cache.EvictStale()
     }
+
+    member this.Interrupt(factory: ISegmentSourceFactory) =
+        buffer |> Option.iter (fun buffer -> buffer.Interrupt(factory))
+
+    [<Obsolete("Clear interruptions when stream becomes inactive instead")>]
+    member this.IsInterrupted() =
+        buffer |> Option.exists (fun buffer -> buffer.IsInterrupted())
+
+    member this.ClearAllInterruptions() =
+        buffer |> Option.iter (fun buffer -> buffer.ClearAllInterruptions())
 
     member this.IsComplete =
         buffer |> Option.forall (fun buffer -> buffer.IsComplete)
