@@ -15,6 +15,15 @@ type Stream(definition: StreamDefinition) =
     let mutable bufferStack = []
     let mutable lastToken = CancellationToken.None
 
+    let popAsync () = task {
+        match bufferStack with
+        | [] -> ()
+        | buffer :: others ->
+            printfn "[Stream] Removing from stack [%d]" definition.channelNumber
+            bufferStack <- others
+            do! (buffer :> IAsyncDisposable).DisposeAsync()
+    }
+
     member _.Cache = cache
     member _.ChannelNumber = definition.channelNumber
 
@@ -34,39 +43,29 @@ type Stream(definition: StreamDefinition) =
         bufferStack <- new SegmentBuffer(factory, lastToken) :: bufferStack
     }
 
-    member _.PopAsync() = task {
-        match bufferStack with
-        | a :: b :: tail ->
-            printfn "[Stream] Removing from stack [%d]" definition.channelNumber
-            bufferStack <- b :: tail
-            do! (a :> IAsyncDisposable).DisposeAsync()
-            return true
-        | _ ->
-            return false
+    member _.ReturnToRootAsync() = task {
+        while bufferStack.Length > 1 do
+            do! popAsync ()
     }
 
-    member _.Read() =
+    member _.ReadFromBufferAsync() = task {
         match bufferStack with
-        | buffer :: nextBuffer :: tail ->
+        | [] -> ()
+        | buffer :: _ ->
             cache.ReadFrom(buffer)
 
             if buffer.IsComplete then
-                printfn "[Stream] Removing completed buffer from stack [%d]" definition.channelNumber
-                bufferStack <- nextBuffer :: tail
-        | [buffer] ->
-            cache.ReadFrom(buffer)
-        | [] -> ()
+                do! popAsync ()
 
         cache.EvictStale()
+    }
 
     member this.IsComplete =
         bufferStack |> List.forall (fun buffer -> buffer.IsComplete)
 
     member this.StopAsync() = task {
-        for buffer in bufferStack do
-            printfn "[Stream] Stopping [%d]; disposing buffer %A" definition.channelNumber buffer
-            bufferStack <- List.tail bufferStack
-            do! (buffer :> IAsyncDisposable).DisposeAsync()
+        while bufferStack.Length > 0 do
+            do! popAsync ()
     }
 
     interface IAsyncDisposable with

@@ -17,7 +17,6 @@ type SegmentBuffer(factory: ISegmentSourceFactory, cancellationToken: Cancellati
     let localToken = localTokenSource.Token
 
     let mutable interval = TimeSpan.FromSeconds(2.0)
-    let mutable isComplete = false
 
     let ingestionTask = task {
         use! segmentSource = factory.CreateAsync()
@@ -52,7 +51,6 @@ type SegmentBuffer(factory: ISegmentSourceFactory, cancellationToken: Cancellati
 
         channel.Writer.Complete()
 
-        isComplete <- true
         SegmentCacheActivityIndicator.notify ()
     }
 
@@ -71,7 +69,7 @@ type SegmentBuffer(factory: ISegmentSourceFactory, cancellationToken: Cancellati
                 more <- false
     ]
 
-    member this.IsComplete = channel.Reader.Count = 0 && isComplete
+    member this.IsComplete = channel.Reader.Count = 0 && channel.Reader.Completion.IsCompleted
 
     interface IAsyncDisposable with
         member this.DisposeAsync() = new ValueTask(task {

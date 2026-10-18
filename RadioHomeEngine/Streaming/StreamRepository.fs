@@ -39,10 +39,7 @@ module StreamRepository =
     let setChannelZeroAsync channelNumber = task {
         channelZero <- Option.ofNullable channelNumber
 
-        let mutable at_root = false
-        while not at_root do
-            let! popped = noise.PopAsync()
-            at_root <- not popped
+        do! noise.ReturnToRootAsync()
 
         match channelZero with
         | None -> ()
@@ -130,7 +127,7 @@ module StreamRepository =
                 for stream in Streams.getAll () do
                     if stream.Cache.IsInUse() then
                         do! stream.StartAsync(cancellationToken)
-                        stream.Read()
+                        do! stream.ReadFromBufferAsync()
                     else
                         do! stream.StopAsync()
                         if Streams.sxm |> Seq.contains stream then
