@@ -21,10 +21,10 @@ module StreamRepository =
         let permanent = [zeroChannel; noise]
         let sxm = new ResizeArray<Stream>()
 
-        let getAll () = seq {
+        let getAll () = [
             yield! permanent
             yield! sxm
-        }
+        ]
 
         let tryGet channelNumber =
             getAll()
@@ -125,12 +125,16 @@ module StreamRepository =
                 for stream in Streams.getAll () do
                     if stream.Cache.IsInUse() then
                         do! stream.StartAsync(cancellationToken)
+                        printfn "[SegmentCacheRepository] Reading [%d]" stream.ChannelNumber
                         do! stream.ReadFromBufferAsync()
-                    else if not (stream.IsInterrupted()) then
+                        printfn "[SegmentCacheRepository] Read [%d]" stream.ChannelNumber
+                    else
+                        printfn "[SegmentCacheRepository] Stopping [%d]" stream.ChannelNumber
                         do! stream.StopAsync()
                         if Streams.sxm |> Seq.contains stream then
                             printfn "[SegmentCacheRepository] Dropping [%d]" stream.ChannelNumber
                             Streams.sxm.Remove(stream) |> ignore
 
+                printfn "[SegmentCacheRepository] Waiting"
                 do! waitForNotify
         }

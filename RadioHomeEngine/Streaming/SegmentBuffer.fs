@@ -25,42 +25,24 @@ type SegmentBuffer(primaryFactory: ISegmentSourceFactory, cancellationToken: Can
         while not localToken.IsCancellationRequested do
             let factory = getCurrentFactory ()
 
-            use! createdSegmentSource = factory.CreateAsync()
+            use! segmentSource = factory.CreateAsync()
 
-            match createdSegmentSource with
-            | LocalSegmentSource segmentSource ->
-                let mutable isComplete = false
+            let mutable isComplete = false
 
-                while factory = getCurrentFactory () && not localToken.IsCancellationRequested && not isComplete do
-                    let! r = segmentSource.ReadNextAsync(localToken)
-                    match r with
-                    | NextSegment segment ->
-                        printfn "[SegmentBuffer] Writing: %A" segment.mediaSequence
-                        do! channel.Writer.WriteAsync(segment, localToken)
-                        printfn "[SegmentBuffer] Written: %A" segment.mediaSequence
-                    | NoMoreSegments ->
-                        isComplete <- true
-            | RemoteSegmentSource segmentSource ->
-                while factory = getCurrentFactory () && not localToken.IsCancellationRequested do
-                    let isComplete = segmentSource.IsComplete
+            while factory = getCurrentFactory () && not localToken.IsCancellationRequested && not isComplete do
+                let! r = segmentSource.ReadNextAsync(localToken)
+                match r with
+                | NextSegment segment ->
+                    printfn "[SegmentBuffer] Writing: %A" segment.mediaSequence
+                    do! channel.Writer.WriteAsync(segment, localToken)
+                    SegmentCacheActivityIndicator.notify ()
+                    printfn "[SegmentBuffer] Written: %A" segment.mediaSequence
+                | NoMoreSegments ->
+                    isComplete <- true
+                    if (Some factory = List.tryHead interruptions) then
+                        interruptions <- List.tail interruptions
 
-                    let! segments = segmentSource.ScanAsync(localToken)
-
-                    for segment in segments do
-                        printfn "[SegmentBuffer] Writing: %A" segment.mediaSequence
-                        do! channel.Writer.WriteAsync(segment, localToken)
-                        printfn "[SegmentBuffer] Written: %A" segment.mediaSequence
-
-                    if segments <> [] then
-                        SegmentCacheActivityIndicator.notify ()
-
-                    do! Task.Delay(segmentSource.RecommendedInterval, localToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
-
-                    match isComplete, interruptions with
-                    | (true, _ :: tail) -> interruptions <- tail
-                    | _ -> ()
-
-            printfn "[SegmentBuffer] Done reading from source: %A" createdSegmentSource
+            printfn "[SegmentBuffer] Done reading from source: %A" segmentSource
 
         channel.Writer.Complete()
 
@@ -96,6 +78,8 @@ type SegmentBuffer(primaryFactory: ISegmentSourceFactory, cancellationToken: Can
     interface IAsyncDisposable with
         member this.DisposeAsync() = new ValueTask(task {
             if not disposed then
+                printfn "[SegmentBuffer] Disposing"
+
                 disposed <- true
 
                 localTokenSource.Cancel()

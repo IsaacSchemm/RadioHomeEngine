@@ -4,8 +4,8 @@ open System
 open System.Diagnostics
 open System.IO
 open System.Threading
-open System.Threading.Tasks
 open System.Threading.Channels
+open System.Threading.Tasks
 
 type NoiseSourceFactory() =
     let path = Path.Combine([|
@@ -55,7 +55,7 @@ type NoiseSourceFactory() =
 
             let reencoder = Process.Start(new ProcessStartInfo(
                 $"ffmpeg",
-                $"{readSpeedParameters} {pipeFormat} -i - {outputParameters}",
+                $"-nostats -hide_banner -loglevel warning {readSpeedParameters} {pipeFormat} -i - {outputParameters}",
                 RedirectStandardInput = true))
 
             let pipe = task {
@@ -97,17 +97,21 @@ type NoiseSourceFactory() =
                 channel.Writer.Complete()
             }
 
-            return LocalSegmentSource {
+            return {
                 new ILocalSegmentSource with
                     member _.ReadNextAsync(cancellationToken) = task {
                         try
+                            printfn "[NoiseSourceFactory] Waiting to read"
                             let! readable = channel.Reader.WaitToReadAsync(cancellationToken)
                             if readable then
+                                printfn "[NoiseSourceFactory] Reading"
                                 let! segment = channel.Reader.ReadAsync(cancellationToken)
                                 return NextSegment segment
                             else
+                                printfn "[NoiseSourceFactory] Ending"
                                 return NoMoreSegments
                         with :? OperationCanceledException when cancellationToken.IsCancellationRequested ->
+                            printfn "[NoiseSourceFactory] Cancelled"
                             return NoMoreSegments
                     }
 

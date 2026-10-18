@@ -3,4 +3,4 @@ namespace RadioHomeEngine
 open System.Threading.Tasks
 
 type ISegmentSourceFactory =
-    abstract member CreateAsync: unit -> Task<SegmentSource>
+    abstract member CreateAsync: unit -> Task<ILocalSegmentSource>

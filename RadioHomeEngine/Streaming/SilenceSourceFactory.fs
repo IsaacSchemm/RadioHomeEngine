@@ -7,44 +7,35 @@ open System.Threading.Tasks
 type SilenceSourceFactory() =
     interface ISegmentSourceFactory with
         member _.CreateAsync() = task {
-            let mutable buffer = []
             let mutable mediaSequence = UInt128.One
 
             let! data = Silence.segmentTask.Value
 
             let interval = TimeSpan.FromSeconds(10.0)
 
-            let timer = new Timer(interval)
+            let mutable lastSegmentTime = DateTimeOffset.UtcNow
 
-            timer.Elapsed.Add(fun args ->
-                printfn "[SilenceSource] Adding new segment for next call"
+            return {
+                new ILocalSegmentSource with
+                    member _.ReadNextAsync(cancellationToken) = task {
+                        let nextSegmentTime = lastSegmentTime + interval
 
-                if List.length buffer < 5 then
-                    let segment = {
-                        dateTime = new DateTimeOffset(args.SignalTime)
-                        duration = interval.TotalSeconds
-                        data = data
-                        mediaSequence = mediaSequence
-                    }
-                    buffer <- segment :: buffer
-                    mediaSequence <- mediaSequence + UInt128.One)
+                        while DateTimeOffset.UtcNow < nextSegmentTime do
+                            do! Task.Delay(TimeSpan.FromSeconds(1.0), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
 
-            timer.Start()
+                        if cancellationToken.IsCancellationRequested then
+                            return NoMoreSegments
+                        else
+                            lastSegmentTime <- nextSegmentTime
 
-            return RemoteSegmentSource {
-                new IRemoteSegmentSource with
-                    member _.ScanAsync(cancellationToken) = task {
-                        let list = buffer
-                        buffer <- []
-                        return List.rev list
+                            return NextSegment {
+                                dateTime = nextSegmentTime
+                                duration = interval.TotalSeconds
+                                data = data
+                                mediaSequence = mediaSequence
+                            }
                     }
 
-                    member _.IsComplete = false
-
-                    member _.RecommendedInterval = TimeSpan.FromSeconds(1.0)
-
-                    member _.DisposeAsync() = new ValueTask(task {
-                        timer.Dispose()
-                    })
+                    member _.DisposeAsync() = ValueTask.CompletedTask
             }
         }

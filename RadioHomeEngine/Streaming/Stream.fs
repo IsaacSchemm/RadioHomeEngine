@@ -50,7 +50,9 @@ type Stream(definition: StreamDefinition) =
         match buffer with
         | None -> ()
         | Some oldBuffer ->
+            printfn "[Stream] Disposing of buffer [%d]" definition.channelNumber
             buffer <- None
+            ignore (oldBuffer.ReadAll())
             do! (oldBuffer :> IAsyncDisposable).DisposeAsync()
     }
 
