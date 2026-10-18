@@ -4,12 +4,9 @@ open System
 open System.Threading
 open System.Threading.Tasks
 
-type StreamMode = Resumable | Ephemeral
-
 type StreamDefinition = {
     channelNumber: int
     factory: ISegmentSourceFactory
-    mode: StreamMode
 }
 
 type Stream(definition: StreamDefinition) =
@@ -20,7 +17,6 @@ type Stream(definition: StreamDefinition) =
 
     member _.Cache = cache
     member _.ChannelNumber = definition.channelNumber
-    member _.Mode = definition.mode
 
     member _.StartAsync(cancellationToken) = task {
         if bufferStack = [] then

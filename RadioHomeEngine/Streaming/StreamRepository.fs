@@ -10,16 +10,26 @@ module StreamRepository =
     let zeroChannel = new Stream({
         channelNumber = 0
         factory = new SilenceSourceFactory()
-        mode = Resumable
     })
 
     let noise = new Stream({
         channelNumber = 8000
         factory = new NoiseSourceFactory()
-        mode = Resumable
     })
 
-    let streams = ResizeArray [zeroChannel; noise]
+    module Streams =
+        let permanent = [zeroChannel; noise]
+        let sxm = new ResizeArray<Stream>()
+
+        let getAll () = seq {
+            yield! permanent
+            yield! sxm
+        }
+
+        let tryGet channelNumber =
+            getAll()
+            |> Seq.where (fun s -> s.ChannelNumber = channelNumber)
+            |> Seq.tryHead
 
     let mutable channelZero: int option = None
 
@@ -40,18 +50,17 @@ module StreamRepository =
             do! noise.PushAsync(new SiriusXMSourceFactory(num))
     }
 
-    let private getStream channelNumber = lock streams (fun () ->
-        match streams |> Seq.where (fun s -> s.ChannelNumber = channelNumber) |> Seq.tryHead with
+    let private getStream channelNumber =
+        match Streams.tryGet channelNumber with
         | Some stream ->
             stream
         | None ->
             let stream = new Stream({
                 channelNumber = channelNumber
                 factory = new SiriusXMSourceFactory(channelNumber)
-                mode = Ephemeral
             })
-            streams.Add(stream)
-            stream)
+            Streams.sxm.Add(stream)
+            stream
 
     let getPlaylist channelNumber = String.concat "\n" [
         let stream = getStream channelNumber
@@ -111,18 +120,15 @@ module StreamRepository =
             while not cancellationToken.IsCancellationRequested do
                 let waitForNotify = SegmentCacheActivityIndicator.waitForNotifyAsync cancellationToken
 
-                for stream in streams do
+                for stream in Streams.getAll () do
                     if stream.Cache.IsInUse() then
                         do! stream.StartAsync(cancellationToken)
                         stream.Read()
                     else
                         do! stream.StopAsync()
-
-                        match stream.Mode with
-                        | Ephemeral ->
+                        if Streams.sxm |> Seq.contains stream then
                             printfn "[SegmentCacheRepository] Dropping [%d]" stream.ChannelNumber
-                            ignore (lock streams (fun () -> streams.Remove(stream)))
-                        | Resumable -> ()
+                            Streams.sxm.Remove(stream) |> ignore
 
                 do! waitForNotify
         }
