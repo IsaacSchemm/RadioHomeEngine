@@ -48,10 +48,10 @@ namespace RadioHomeEngine.AspNetCore.Controllers
             var playerConnection = PlayerConnections.GetAll()
                 .FirstOrDefault(player => player.MacAddress == macAddress);
 
-            //if (playerConnection != null)
-            //    await AtomicActions.performActionAsync(
-            //        playerConnection.Player,
-            //        AtomicAction.NewPlaySiriusXMChannel(num, PlaylistPosition.Now));
+            if (playerConnection != null)
+                await AtomicActions.performActionAsync(
+                    playerConnection.Player,
+                    AtomicAction.NewPlayChannel(0, PlaylistPosition.Now));
 
             throw new NotImplementedException();
         }

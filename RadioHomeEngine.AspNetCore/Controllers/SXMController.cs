@@ -51,7 +51,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
             if (playerConnection != null)
                 await AtomicActions.performActionAsync(
                     playerConnection.Player,
-                    AtomicAction.NewPlaySiriusXMChannel(num, PlaylistPosition.Now));
+                    AtomicAction.NewPlayChannel(num, PlaylistPosition.Now));
 
             throw new NotImplementedException();
         }

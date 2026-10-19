@@ -10,7 +10,7 @@ open System.Threading
 open System.Threading.Channels
 open System.Threading.Tasks
 
-type SiriusXMSourceFactory(channelNumber: int) =
+type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
     let sxm = new SiriusXMClient()
 
     interface ISegmentSourceFactory with
@@ -32,7 +32,7 @@ type SiriusXMSourceFactory(channelNumber: int) =
 
             let chunklistUri = new Uri(playlistUri, chunklistPath)
 
-            let getChunklistAsync cancellationToken = task {
+            let getChunklistAsync count cancellationToken = task {
                 let! chunklistData = sxm.GetFileAsync(chunklistUri, cancellationToken)
 
                 let chunklist =
@@ -41,7 +41,7 @@ type SiriusXMSourceFactory(channelNumber: int) =
                     |> ChunklistParser.parse
                     |> ChunklistNormalizer.normalize chunklistUri
                     |> Seq.rev
-                    |> Seq.truncate 3
+                    |> Seq.truncate count
                     |> Seq.rev
 
                 return chunklist
@@ -109,10 +109,13 @@ type SiriusXMSourceFactory(channelNumber: int) =
                 let cancellationToken = adapterCancellationTokenSource.Token
 
                 try
+                    let mutable count = initialCount
                     while not cancellationToken.IsCancellationRequested do
                         let minimumDelay = Task.Delay(5000, cancellationToken)
 
-                        let! chunklist = getChunklistAsync cancellationToken
+                        let! chunklist = getChunklistAsync count cancellationToken
+                        count <- Int32.MaxValue
+
                         for chunk in chunklist do
                             if sequenceNumber < chunk.mediaSequence then
                                 printfn "[SiriusXMSourceFactory] Found new segment %A" chunk.mediaSequence

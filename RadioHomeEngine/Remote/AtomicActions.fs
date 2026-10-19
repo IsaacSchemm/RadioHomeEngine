@@ -12,7 +12,7 @@ type PlaylistPosition =
 | Last
 
 type AtomicAction =
-| PlaySiriusXMChannel of int * PlaylistPosition
+| PlayChannel of int * PlaylistPosition
 | PlayPause
 | Replay
 | PlayCD of DiscDriveScope * PlaylistPosition
@@ -27,13 +27,13 @@ module AtomicActions =
         | "000" -> Forecast
         | "00" -> PlayCD (AllDrives, Now)
         | "0" -> Stop
-        | Int32 n when n > 0 -> PlaySiriusXMChannel (n, Now)
+        | Int32 n when n > 0 -> PlayChannel (n, Now)
         | _ -> ()
     })
 
     let performActionAsync player atomicAction = task {
         match atomicAction with
-        | PlaySiriusXMChannel (channelNumber, position) ->
+        | PlayChannel (channelNumber, position) ->
             let! channels = SiriusXMClient.GetChannelsAsync(CancellationToken.None)
             let name =
                 channels
@@ -118,7 +118,7 @@ module AtomicActions =
 
     let performAlternateActionAsync player atomicAction = task {
         match atomicAction with
-        | PlaySiriusXMChannel (channelNumber, _) ->
+        | PlayChannel (channelNumber, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
 
             let! playlist = SiriusXMClient.GetPlaylistAsync(channelNumber, CancellationToken.None)

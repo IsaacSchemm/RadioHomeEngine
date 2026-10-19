@@ -179,7 +179,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         private static async Task AddSXMChannelAsync(string playerId, PlaylistPosition playlistPosition, int channelNumber) =>
             await AtomicActions.performActionAsync(
                 LyrionCLI.Player.NewPlayer(playerId),
-                AtomicAction.NewPlaySiriusXMChannel(
+                AtomicAction.NewPlayChannel(
                     channelNumber,
                     playlistPosition));
 

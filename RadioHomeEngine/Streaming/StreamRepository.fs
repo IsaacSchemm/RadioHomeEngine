@@ -37,10 +37,10 @@ module StreamRepository =
         | None ->
             do! zeroChannel.ClearAllInterruptionsAsync()
         | Some 2 ->
-            do! zeroChannel.InterruptAsync(new SiriusXMSourceFactory(2))
+            do! zeroChannel.InterruptAsync(new SiriusXMSourceFactory(2, 1))
             do! zeroChannel.InterruptAsync(new TestSourceFactory())
         | Some n ->
-            do! zeroChannel.InterruptAsync(new SiriusXMSourceFactory(n))
+            do! zeroChannel.InterruptAsync(new SiriusXMSourceFactory(n, 1))
     }
 
     let private getComposite channelNumber =
@@ -48,7 +48,7 @@ module StreamRepository =
         | Some stream ->
             stream
         | None ->
-            let composite = new Composite(channelNumber, new SiriusXMSourceFactory(channelNumber))
+            let composite = new Composite(channelNumber, new SiriusXMSourceFactory(channelNumber, 3))
             Composites.sxm.Add(composite)
             composite
 
