@@ -19,7 +19,7 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
         | [] -> ()
         | head :: tail ->
             interruptions <- tail
-            //do! head.DisposeAsync()
+            do! head.DisposeAsync()
     }
 
     let readAllFromSourceAsync (source: ISegmentSource) (cancellationToken: CancellationToken) = task {
@@ -56,8 +56,7 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
                         match List.tryHead interruptions with
                         | Some interruption ->
                             do! readAllFromSourceAsync interruption cts.Token
-                            while List.tryHead interruptions = Some interruption do
-                                do! endInterruptionAsync ()
+                            do! endInterruptionAsync ()
                         | None ->
                             use! rootSource = rootFactory.CreateAsync()
                             do! readAllFromSourceAsync rootSource cts.Token

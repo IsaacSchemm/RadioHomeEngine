@@ -11,7 +11,7 @@ type SegmentCache() =
 
     // Stores a decrypted audio segment to the cache, along with the metadata and its new sequence number.
     let add (segment: DownstreamSegment) =
-        printfn $"[SegmentCache] Adding {segment.mediaSequence} -> {nextSequenceNumber}"
+        printfn "[SegmentCache] Adding %A -> %A (%A)" segment.mediaSequence nextSequenceNumber segment.dateTime
         let cacheItem = {
             segment with mediaSequence = nextSequenceNumber
         }
@@ -30,11 +30,9 @@ type SegmentCache() =
         |> Seq.tryHead
 
     member _.Add(segment) =
-        // Look for segments that have a timestamp at least [segment-length / 2] seconds newer than the newest cached segment.
-
         let threshold =
             match Seq.tryHead cache with
-            | Some segment -> segment.dateTime + TimeSpan.FromSeconds(float segment.duration / 2.0)
+            | Some segment -> segment.dateTime
             | None -> DateTimeOffset.MinValue
 
         if segment.dateTime > threshold then
