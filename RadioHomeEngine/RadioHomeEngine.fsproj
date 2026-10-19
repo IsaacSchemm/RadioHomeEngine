@@ -18,8 +18,6 @@
     <Compile Include="streaming\ChunklistNormalizer.fs" />
     <Compile Include="Streaming\DownstreamSegment.fs" />
     <Compile Include="Streaming\ILocalSegmentSource.fs" />
-    <Compile Include="streaming\IRemoteSegmentSource.fs" />
-    <Compile Include="streaming\RemoteSegmentSourceAdapter.fs" />
     <Compile Include="streaming\ISegmentSourceFactory.fs" />
     <Compile Include="Streaming\NoiseSourceFactory.fs" />
     <Compile Include="Streaming\TestSourceFactory.fs" />

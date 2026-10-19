@@ -1,13 +1,14 @@
 namespace RadioHomeEngine
 
 open System
+open System.Buffers.Binary
 open System.Diagnostics
 open System.IO
+open System.Security.Cryptography
 open System.Text
 open System.Threading
+open System.Threading.Channels
 open System.Threading.Tasks
-open System.Security.Cryptography
-open System.Buffers.Binary
 
 type SiriusXMSourceFactory(channelNumber: int) =
     let sxm = new SiriusXMClient()
@@ -31,85 +32,102 @@ type SiriusXMSourceFactory(channelNumber: int) =
 
             let chunklistUri = new Uri(playlistUri, chunklistPath)
 
-            return RemoteSegmentSourceAdapter {
-                new IRemoteSegmentSource with
-                    member _.ScanAsync(cancellationToken) = task {
-                        let! chunklistData = sxm.GetFileAsync(chunklistUri, cancellationToken)
+            let getChunklistAsync cancellationToken = task {
+                let! chunklistData = sxm.GetFileAsync(chunklistUri, cancellationToken)
 
-                        let chunklist =
-                            chunklistData.content
-                            |> Encoding.UTF8.GetString
-                            |> ChunklistParser.parse
-                            |> ChunklistNormalizer.normalize chunklistUri
-                            |> Seq.rev
-                            |> Seq.truncate 3
-                            |> Seq.rev
+                let chunklist =
+                    chunklistData.content
+                    |> Encoding.UTF8.GetString
+                    |> ChunklistParser.parse
+                    |> ChunklistNormalizer.normalize chunklistUri
+                    |> Seq.rev
+                    |> Seq.truncate 3
+                    |> Seq.rev
 
-                        let mutable segments = []
+                return chunklist
+            }
 
+            let decryptAsync (chunk: UpstreamSegment) (data: byte array) = task {
+                match chunk.encryption with
+                | Aes128 "key/1" ->
+                    use algorithm = Aes.Create()
+                    algorithm.Padding <- PaddingMode.PKCS7
+                    algorithm.Mode <- CipherMode.CBC
+                    algorithm.KeySize <- 128
+                    algorithm.BlockSize <- 128
+
+                    algorithm.Key <- sxm.GetKey()
+
+                    algorithm.IV <-
+                        let iv = Array.zeroCreate 16
+                        BinaryPrimitives.WriteUInt128BigEndian(iv.AsSpan(), chunk.mediaSequence)
+                        iv
+
+                    use outputStream = new MemoryStream()
+
+                    do! task {
+                        use cryptoStream = new CryptoStream(outputStream, algorithm.CreateDecryptor(), CryptoStreamMode.Write)
+                        do! cryptoStream.WriteAsync(data)
+                    }
+
+                    return outputStream.ToArray()
+                | Clear ->
+                    return data
+                | x ->
+                    return failwithf "Unrecognized stream encryption: %A" x
+            }
+
+            let recontainerizeAsync (data: byte array) = task {
+                use ffmpeg =
+                    new ProcessStartInfo(
+                        "ffmpeg",
+                        "-nostats -hide_banner -loglevel warning -i - -f mpegts -c:a copy -",
+                        RedirectStandardInput = true,
+                        RedirectStandardOutput = true)
+                    |> Process.Start
+
+                use buffer = new MemoryStream()
+
+                let writeTask = ffmpeg.StandardInput.BaseStream.WriteAsync(data)
+                let readTask = ffmpeg.StandardOutput.BaseStream.CopyToAsync(buffer)
+
+                do! writeTask
+
+                ffmpeg.StandardInput.BaseStream.Close()
+
+                do! readTask
+                do! ffmpeg.WaitForExitAsync()
+
+                return buffer.ToArray()
+            }
+
+            let internalBuffer = Channel.CreateBounded<DownstreamSegment>(3)
+
+            let adapterCancellationTokenSource = new CancellationTokenSource()
+
+            let activeTask = task {
+                let cancellationToken = adapterCancellationTokenSource.Token
+
+                try
+                    while not cancellationToken.IsCancellationRequested do
+                        let minimumDelay = Task.Delay(5000, cancellationToken)
+
+                        let! chunklist = getChunklistAsync cancellationToken
                         for chunk in chunklist do
                             if sequenceNumber < chunk.mediaSequence then
+                                printfn "[SiriusXMSourceFactory] Found new segment %A" chunk.mediaSequence
+
                                 sequenceNumber <- chunk.mediaSequence
 
                                 match chunk.dateTime, chunk.duration with
                                 | Some dateTime, Some duration ->
                                     let chunkUri = new Uri(chunklistUri, chunk.path)
 
-                                    let! encryptedData = sxm.GetFileAsync(chunkUri, cancellationToken)
+                                    let! file = sxm.GetFileAsync(chunkUri, cancellationToken)
 
-                                    let! data = task {
-                                        match chunk.encryption with
-                                        | Aes128 "key/1" ->
-                                            use algorithm = Aes.Create()
-                                            algorithm.Padding <- PaddingMode.PKCS7
-                                            algorithm.Mode <- CipherMode.CBC
-                                            algorithm.KeySize <- 128
-                                            algorithm.BlockSize <- 128
+                                    let! data = decryptAsync chunk file.content
 
-                                            algorithm.Key <- sxm.GetKey()
-
-                                            algorithm.IV <-
-                                                let iv = Array.zeroCreate 16
-                                                BinaryPrimitives.WriteUInt128BigEndian(iv.AsSpan(), chunk.mediaSequence)
-                                                iv
-
-                                            use outputStream = new MemoryStream()
-
-                                            do! task {
-                                                use cryptoStream = new CryptoStream(outputStream, algorithm.CreateDecryptor(), CryptoStreamMode.Write)
-                                                do! cryptoStream.WriteAsync(encryptedData.content)
-                                            }
-
-                                            return outputStream.ToArray()
-                                        | Clear ->
-                                            return encryptedData.content
-                                        | x ->
-                                            return failwithf "Unrecogznied stream encryption: %A" x
-                                    }
-
-                                    let ffmpeg =
-                                        new ProcessStartInfo(
-                                            "ffmpeg",
-                                            "-nostats -hide_banner -loglevel warning -i - -f mpegts -c:a copy -",
-                                            RedirectStandardInput = true,
-                                            RedirectStandardOutput = true)
-                                        |> Process.Start
-
-                                    let! recontainerized_data = task {
-                                        use buffer = new MemoryStream()
-
-                                        let writeTask = ffmpeg.StandardInput.BaseStream.WriteAsync(data)
-                                        let readTask = ffmpeg.StandardOutput.BaseStream.CopyToAsync(buffer)
-
-                                        do! writeTask
-
-                                        ffmpeg.StandardInput.BaseStream.Close()
-
-                                        do! readTask
-                                        do! ffmpeg.WaitForExitAsync()
-
-                                        return buffer.ToArray()
-                                    }
+                                    let! recontainerized_data = recontainerizeAsync data
 
                                     let segment = {
                                         dateTime = dateTime
@@ -118,16 +136,38 @@ type SiriusXMSourceFactory(channelNumber: int) =
                                         mediaSequence = chunk.mediaSequence
                                     }
 
-                                    segments <- segment :: segments
+                                    printfn "[SiriusXMSourceFactory] Writing segment %A" segment.mediaSequence
+
+                                    do! internalBuffer.Writer.WriteAsync(segment, cancellationToken)
                                 | _ -> ()
 
-                        return segments |> List.sortBy (fun s -> s.dateTime)
+                        do! minimumDelay
+                with :? OperationCanceledException when cancellationToken.IsCancellationRequested -> ()
+
+                internalBuffer.Writer.Complete()
+
+                printfn "[SiriusXMSourceFactory] Complete"
+            }
+
+            return {
+                new ILocalSegmentSource with
+                    member _.ReadNextAsync(cancellationToken) =  task {
+                        let! more = internalBuffer.Reader.WaitToReadAsync(cancellationToken)
+
+                        if more then
+                            printfn "[SiriusXMSourceFactory] Waiting for segment"
+                            let! segment = internalBuffer.Reader.ReadAsync(cancellationToken)
+                            printfn "[SiriusXMSourceFactory] Returning segment %A" segment.mediaSequence
+                            return AsyncNextSegment segment
+                        else
+                            printfn "[SiriusXMSourceFactory] No more segments"
+                            return AsyncNoMoreSegments
                     }
 
-                    member _.IsComplete = false
-
-                    member _.RecommendedInterval = TimeSpan.FromSeconds(5.0)
-
-                    member _.DisposeAsync() = ValueTask.CompletedTask
-            } :> ILocalSegmentSource
-        }
+                    member _.DisposeAsync() = ValueTask (task {
+                        printfn "[SiriusXMSourceFactory] Disposing"
+                        do! adapterCancellationTokenSource.CancelAsync()
+                        do! activeTask
+                    })
+            }
+    }
