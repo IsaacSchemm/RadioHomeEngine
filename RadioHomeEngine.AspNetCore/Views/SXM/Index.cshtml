@@ -32,7 +32,46 @@
     </style>
 </head>
 <body>
-    <section aria-label="Tuner" style="flex: 0 0 auto; text-align: start">
+    <section aria-labelledby="directPlayLabel" style="flex: 0 0 auto; text-align: start">
+        <span id="directPlayLabel">Direct Play</span>
+
+        <form asp-action="ViewChannel" style="display: inline" target="currentChannelFrame">
+            <input type="number"
+                   min="1"
+                   max="@Model.Channels.Select(c => c.ChannelNumber).DefaultIfEmpty(1).Max()"
+                   name="num"
+                   value="@Model.ChannelNumber"
+                   class="pad" />
+
+            <button type="submit" class="pad">View</button>
+        </form>
+
+        <form asp-action="ViewChannel" style="display: inline" target="currentChannelFrame">
+            <select name="num">
+                @foreach (var channel in Model.Channels)
+                {
+                    if (channel.ChannelNumber == Model.ChannelNumber)
+                    {
+                        <option value="@channel.ChannelNumber" selected>
+                            @channel.ChannelNumber | @channel.Name
+                        </option>
+                    }
+                    else
+                    {
+                        <option value="@channel.ChannelNumber">
+                            @channel.ChannelNumber | @channel.Name
+                        </option>
+                    }
+                }
+            </select>
+
+            <button type="submit" class="pad">View</button>
+        </form>
+    </section>
+
+    <section aria-labelledby="channelZeroLabel" style="flex: 0 0 auto; text-align: start">
+        <span id="channelZeroLabel">Channel 0</span>
+
         <form asp-action="SetChannel" style="display: inline" target="currentChannelFrame">
             <input type="number"
                    min="1"
@@ -73,7 +112,7 @@
 
     <section aria-label="Devices" style="flex: 0 0 auto">
         <div>
-            Play on:
+            Play channel 0 on:
         </div>
 
         <form asp-action="Player" method="get" style="display: inline" target="_blank">
@@ -82,7 +121,7 @@
             </button>
         </form>
 
-        @foreach (var playerConnection in Model.Players)
+        @* @foreach (var playerConnection in Model.Players)
         {
             <form asp-action="PlayOn" style="display: inline">
                 <input type="hidden" name="macAddress" value="@playerConnection.MacAddress" />
@@ -90,7 +129,7 @@
                     @playerConnection.Name
                 </button>
             </form>
-        }
+        } *@
     </section>
 
     @* <iframe name="audioFrame" src="/SXM/Player" style="border: 0; flex: 0 0 auto" height="80"></iframe> *@
