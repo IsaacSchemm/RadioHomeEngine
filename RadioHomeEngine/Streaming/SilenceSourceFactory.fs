@@ -37,20 +37,6 @@ type SilenceSourceFactory() =
                             }
                     }
 
-                    member _.TryReadNext() =
-                        let nextSegmentTime = lastSegmentTime + interval
-                        if nextSegmentTime > DateTimeOffset.UtcNow then
-                            WaitingForMoreSegments
-                        else
-                            lastSegmentTime <- nextSegmentTime
-
-                            NextSegment {
-                                dateTime = nextSegmentTime
-                                duration = interval.TotalSeconds
-                                data = data
-                                mediaSequence = mediaSequence
-                            }
-
                     member _.DisposeAsync() = ValueTask.CompletedTask
             }
         }

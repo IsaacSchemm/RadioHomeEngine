@@ -115,12 +115,6 @@ type NoiseSourceFactory() =
                             return AsyncNoMoreSegments
                     }
 
-                    member _.TryReadNext() =
-                        match channel.Reader.TryRead() with
-                        | (true, segment) -> NextSegment segment
-                        | (false, _) when channel.Reader.Completion.IsCompleted -> NoMoreSegments
-                        | (false, _) -> WaitingForMoreSegments
-
                     member _.DisposeAsync() = new ValueTask(task {
                         printfn "[NoiseSource] Disposing"
 

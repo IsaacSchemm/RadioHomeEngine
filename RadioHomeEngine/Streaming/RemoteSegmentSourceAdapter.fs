@@ -45,18 +45,6 @@ type RemoteSegmentSourceAdapter(source: IRemoteSegmentSource) =
                 return AsyncNoMoreSegments
         }
 
-        member _.TryReadNext() =
-            match internalBuffer.Reader.TryRead() with
-            | (true, segment) ->
-                printfn "[RemoteSegmentSourceAdapter] Returning %A" segment.mediaSequence
-                NextSegment segment
-            | (false, _) when internalBuffer.Reader.Completion.IsCompleted ->
-                printfn "[RemoteSegmentSourceAdapter] No more segments"
-                NoMoreSegments
-            | (false, _) ->
-                printfn "[RemoteSegmentSourceAdapter] Waiting for more segments"
-                WaitingForMoreSegments
-
         member _.DisposeAsync() = ValueTask (task {
             printfn "[RemoteSegmentSourceAdapter] Disposing"
             do! source.DisposeAsync()

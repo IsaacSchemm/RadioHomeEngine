@@ -27,34 +27,6 @@ type SegmentCache() =
     let isInUse () =
         DateTimeOffset.UtcNow - lastRequested < TimeSpan.FromMinutes(1.0)
 
-    let readFrom (source: ILocalSegmentSource) =
-        // Look for segments that have a timestamp at least [segment-length / 2] seconds newer than the newest cached segment.
-        // Never take more than the three most recent segments, though.
-
-        let mutable threshold =
-            match Seq.tryHead cache with
-            | Some segment -> segment.dateTime + TimeSpan.FromSeconds(float segment.duration / 2.0)
-            | None -> DateTimeOffset.MinValue
-
-        // Add any newly generated chunks.
-
-        let mutable moreNow = true
-        let mutable moreLater = true
-
-        while moreNow do
-            match source.TryReadNext() with
-            | NextSegment segment ->
-                if segment.dateTime > threshold then
-                    add segment
-                    threshold <- segment.dateTime
-            | NoMoreSegments ->
-                moreNow <- false
-                moreLater <- false
-            | WaitingForMoreSegments ->
-                moreNow <- false
-
-        moreLater
-
     /// Gets a segment's unencrypted audio data from the cache, if it exists, using its new sequence number.
     let tryGetData sequenceNumber =
         cache
@@ -92,9 +64,6 @@ type SegmentCache() =
 
     member _.IsInUse() =
         isInUse ()
-
-    member _.ReadFrom(buffer) =
-        readFrom buffer
 
     member _.EvictStale() =
         evictStale ()
