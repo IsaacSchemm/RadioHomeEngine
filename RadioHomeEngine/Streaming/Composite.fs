@@ -7,7 +7,7 @@ open System.Threading.Tasks
 type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
     let cache = new SegmentCache()
 
-    let mutable interruptions: ILocalSegmentSource list = []
+    let mutable interruptions: ISegmentSource list = []
     let mutable isActive = true
     let mutable stopWaitingForNextSegment = fun () -> ()
 
@@ -21,17 +21,17 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
             //do! head.DisposeAsync()
     }
 
-    let readAllFromSourceAsync (source: ILocalSegmentSource) (cancellationToken: CancellationToken) = task {
+    let readAllFromSourceAsync (source: ISegmentSource) (cancellationToken: CancellationToken) = task {
         try
             let mutable finished = false
             while not finished && not cancellationToken.IsCancellationRequested do
                 printfn "[Composite] Waiting for next segment [%d]" channelNumber
                 let! next = source.ReadNextAsync(cancellationToken)
                 match next with
-                | AsyncNextSegment segment ->
+                | NextSegment segment ->
                     printfn "[Composite] Found next segment %A [%d]" segment.mediaSequence channelNumber
                     cache.Add(segment)
-                | AsyncNoMoreSegments ->
+                | NoMoreSegments ->
                     printfn "[Composite] Found end [%d]" channelNumber
                     finished <- true
         with :? OperationCanceledException when cancellationToken.IsCancellationRequested ->
@@ -69,7 +69,7 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
     member _.Cache = cache
     member _.ChannelNumber = channelNumber
 
-    member this.Interrupt(source: ILocalSegmentSource) =
+    member this.Interrupt(source: ISegmentSource) =
         interruptions <- source :: interruptions
         stopWaitingForNextSegment ()
 

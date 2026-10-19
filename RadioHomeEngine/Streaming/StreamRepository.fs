@@ -11,7 +11,7 @@ module StreamRepository =
 
     let noise = new Composite(8000, new NoiseSourceFactory())
 
-    module Streams =
+    module Composites =
         let permanent = [zeroChannel; noise]
         let sxm = new ResizeArray<Composite>()
 
@@ -43,18 +43,18 @@ module StreamRepository =
             do! zeroChannel.InterruptAsync(new SiriusXMSourceFactory(n))
     }
 
-    let private getStream channelNumber =
-        match Streams.tryGet channelNumber with
+    let private getComposite channelNumber =
+        match Composites.tryGet channelNumber with
         | Some stream ->
             stream
         | None ->
-            let stream = new Composite(channelNumber, new SiriusXMSourceFactory(channelNumber))
-            Streams.sxm.Add(stream)
-            stream
+            let composite = new Composite(channelNumber, new SiriusXMSourceFactory(channelNumber))
+            Composites.sxm.Add(composite)
+            composite
 
     let getPlaylist channelNumber = String.concat "\n" [
-        let stream = getStream channelNumber
-        ignore stream
+        let composite = getComposite channelNumber
+        ignore composite
 
         "#EXTM3U"
         "#EXT-X-ALLOW-CACHE:NO"
@@ -66,8 +66,8 @@ module StreamRepository =
     ]
 
     let getChunklist channelNumber = String.concat "\n" [
-        let stream = getStream channelNumber
-        let segments = stream.Cache.GetSegments()
+        let composite = getComposite channelNumber
+        let segments = composite.Cache.GetSegments()
         let finalSegment = segments |> Seq.rev |> Seq.tryHead
 
         "#EXTM3U"
@@ -95,13 +95,13 @@ module StreamRepository =
     ]
 
     let getChunkAsync channelNumber sequenceNumber =
-        let stream = getStream channelNumber
-        stream.Cache.GetSegmentDataAsync(sequenceNumber)
+        let composite = getComposite channelNumber
+        composite.Cache.GetSegmentDataAsync(sequenceNumber)
 
     let waitForSegmentsAsync channelNumber (cancellationToken: CancellationToken) = task {
         try
-            let stream = getStream channelNumber
-            while stream.Cache.GetSegments() = [] && not cancellationToken.IsCancellationRequested do
+            let composite = getComposite channelNumber
+            while composite.Cache.GetSegments() = [] && not cancellationToken.IsCancellationRequested do
                 do! Task.Delay(TimeSpan.FromSeconds(0.5), cancellationToken)
         with :? OperationCanceledException -> ()
     }
@@ -113,17 +113,17 @@ module StreamRepository =
             while not cancellationToken.IsCancellationRequested do
                 let waitForNotify = SegmentCacheActivityIndicator.waitForNotifyAsync cancellationToken
 
-                for stream in Streams.getAll () do
-                    if stream.Cache.IsInUse() then
-                        printfn "[SegmentCacheRepository] Marking active [%d]" stream.ChannelNumber
-                        stream.MarkActive()
+                for composite in Composites.getAll () do
+                    if composite.Cache.IsInUse() then
+                        printfn "[SegmentCacheRepository] Marking active [%d]" composite.ChannelNumber
+                        composite.MarkActive()
                     else
-                        printfn "[SegmentCacheRepository] Marking inactive [%d]" stream.ChannelNumber
-                        stream.MarkInactive()
-                        if Streams.sxm |> Seq.contains stream then
-                            printfn "[SegmentCacheRepository] Dropping [%d]" stream.ChannelNumber
-                            Streams.sxm.Remove(stream) |> ignore
-                            do! (stream :> IAsyncDisposable).DisposeAsync()
+                        printfn "[SegmentCacheRepository] Marking inactive [%d]" composite.ChannelNumber
+                        composite.MarkInactive()
+                        if Composites.sxm |> Seq.contains composite then
+                            printfn "[SegmentCacheRepository] Dropping [%d]" composite.ChannelNumber
+                            Composites.sxm.Remove(composite) |> ignore
+                            do! (composite :> IAsyncDisposable).DisposeAsync()
 
                 printfn "[SegmentCacheRepository] Waiting"
                 let! _ = Task.WhenAny(Task.Delay(30000), waitForNotify)

@@ -98,7 +98,7 @@ type NoiseSourceFactory() =
             }
 
             return {
-                new ILocalSegmentSource with
+                new ISegmentSource with
                     member _.ReadNextAsync(cancellationToken) = task {
                         try
                             printfn "[NoiseSourceFactory] Waiting to read"
@@ -106,13 +106,13 @@ type NoiseSourceFactory() =
                             if readable then
                                 printfn "[NoiseSourceFactory] Reading"
                                 let! segment = channel.Reader.ReadAsync(cancellationToken)
-                                return AsyncNextSegment segment
+                                return NextSegment segment
                             else
                                 printfn "[NoiseSourceFactory] Ending"
-                                return AsyncNoMoreSegments
+                                return NoMoreSegments
                         with :? OperationCanceledException when cancellationToken.IsCancellationRequested ->
                             printfn "[NoiseSourceFactory] Cancelled"
-                            return AsyncNoMoreSegments
+                            return NoMoreSegments
                     }
 
                     member _.DisposeAsync() = new ValueTask(task {

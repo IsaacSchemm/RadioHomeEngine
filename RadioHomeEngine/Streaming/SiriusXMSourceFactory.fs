@@ -150,7 +150,7 @@ type SiriusXMSourceFactory(channelNumber: int) =
             }
 
             return {
-                new ILocalSegmentSource with
+                new ISegmentSource with
                     member _.ReadNextAsync(cancellationToken) =  task {
                         let! more = internalBuffer.Reader.WaitToReadAsync(cancellationToken)
 
@@ -158,10 +158,10 @@ type SiriusXMSourceFactory(channelNumber: int) =
                             printfn "[SiriusXMSourceFactory] Waiting for segment"
                             let! segment = internalBuffer.Reader.ReadAsync(cancellationToken)
                             printfn "[SiriusXMSourceFactory] Returning segment %A" segment.mediaSequence
-                            return AsyncNextSegment segment
+                            return NextSegment segment
                         else
                             printfn "[SiriusXMSourceFactory] No more segments"
-                            return AsyncNoMoreSegments
+                            return NoMoreSegments
                     }
 
                     member _.DisposeAsync() = ValueTask (task {

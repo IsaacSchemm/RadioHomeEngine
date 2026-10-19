@@ -13,12 +13,13 @@
     <Compile Include="Utility.fs" />
     <Compile Include="ActivePatterns.fs" />
     <Compile Include="Network.fs" />
-    <Compile Include="UpstreamSegment.fs" />
+    <Compile Include="Streaming\UpstreamSegment.fs" />
     <Compile Include="Streaming\ChunklistParser.fs" />
-    <Compile Include="streaming\ChunklistNormalizer.fs" />
+    <Compile Include="Streaming\ChunklistNormalizer.fs" />
     <Compile Include="Streaming\DownstreamSegment.fs" />
-    <Compile Include="Streaming\ILocalSegmentSource.fs" />
-    <Compile Include="streaming\ISegmentSourceFactory.fs" />
+    <Compile Include="Streaming\SegmentReadResult.fs" />
+    <Compile Include="Streaming\ISegmentSource.fs" />
+    <Compile Include="Streaming\ISegmentSourceFactory.fs" />
     <Compile Include="Streaming\NoiseSourceFactory.fs" />
     <Compile Include="Streaming\TestSourceFactory.fs" />
     <Compile Include="Streaming\Silence.fs" />
@@ -27,7 +28,7 @@
     <Compile Include="Streaming\SiriusXMSourceFactory.fs" />
     <Compile Include="Streaming\StreamActivityIndicator.fs" />
     <Compile Include="Streaming\SegmentCache.fs" />
-    <Compile Include="streaming\Composite.fs" />
+    <Compile Include="Streaming\Composite.fs" />
     <Compile Include="Streaming\StreamRepository.fs" />
     <Compile Include="Lyrion\LyrionCLI.fs" />
     <Compile Include="Lyrion\LyrionCLIService.fs" />

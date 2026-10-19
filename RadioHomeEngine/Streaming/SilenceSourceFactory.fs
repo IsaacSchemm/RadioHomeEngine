@@ -16,7 +16,7 @@ type SilenceSourceFactory() =
             let mutable lastSegmentTime = DateTimeOffset.UtcNow
 
             return {
-                new ILocalSegmentSource with
+                new ISegmentSource with
                     member _.ReadNextAsync(cancellationToken) = task {
                         let nextSegmentTime = lastSegmentTime + interval
 
@@ -25,11 +25,11 @@ type SilenceSourceFactory() =
                             do! Task.Delay(ts, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
 
                         if cancellationToken.IsCancellationRequested then
-                            return AsyncNoMoreSegments
+                            return NoMoreSegments
                         else
                             lastSegmentTime <- nextSegmentTime
 
-                            return AsyncNextSegment {
+                            return NextSegment {
                                 dateTime = nextSegmentTime
                                 duration = interval.TotalSeconds
                                 data = data

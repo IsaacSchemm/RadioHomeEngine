@@ -108,17 +108,17 @@ type TestSourceFactory() =
             }
 
             return {
-                new ILocalSegmentSource with
+                new ISegmentSource with
                     member _.ReadNextAsync(cancellationToken) = task {
                         try
                             let! readable = channel.Reader.WaitToReadAsync(cancellationToken)
                             if readable then
                                 let! segment = channel.Reader.ReadAsync(cancellationToken)
-                                return AsyncNextSegment segment
+                                return NextSegment segment
                             else
-                                return AsyncNoMoreSegments
+                                return NoMoreSegments
                         with :? OperationCanceledException when cancellationToken.IsCancellationRequested ->
-                            return AsyncNoMoreSegments
+                            return NoMoreSegments
                     }
 
                     member _.DisposeAsync() = new ValueTask(task {
