@@ -26,7 +26,6 @@
     <Compile Include="Streaming\SilenceSourceFactory.fs" />
     <Compile Include="Streaming\SiriusXMClient.fs" />
     <Compile Include="Streaming\SiriusXMSourceFactory.fs" />
-    <Compile Include="Streaming\StreamActivityIndicator.fs" />
     <Compile Include="Streaming\SegmentCache.fs" />
     <Compile Include="Streaming\Composite.fs" />
     <Compile Include="Streaming\StreamRepository.fs" />

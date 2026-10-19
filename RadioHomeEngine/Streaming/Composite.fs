@@ -9,6 +9,7 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
 
     let mutable interruptions: ISegmentSource list = []
     let mutable isActive = true
+    let mutable lastActive = DateTimeOffset.UtcNow
     let mutable stopWaitingForNextSegment = fun () -> ()
 
     let overallCancellationTokenSource = new CancellationTokenSource()
@@ -84,13 +85,19 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
         stopWaitingForNextSegment ()
     }
 
+    member this.IsActive() =
+        isActive
+
     member this.MarkActive() =
+        lastActive <- DateTimeOffset.UtcNow
         if not isActive then
+            printfn "[Composite] Marking active [%d]" channelNumber
             isActive <- true
             stopWaitingForNextSegment ()
 
-    member this.MarkInactive() =
-        if isActive then
+    member this.CheckForInactivity() =
+        if isActive && DateTimeOffset.UtcNow - lastActive > TimeSpan.FromMinutes(1.0) then
+            printfn "[Composite] Marking inactive [%d]" channelNumber
             isActive <- false
             stopWaitingForNextSegment ()
 

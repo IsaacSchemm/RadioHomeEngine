@@ -55,7 +55,7 @@ type NoiseSourceFactory() =
 
             let reencoder = Process.Start(new ProcessStartInfo(
                 $"ffmpeg",
-                $"{readSpeedParameters} {pipeFormat} -i - {outputParameters}",
+                $"-nostats -hide_banner -loglevel warning {readSpeedParameters} {pipeFormat} -i - {outputParameters}",
                 RedirectStandardInput = true))
 
             let pipe = task {

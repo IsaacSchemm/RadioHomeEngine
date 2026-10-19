@@ -9,9 +9,6 @@ type SegmentCache() =
     /// The sequence number that will be used for the next segment.
     let mutable nextSequenceNumber = UInt128.One
 
-    /// The last date and time at which the cache was accessed. Cache population is paused when not in use.
-    let mutable lastRequested = DateTimeOffset.UtcNow
-
     // Stores a decrypted audio segment to the cache, along with the metadata and its new sequence number.
     let add (segment: DownstreamSegment) =
         let cacheItem = {
@@ -23,9 +20,6 @@ type SegmentCache() =
     /// Remove all but the ten most recent segments from the cache.
     let evictStale () =
         cache <- cache |> List.truncate 10
-
-    let isInUse () =
-        DateTimeOffset.UtcNow - lastRequested < TimeSpan.FromMinutes(1.0)
 
     /// Gets a segment's unencrypted audio data from the cache, if it exists, using its new sequence number.
     let tryGetData sequenceNumber =
@@ -47,9 +41,6 @@ type SegmentCache() =
             add segment
 
     member _.GetSegments() =
-        lastRequested <- DateTimeOffset.UtcNow
-        SegmentCacheActivityIndicator.notify ()
-
         cache
         |> List.truncate 3
         |> List.rev
@@ -61,9 +52,6 @@ type SegmentCache() =
         | _ ->
             return! Silence.segmentTask.Value
     }
-
-    member _.IsInUse() =
-        isInUse ()
 
     member _.EvictStale() =
         evictStale ()
