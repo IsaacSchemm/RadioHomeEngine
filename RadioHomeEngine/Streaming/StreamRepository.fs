@@ -88,6 +88,7 @@ module StreamRepository =
         let mutable encryption = Clear
 
         for segment in segments do
+            printfn $"[StreamRepository] Including segment {segment.mediaSequence}"
             $"#EXT-X-PROGRAM-DATE-TIME:{segment.dateTime:o}"
             $"#EXTINF:{segment.duration},"
             $"/Stream/chunk-{channelNumber}-{segment.mediaSequence}.ts"

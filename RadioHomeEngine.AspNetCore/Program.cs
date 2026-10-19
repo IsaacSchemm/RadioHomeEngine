@@ -6,13 +6,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient();
 
-//builder.Services.AddHostedService<LyrionCLIService>();
-//builder.Services.AddHostedService<WeatherService>();
-//builder.Services.AddHostedService<LyrionPlayerDetectionService>();
-//builder.Services.AddHostedService<DiscDriveChangeDetectionService>();
+if (Environment.OSVersion.Platform == PlatformID.Unix)
+{
+    builder.Services.AddHostedService<LyrionCLIService>();
+    builder.Services.AddHostedService<WeatherService>();
+    builder.Services.AddHostedService<LyrionPlayerDetectionService>();
+    builder.Services.AddHostedService<DiscDriveChangeDetectionService>();
+}
+
 builder.Services.AddHostedService<StreamRepository.Service>();
 
 builder.Services.AddOpenApi();
+
+builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
 
 var app = builder.Build();
 
