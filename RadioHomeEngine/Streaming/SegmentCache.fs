@@ -62,6 +62,18 @@ type SegmentCache() =
         |> Seq.map (fun s -> s.data)
         |> Seq.tryHead
 
+    member _.Add(segment) =
+        // Look for segments that have a timestamp at least [segment-length / 2] seconds newer than the newest cached segment.
+        // Never take more than the three most recent segments, though.
+
+        let threshold =
+            match Seq.tryHead cache with
+            | Some segment -> segment.dateTime + TimeSpan.FromSeconds(float segment.duration / 2.0)
+            | None -> DateTimeOffset.MinValue
+
+        if segment.dateTime > threshold then
+            add segment
+
     member _.GetSegments() =
         lastRequested <- DateTimeOffset.UtcNow
         SegmentCacheActivityIndicator.notify ()

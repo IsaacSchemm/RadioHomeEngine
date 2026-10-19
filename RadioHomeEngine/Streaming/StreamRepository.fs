@@ -7,19 +7,13 @@ open Microsoft.Extensions.Hosting
 open FSharp.Control
 
 module StreamRepository =
-    let zeroChannel = new Stream({
-        channelNumber = 0
-        factory = new SilenceSourceFactory()
-    })
+    let zeroChannel = new Composite(0, new SilenceSourceFactory())
 
-    let noise = new Stream({
-        channelNumber = 8000
-        factory = new NoiseSourceFactory()
-    })
+    let noise = new Composite(8000, new NoiseSourceFactory())
 
     module Streams =
         let permanent = [zeroChannel; noise]
-        let sxm = new ResizeArray<Stream>()
+        let sxm = new ResizeArray<Composite>()
 
         let getAll () = [
             yield! permanent
@@ -41,12 +35,12 @@ module StreamRepository =
 
         match channelZero with
         | None ->
-            zeroChannel.ClearAllInterruptions()
+            do! zeroChannel.ClearAllInterruptionsAsync()
         | Some 2 ->
-            zeroChannel.Interrupt(new SiriusXMSourceFactory(2))
-            zeroChannel.Interrupt(new TestSourceFactory())
+            do! zeroChannel.InterruptAsync(new SiriusXMSourceFactory(2))
+            do! zeroChannel.InterruptAsync(new TestSourceFactory())
         | Some n ->
-            zeroChannel.Interrupt(new SiriusXMSourceFactory(n))
+            do! zeroChannel.InterruptAsync(new SiriusXMSourceFactory(n))
     }
 
     let private getStream channelNumber =
@@ -54,10 +48,7 @@ module StreamRepository =
         | Some stream ->
             stream
         | None ->
-            let stream = new Stream({
-                channelNumber = channelNumber
-                factory = new SiriusXMSourceFactory(channelNumber)
-            })
+            let stream = new Composite(channelNumber, new SiriusXMSourceFactory(channelNumber))
             Streams.sxm.Add(stream)
             stream
 
@@ -99,8 +90,8 @@ module StreamRepository =
             $"#EXTINF:{segment.duration},"
             $"/Stream/chunk-{channelNumber}-{segment.mediaSequence}.ts"
 
-        if stream.IsComplete then
-            "#EXT-X-ENDLIST"
+        //if stream.IsComplete then
+        //    "#EXT-X-ENDLIST"
     ]
 
     let getChunkAsync channelNumber sequenceNumber =
@@ -124,18 +115,17 @@ module StreamRepository =
 
                 for stream in Streams.getAll () do
                     if stream.Cache.IsInUse() then
-                        do! stream.StartAsync(cancellationToken)
-                        printfn "[SegmentCacheRepository] Reading [%d]" stream.ChannelNumber
-                        do! stream.ReadFromBufferAsync()
-                        printfn "[SegmentCacheRepository] Read [%d]" stream.ChannelNumber
+                        printfn "[SegmentCacheRepository] Marking active [%d]" stream.ChannelNumber
+                        stream.MarkActive()
                     else
-                        printfn "[SegmentCacheRepository] Stopping [%d]" stream.ChannelNumber
-                        do! stream.StopAsync()
+                        printfn "[SegmentCacheRepository] Marking inactive [%d]" stream.ChannelNumber
+                        stream.MarkInactive()
                         if Streams.sxm |> Seq.contains stream then
                             printfn "[SegmentCacheRepository] Dropping [%d]" stream.ChannelNumber
                             Streams.sxm.Remove(stream) |> ignore
+                            do! (stream :> IAsyncDisposable).DisposeAsync()
 
                 printfn "[SegmentCacheRepository] Waiting"
-                let! _ = Task.WhenAny(Task.Delay(2500), waitForNotify)
+                let! _ = Task.WhenAny(Task.Delay(30000), waitForNotify)
                 ()
         }

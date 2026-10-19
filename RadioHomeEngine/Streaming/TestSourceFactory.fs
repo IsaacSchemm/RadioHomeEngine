@@ -65,14 +65,17 @@ type TestSourceFactory() =
                     let buffer = Array.zeroCreate<byte> 81920
 
                     let mutable nextFileCheck = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1.0)
-                    let mutable ended = false
+                    let mutable inputEnded = false
+                    let mutable outputEnded = false
 
-                    while not disposing && not ended do
+                    while not disposing && not outputEnded do
                         let! len = input.ReadAsync(buffer)
-                        if len = 0 then
-                            ended <- true
-
-                        do! output.WriteAsync(buffer, 0, len)
+                        if len > 0 then
+                            do! output.WriteAsync(buffer, 0, len)
+                        else
+                            inputEnded <- true
+                            printfn "[TestSourceFactory] Writing zeroes"
+                            do! output.WriteAsync(Array.zeroCreate<byte> 81920)
 
                         if nextFileCheck <= DateTimeOffset.UtcNow then
                             nextFileCheck <- nextFileCheck + TimeSpan.FromSeconds(1.0)
@@ -95,6 +98,9 @@ type TestSourceFactory() =
 
                             for file in files do
                                 File.Delete(file)
+
+                            if inputEnded && files.Length > 0 then
+                                outputEnded <- true
                 with :? IOException when disposing -> ()
 
                 printfn "[TestSourceFactory] Completing"

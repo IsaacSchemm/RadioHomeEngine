@@ -29,7 +29,6 @@
     <Compile Include="Streaming\SiriusXMSourceFactory.fs" />
     <Compile Include="Streaming\StreamActivityIndicator.fs" />
     <Compile Include="Streaming\SegmentCache.fs" />
-    <Compile Include="Streaming\Stream.fs" />
     <Compile Include="streaming\Composite.fs" />
     <Compile Include="Streaming\StreamRepository.fs" />
     <Compile Include="Lyrion\LyrionCLI.fs" />
