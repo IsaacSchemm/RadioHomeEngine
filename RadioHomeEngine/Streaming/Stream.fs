@@ -12,48 +12,53 @@ type StreamDefinition = {
 type Stream(definition: StreamDefinition) =
     let cache = new SegmentCache()
 
-    let mutable buffer = None
+    let mutable source = None
+    let mutable sourceFinished = false
+    let mutable flag = new SemaphoreSlim(1, 1)
 
     member _.Cache = cache
     member _.ChannelNumber = definition.channelNumber
 
-    member _.StartAsync(cancellationToken) = task {
-        if buffer = None then
-            printfn "[Stream] Starting new buffer for %d" definition.channelNumber
-            buffer <- Some (new SegmentBuffer(definition.factory, cancellationToken))
+    member _.StartAsync(cancellationToken: CancellationToken) = task {
+        do! flag.WaitAsync(cancellationToken)
+        try
+            if source = None then
+                printfn "[Stream] Starting new source for %d" definition.channelNumber
+                let! src = definition.factory.CreateAsync()
+                source <- Some src
+        finally
+            flag.Release() |> ignore
     }
 
     member _.ReadFromBufferAsync() = task {
-        // TODO: can we use a LocalSegmentSource here directly and bypass SegmentBuffer? (This method shouldn't block if no new segments are available yet.)
+        // TODO: have the stream object hold a background task which reads segments (or doesn't) from whatever stream StreamRepository.Service told it to
 
-        match buffer with
+        match source with
         | None -> ()
-        | Some buffer -> cache.ReadFrom(buffer)
+        | Some source ->
+            let keepRunning = cache.ReadFrom(source)
+            sourceFinished <- not keepRunning
 
         cache.EvictStale()
     }
 
     member this.Interrupt(factory: ISegmentSourceFactory) =
-        buffer |> Option.iter (fun buffer -> buffer.Interrupt(factory))
-
-    [<Obsolete("Clear interruptions when stream becomes inactive instead")>]
-    member this.IsInterrupted() =
-        buffer |> Option.exists (fun buffer -> buffer.IsInterrupted())
+        raise (new NotImplementedException())
 
     member this.ClearAllInterruptions() =
-        buffer |> Option.iter (fun buffer -> buffer.ClearAllInterruptions())
+        raise (new NotImplementedException())
 
     member this.IsComplete =
-        buffer |> Option.forall (fun buffer -> buffer.IsComplete)
+        sourceFinished
 
     member this.StopAsync() = task {
-        match buffer with
+        match source with
         | None -> ()
-        | Some oldBuffer ->
-            printfn "[Stream] Disposing of buffer [%d]" definition.channelNumber
-            buffer <- None
-            ignore (oldBuffer.ReadAll())
-            do! (oldBuffer :> IAsyncDisposable).DisposeAsync()
+        | Some oldSource ->
+            printfn "[Stream] Disposing of source [%d]" definition.channelNumber
+            source <- None
+            //ignore (oldSource.ReadAll())
+            do! (oldSource :> IAsyncDisposable).DisposeAsync()
     }
 
     interface IAsyncDisposable with

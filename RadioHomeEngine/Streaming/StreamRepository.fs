@@ -136,5 +136,6 @@ module StreamRepository =
                             Streams.sxm.Remove(stream) |> ignore
 
                 printfn "[SegmentCacheRepository] Waiting"
-                do! waitForNotify
+                let! _ = Task.WhenAny(Task.Delay(2500), waitForNotify)
+                ()
         }

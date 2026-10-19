@@ -41,7 +41,7 @@ type TestSourceFactory() =
 
     interface ISegmentSourceFactory with
         member _.CreateAsync() = task {
-            let channel = Channel.CreateBounded(1)
+            let channel = Channel.CreateBounded(3)
             let mutable disposing = false
 
             Directory.CreateDirectory(path) |> ignore
@@ -108,12 +108,18 @@ type TestSourceFactory() =
                             let! readable = channel.Reader.WaitToReadAsync(cancellationToken)
                             if readable then
                                 let! segment = channel.Reader.ReadAsync(cancellationToken)
-                                return NextSegment segment
+                                return AsyncNextSegment segment
                             else
-                                return NoMoreSegments
+                                return AsyncNoMoreSegments
                         with :? OperationCanceledException when cancellationToken.IsCancellationRequested ->
-                            return NoMoreSegments
+                            return AsyncNoMoreSegments
                     }
+
+                    member _.TryReadNext() =
+                        match channel.Reader.TryRead() with
+                        | (true, segment) -> NextSegment segment
+                        | (false, _) when channel.Reader.Completion.IsCompleted -> NoMoreSegments
+                        | (false, _) -> WaitingForMoreSegments
 
                     member _.DisposeAsync() = new ValueTask(task {
                         if not disposing then

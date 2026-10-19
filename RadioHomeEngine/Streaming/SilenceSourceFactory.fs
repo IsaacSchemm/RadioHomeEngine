@@ -21,20 +21,35 @@ type SilenceSourceFactory() =
                         let nextSegmentTime = lastSegmentTime + interval
 
                         while DateTimeOffset.UtcNow < nextSegmentTime do
-                            do! Task.Delay(TimeSpan.FromSeconds(1.0), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
+                            let ts = max (nextSegmentTime - DateTimeOffset.UtcNow) (TimeSpan.FromSeconds(0.1))
+                            do! Task.Delay(ts, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)
 
                         if cancellationToken.IsCancellationRequested then
-                            return NoMoreSegments
+                            return AsyncNoMoreSegments
                         else
                             lastSegmentTime <- nextSegmentTime
 
-                            return NextSegment {
+                            return AsyncNextSegment {
                                 dateTime = nextSegmentTime
                                 duration = interval.TotalSeconds
                                 data = data
                                 mediaSequence = mediaSequence
                             }
                     }
+
+                    member _.TryReadNext() =
+                        let nextSegmentTime = lastSegmentTime + interval
+                        if nextSegmentTime > DateTimeOffset.UtcNow then
+                            WaitingForMoreSegments
+                        else
+                            lastSegmentTime <- nextSegmentTime
+
+                            NextSegment {
+                                dateTime = nextSegmentTime
+                                duration = interval.TotalSeconds
+                                data = data
+                                mediaSequence = mediaSequence
+                            }
 
                     member _.DisposeAsync() = ValueTask.CompletedTask
             }

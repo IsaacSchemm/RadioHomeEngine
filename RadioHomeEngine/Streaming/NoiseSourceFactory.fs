@@ -42,7 +42,7 @@ type NoiseSourceFactory() =
 
     interface ISegmentSourceFactory with
         member _.CreateAsync() = task {
-            let channel = Channel.CreateBounded(1)
+            let channel = Channel.CreateBounded(3)
             let mutable disposing = false
 
             Directory.CreateDirectory(path) |> ignore
@@ -55,7 +55,7 @@ type NoiseSourceFactory() =
 
             let reencoder = Process.Start(new ProcessStartInfo(
                 $"ffmpeg",
-                $"-nostats -hide_banner -loglevel warning {readSpeedParameters} {pipeFormat} -i - {outputParameters}",
+                $"{readSpeedParameters} {pipeFormat} -i - {outputParameters}",
                 RedirectStandardInput = true))
 
             let pipe = task {
@@ -106,14 +106,20 @@ type NoiseSourceFactory() =
                             if readable then
                                 printfn "[NoiseSourceFactory] Reading"
                                 let! segment = channel.Reader.ReadAsync(cancellationToken)
-                                return NextSegment segment
+                                return AsyncNextSegment segment
                             else
                                 printfn "[NoiseSourceFactory] Ending"
-                                return NoMoreSegments
+                                return AsyncNoMoreSegments
                         with :? OperationCanceledException when cancellationToken.IsCancellationRequested ->
                             printfn "[NoiseSourceFactory] Cancelled"
-                            return NoMoreSegments
+                            return AsyncNoMoreSegments
                     }
+
+                    member _.TryReadNext() =
+                        match channel.Reader.TryRead() with
+                        | (true, segment) -> NextSegment segment
+                        | (false, _) when channel.Reader.Completion.IsCompleted -> NoMoreSegments
+                        | (false, _) -> WaitingForMoreSegments
 
                     member _.DisposeAsync() = new ValueTask(task {
                         printfn "[NoiseSource] Disposing"
