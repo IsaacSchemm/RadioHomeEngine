@@ -43,15 +43,15 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         }
 
         [HttpPost]
-        public async Task PlayOn(string macAddress, CancellationToken cancellationToken)
+        public async Task PlayOn(int num, string macAddress)
         {
             var playerConnection = PlayerConnections.GetAll()
                 .FirstOrDefault(player => player.MacAddress == macAddress);
 
-            //if (playerConnection != null)
-            //    await AtomicActions.performActionAsync(
-            //        playerConnection.Player,
-            //        AtomicAction.PlayCurrentChannel);
+            if (playerConnection != null)
+                await AtomicActions.performActionAsync(
+                    playerConnection.Player,
+                    AtomicAction.NewPlaySiriusXMChannel(num, PlaylistPosition.Now));
 
             throw new NotImplementedException();
         }
@@ -128,7 +128,5 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 ]
             });
         }
-
-        public ActionResult Player() => View();
     }
 }
