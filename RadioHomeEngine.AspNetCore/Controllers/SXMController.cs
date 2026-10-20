@@ -94,12 +94,14 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         public async Task<IActionResult> ViewChannel(int? num, CancellationToken cancellationToken)
         {
             if ((num ?? StreamRepository.getChannelZero()) is not int channelNumber)
-                return NotFound();
+                return View("Blank");
 
             var channels = await SiriusXMClientModule.GetChannelsAsync(cancellationToken);
             var channel = channels
-                .Where(c => c.channelNumber == $"{channelNumber}")
-                .First();
+                .FirstOrDefault(c => c.channelNumber == $"{channelNumber}");
+
+            if (channel == null)
+                return View("Blank");
 
             var playlist = await SiriusXMClientModule.GetPlaylistAsync(
                 channelNumber,

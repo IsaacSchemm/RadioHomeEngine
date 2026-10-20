@@ -26,7 +26,7 @@ module AtomicActions =
         match entry with
         | "000" -> Forecast
         | "00" -> PlayCD (AllDrives, Now)
-        | "0" -> Stop
+        | "9999" -> Stop
         | Int32 n when n > 0 -> PlayChannel (n, Now)
         | _ -> ()
     })
@@ -35,21 +35,19 @@ module AtomicActions =
         match atomicAction with
         | PlayChannel (channelNumber, position) ->
             let! channels = SiriusXMClient.GetChannelsAsync(CancellationToken.None)
-            let name =
+            let channelName =
                 channels
                 |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
                 |> Seq.map (fun c -> c.name)
                 |> Seq.tryHead
+                |> Option.defaultValue ""
 
-            match name with
-            | None -> ()
-            | Some channelName ->
-                let! address = Network.getAddressAsync ()
-                let url = $"http://{address}:{Config.port}/SXM/PlayChannel?num={channelNumber}"
-                let title = $"[{channelNumber}] {channelName}"
-                match position with
-                | Now -> do! Playlist.playItemAsync player url title
-                | Last -> do! Playlist.addItemAsync player url title
+            let! address = Network.getAddressAsync ()
+            let url = $"http://{address}:{Config.port}/Stream/playlist-{channelNumber}.m3u8"
+            let title = $"[{channelNumber}] {channelName}"
+            match position with
+            | Now -> do! Playlist.playItemAsync player url title
+            | Last -> do! Playlist.addItemAsync player url title
 
         | PlayPause ->
             let! state = Playlist.getModeAsync player

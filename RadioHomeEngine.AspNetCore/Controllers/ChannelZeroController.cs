@@ -43,7 +43,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         }
 
         [HttpPost]
-        public async Task PlayOn(string macAddress)
+        public async Task<IActionResult> PlayOn(string macAddress)
         {
             var playerConnection = PlayerConnections.GetAll()
                 .FirstOrDefault(player => player.MacAddress == macAddress);
@@ -53,7 +53,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                     playerConnection.Player,
                     AtomicAction.NewPlayChannel(0, PlaylistPosition.Now));
 
-            throw new NotImplementedException();
+            return NoContent();
         }
 
         public ActionResult Player() => View();

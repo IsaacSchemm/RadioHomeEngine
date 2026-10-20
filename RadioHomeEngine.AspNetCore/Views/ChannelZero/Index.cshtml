@@ -82,7 +82,7 @@
             </button>
         </form>
 
-        @* @foreach (var playerConnection in Model.Players)
+        @foreach (var playerConnection in Model.Players)
         {
             <form asp-action="PlayOn" style="display: inline">
                 <input type="hidden" name="macAddress" value="@playerConnection.MacAddress" />
@@ -90,7 +90,7 @@
                     @playerConnection.Name
                 </button>
             </form>
-        } *@
+        }
     </section>
 
     <iframe aria-label="Channel Information"
