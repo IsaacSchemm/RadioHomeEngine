@@ -13,8 +13,43 @@ open System.Threading.Tasks
 type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
     let sxm = new SiriusXMClient()
 
+    interface IProgramInformationSource with
+        member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
+            let! channels = sxm.GetChannelsAsync(cancellationToken)
+
+            let channel =
+                channels
+                |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
+                |> Seq.tryHead
+
+            let! playlist = sxm.GetPlaylistAsync(channelNumber, CancellationToken.None)
+
+            let cut =
+                playlist.cuts
+                |> Seq.sortByDescending (fun cut -> cut.startTime)
+                |> Seq.tryHead
+
+            match (channel, cut) with
+            | Some ch, Some s ->
+                return {
+                    channelName = $"[{ch.channelNumber}] {ch.name}"
+                    title = s.title
+                    artists = s.artists
+                    albums = [for a in s.albums do a.title]
+                }
+            | _ ->
+                return {
+                    channelName = $"{channelNumber}"
+                    title = $"{channelNumber}"
+                    artists = []
+                    albums = []
+                }
+        }
+
     interface ISegmentSourceFactory with
-        member _.CreateAsync() = task {
+        member this.ProgramInformationSource = this
+
+        member this.CreateAsync() = task {
             let mutable sequenceNumber = UInt128.Zero
 
             let! playlist = sxm.GetPlaylistAsync(channelNumber, CancellationToken.None)
@@ -154,6 +189,8 @@ type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
 
             return {
                 new ISegmentSource with
+                    member _.ProgramInformationSource = this
+
                     member _.ReadNextAsync(cancellationToken) =  task {
                         let! more = internalBuffer.Reader.WaitToReadAsync(cancellationToken)
 

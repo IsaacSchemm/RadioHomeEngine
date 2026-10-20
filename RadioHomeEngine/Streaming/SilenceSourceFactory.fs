@@ -5,7 +5,19 @@ open System.Timers
 open System.Threading.Tasks
 
 type SilenceSourceFactory() =
+    let programInformationSource = {
+        new IProgramInformationSource with
+            member _.GetCurrentProgramInformationAsync(cancellationToken) = Task.FromResult({
+                channelName = "Silence"
+                title = "Silence"
+                artists = []
+                albums = []
+            })
+    }
+
     interface ISegmentSourceFactory with
+        member _.ProgramInformationSource = programInformationSource
+
         member _.CreateAsync() = task {
             let mutable mediaSequence = UInt128.One
 
@@ -17,6 +29,8 @@ type SilenceSourceFactory() =
 
             return {
                 new ISegmentSource with
+                    member _.ProgramInformationSource = programInformationSource
+
                     member _.ReadNextAsync(cancellationToken) = task {
                         let nextSegmentTime = lastSegmentTime + interval
 

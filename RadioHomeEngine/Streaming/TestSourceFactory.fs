@@ -19,7 +19,7 @@ type TestSourceFactory() =
     let segmentTimeSeconds = 10.0
 
     let inputParameters = String.concat " " [
-        $"-i \"K:/Documents/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac\" -ss 150"
+        $"-i \"/media/usb/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac\" -ss 150"
     ]
 
     let pipeFormat = "-f f64le -ac 1"
@@ -39,7 +39,19 @@ type TestSourceFactory() =
         "-readrate 1"
     ]
 
+    let programInformationSource = {
+        new IProgramInformationSource with
+            member _.GetCurrentProgramInformationAsync(cancellationToken) = Task.FromResult({
+                channelName = "TestSourceFactory"
+                title = "Love’s Got a Hold on My Heart"
+                artists = ["Steps"]
+                albums = ["Gold Greatest Hits"]
+            })
+    }
+
     interface ISegmentSourceFactory with
+        member _.ProgramInformationSource = programInformationSource
+
         member _.CreateAsync() = task {
             let channel = Channel.CreateBounded(3)
             let mutable disposing = false
@@ -109,6 +121,8 @@ type TestSourceFactory() =
 
             return {
                 new ISegmentSource with
+                    member _.ProgramInformationSource = programInformationSource
+
                     member _.ReadNextAsync(cancellationToken) = task {
                         try
                             let! readable = channel.Reader.WaitToReadAsync(cancellationToken)

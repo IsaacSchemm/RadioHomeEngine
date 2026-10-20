@@ -69,6 +69,16 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
     member _.Cache = cache
     member _.ChannelNumber = channelNumber
 
+    member _.GetCurrentStreamInformationAsync(cancellationToken) = task {
+        let programInformationSource =
+            interruptions
+            |> Seq.map (fun i -> i.ProgramInformationSource)
+            |> Seq.tryHead
+            |> Option.defaultValue rootFactory.ProgramInformationSource
+
+        return! programInformationSource.GetCurrentProgramInformationAsync(cancellationToken)
+    }
+
     member this.Interrupt(source: ISegmentSource) =
         interruptions <- source :: interruptions
         stopWaitingForNextSegment ()

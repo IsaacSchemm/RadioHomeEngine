@@ -6,4 +6,5 @@ open System.Threading.Tasks
 
 type ISegmentSource =
     inherit IAsyncDisposable
+    abstract member ProgramInformationSource: IProgramInformationSource
     abstract member ReadNextAsync: cancellationToken: CancellationToken -> Task<SegmentReadResult>

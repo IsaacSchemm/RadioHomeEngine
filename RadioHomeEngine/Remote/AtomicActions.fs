@@ -27,7 +27,7 @@ module AtomicActions =
         | "000" -> Forecast
         | "00" -> PlayCD (AllDrives, Now)
         | "9999" -> Stop
-        | Int32 n when n > 0 -> PlayChannel (n, Now)
+        | Int32 n when n >= 0 -> PlayChannel (n, Now)
         | _ -> ()
     })
 
@@ -36,11 +36,14 @@ module AtomicActions =
         | PlayChannel (channelNumber, position) ->
             let! channels = SiriusXMClient.GetChannelsAsync(CancellationToken.None)
             let channelName =
-                channels
-                |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
-                |> Seq.map (fun c -> c.name)
-                |> Seq.tryHead
-                |> Option.defaultValue ""
+                match channelNumber with
+                | 0 | 8000 -> "RadioHomeEngine"
+                | _ ->
+                    channels
+                    |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
+                    |> Seq.map (fun c -> c.name)
+                    |> Seq.tryHead
+                    |> Option.defaultValue ""
 
             let! address = Network.getAddressAsync ()
             let url = $"http://{address}:{Config.port}/Stream/playlist-{channelNumber}.m3u8"
@@ -119,17 +122,18 @@ module AtomicActions =
         | PlayChannel (channelNumber, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
 
-            let! playlist = SiriusXMClient.GetPlaylistAsync(channelNumber, CancellationToken.None)
-            let song =
-                playlist.cuts
-                |> Seq.sortByDescending (fun cut -> cut.startTime)
-                |> Seq.tryHead
+            let composite = StreamRepository.getComposite channelNumber
 
-            match song with
-            | None -> ()
-            | Some c ->
-                let artist = String.concat " / " c.artists
-                do! Players.setDisplayAsync player artist c.title (TimeSpan.FromSeconds(10.0))
+            let! info = composite.GetCurrentStreamInformationAsync(CancellationToken.None)
+
+            let programName = String.concat " - " [
+                if info.artists <> [] then
+                    String.concat " / " info.artists
+
+                info.title
+            ]
+
+            do! Players.setDisplayAsync player info.channelName programName (TimeSpan.FromSeconds(15.0))
 
         | PlayCD (scope, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))

@@ -40,7 +40,19 @@ type NoiseSourceFactory() =
         "-readrate 1"
     ]
 
+    let programInformationSource = {
+        new IProgramInformationSource with
+            member _.GetCurrentProgramInformationAsync(cancellationToken) = Task.FromResult({
+                channelName = "Brown Noise"
+                title = "Brown Noise"
+                artists = []
+                albums = []
+            })
+    }
+
     interface ISegmentSourceFactory with
+        member _.ProgramInformationSource = programInformationSource
+
         member _.CreateAsync() = task {
             let channel = Channel.CreateBounded(3)
             let mutable disposing = false
@@ -99,6 +111,8 @@ type NoiseSourceFactory() =
 
             return {
                 new ISegmentSource with
+                    member _.ProgramInformationSource = programInformationSource
+
                     member _.ReadNextAsync(cancellationToken) = task {
                         try
                             printfn "[NoiseSourceFactory] Waiting to read"

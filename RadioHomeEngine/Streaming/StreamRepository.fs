@@ -7,9 +7,9 @@ open Microsoft.Extensions.Hosting
 open FSharp.Control
 
 module StreamRepository =
-    let zeroChannel = new Composite(0, new SilenceSourceFactory())
+    let private zeroChannel = new Composite(0, new SilenceSourceFactory())
 
-    let noise = new Composite(8000, new NoiseSourceFactory())
+    let private noise = new Composite(8000, new NoiseSourceFactory())
 
     module private Composites =
         let sxm = new ResizeArray<Composite>()
@@ -43,10 +43,10 @@ module StreamRepository =
             do! zeroChannel.InterruptAsync(new SiriusXMSourceFactory(n, 1))
     }
 
-    let private getComposite channelNumber =
+    let getComposite channelNumber =
         match Composites.tryGet channelNumber with
-        | Some stream ->
-            stream
+        | Some composite ->
+            composite
         | None ->
             let composite = new Composite(channelNumber, new SiriusXMSourceFactory(channelNumber, 3))
             Composites.sxm.Add(composite)
