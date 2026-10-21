@@ -17,8 +17,6 @@
     <Compile Include="Streaming\ChunklistParser.fs" />
     <Compile Include="Streaming\ChunklistNormalizer.fs" />
     <Compile Include="Streaming\DownstreamSegment.fs" />
-    <Compile Include="Streaming\SegmentReadResult.fs" />
-    <Compile Include="streaming\ProgramInformation.fs" />
     <Compile Include="streaming\IProgramInformationSource.fs" />
     <Compile Include="Streaming\ISegmentSource.fs" />
     <Compile Include="Streaming\ISegmentSourceFactory.fs" />

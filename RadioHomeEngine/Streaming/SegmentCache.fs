@@ -2,6 +2,7 @@ namespace RadioHomeEngine
 
 open System
 
+/// An in-memory cache of HLS media segments associated with a specific radio channel number.
 type SegmentCache() =
     /// All currently cached segments and their data, in order from newest to oldest.
     let mutable cache = []
@@ -40,6 +41,8 @@ type SegmentCache() =
         else
             printfn $"[SegmentCache] Skipping segment {segment.mediaSequence} because {segment.dateTime} <= {threshold}"
 
+        evictStale ()
+
     member _.GetSegments() =
         cache
         |> List.truncate 3
@@ -52,6 +55,3 @@ type SegmentCache() =
         | _ ->
             return! Silence.segmentTask.Value
     }
-
-    member _.EvictStale() =
-        evictStale ()

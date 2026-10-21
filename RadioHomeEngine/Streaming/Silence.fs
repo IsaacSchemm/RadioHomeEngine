@@ -7,14 +7,16 @@ open System.Text
 open System.Threading.Tasks
 open Microsoft.Extensions.Hosting
 
+/// A module that provides HLS media segments with continuous silence.
 module Silence =
-    let bitsPerSecond = 65536
+    let hlsBitrate = 65536
 
+    /// Wraps a task that will generate a single HLS segment consisting of ten seconds of silence.
     let segmentTask = lazy task {
         let ffmpeg =
             new ProcessStartInfo(
                 "ffmpeg",
-                $"-nostats -hide_banner -loglevel warning -f lavfi -i anullsrc=cl=stereo:sample_rate=44100 -t 10 -c:a aac -b:a {bitsPerSecond} -f mpegts -",
+                $"-nostats -hide_banner -loglevel warning -f lavfi -i anullsrc=cl=stereo:sample_rate=44100 -t 10 -c:a aac -b:a {hlsBitrate} -f mpegts -",
                 RedirectStandardOutput = true)
             |> Process.Start
 
@@ -27,8 +29,3 @@ module Silence =
 
         return buffer.ToArray()
     }
-
-    segmentTask.Force() |> ignore
-
-    let getSegment () =
-        segmentTask.Value.GetAwaiter().GetResult()

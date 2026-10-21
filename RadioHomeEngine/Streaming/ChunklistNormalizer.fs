@@ -2,6 +2,8 @@ namespace RadioHomeEngine
 
 open System
 
+/// Adjusts the date and time of HLS media segments found in a remote chunklist,
+/// applying a consistent offset relative to the first time the chunklist was fetched.
 module ChunklistNormalizer =
     type Segment = UpstreamSegment
 

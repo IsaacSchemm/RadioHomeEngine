@@ -4,6 +4,8 @@ open System
 open System.Threading
 open System.Threading.Tasks
 
+/// A multiplexed composite audio stream associated with a specific radio channel number.
+/// Maintains a segment cache, a "root" audio source, and a set of "interruptions" that consist of other, likely finite, audio sources.
 type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
     let cache = new SegmentCache()
 
@@ -36,7 +38,7 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
                     printfn "[Composite] Found end [%d]" channelNumber
                     finished <- true
         with :? OperationCanceledException when cancellationToken.IsCancellationRequested ->
-            printfn "[Composite] No longer waiting for next segment [%d]" channelNumber
+            printfn "[Composite] No longer waiting for next segment (operation cancelled) [%d]" channelNumber
     }
 
     let runningTask = task {

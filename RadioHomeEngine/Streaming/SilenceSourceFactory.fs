@@ -4,6 +4,7 @@ open System
 open System.Timers
 open System.Threading.Tasks
 
+/// A media source that generates a stream of continuous silenec.
 type SilenceSourceFactory() =
     let programInformationSource = {
         new IProgramInformationSource with

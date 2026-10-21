@@ -122,7 +122,7 @@ module AtomicActions =
         | PlayChannel (channelNumber, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
 
-            let composite = StreamRepository.getComposite channelNumber
+            let composite = StreamRepository.getOrCreate channelNumber
 
             let! info = composite.GetCurrentStreamInformationAsync(CancellationToken.None)
 

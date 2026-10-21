@@ -2,6 +2,7 @@
 
 open System
 
+/// Parses a chunklist.m3u8 file from a remote server.
 module ChunklistParser =
     let zero = UInt128.Zero
     let one = UInt128.One
@@ -69,39 +70,4 @@ module ChunklistParser =
                 duration <- None
                 byteRange <- None
             | _ -> ()
-    ]
-
-    [<Obsolete>]
-    let write segments = String.concat "\n" [
-        "#EXTM3U"
-
-        match Seq.tryHead segments with
-        | None -> ()
-        | Some segment ->
-            match segment.duration with
-            | Some duration -> $"#EXT-X-TARGETDURATION:{int (round duration)}"
-            | None -> ()
-
-            "#EXT-X-VERSION:1"
-            "#EXT-X-ALLOW-CACHE:NO"
-
-            if segment.mediaSequence <> zero then
-                $"#EXT-X-MEDIA-SEQUENCE:{segment.mediaSequence}"
-
-        let mutable encryption = Clear
-
-        for segment in segments do
-            if segment.encryption <> encryption then
-                $"EXT-X-KEY:{encryption}"
-                encryption <- segment.encryption
-
-            match segment.dateTime with
-            | Some dateTime -> $"#EXT-X-PROGRAM-DATE-TIME:{dateTime:o}"
-            | None -> ()
-
-            match segment.duration with
-            | Some duration -> $"#EXTINF:{duration},"
-            | None -> ()
-
-            segment.path
     ]

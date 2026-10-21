@@ -8,13 +8,11 @@ namespace RadioHomeEngine.AspNetCore.Controllers
     {
         public async Task<IActionResult> Index(CancellationToken cancellationToken)
         {
-            var channelNumber = StreamRepository.getChannelZero();
-
             var channels = await SiriusXMClientModule.GetChannelsAsync(cancellationToken);
 
             var model = new SiriusXMIndexModel
             {
-                ChannelNumber = channelNumber,
+                ChannelNumber = 4,
                 Channels = [
                     .. channels.Select(c => new SiriusXMIndexModel.Channel
                     {
@@ -26,20 +24,6 @@ namespace RadioHomeEngine.AspNetCore.Controllers
             };
 
             return View(model);
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> SetChannel(int channelNumber)
-        {
-            await StreamRepository.setChannelZeroAsync(channelNumber);
-            return RedirectToAction(nameof(ViewChannel));
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> ClearChannel()
-        {
-            await StreamRepository.setChannelZeroAsync(null);
-            return RedirectToAction(nameof(ViewChannel));
         }
 
         [HttpPost]
@@ -85,7 +69,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 resp.Content.Headers.ContentType?.MediaType ?? "application/octet-stream");
         }
 
-        [Obsolete]
+        [Obsolete("This path was used by a previous version of the application.")]
         public async Task<IActionResult> PlayChannel(int num, CancellationToken cancellationToken)
         {
             return Redirect($"/Stream/playlist-{num}.m3u8");
@@ -93,8 +77,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 
         public async Task<IActionResult> ViewChannel(int? num, CancellationToken cancellationToken)
         {
-            if ((num ?? StreamRepository.getChannelZero()) is not int channelNumber)
-                return View("Blank");
+            var channelNumber = num ?? StreamRepository.getActionCode();
 
             var channels = await SiriusXMClientModule.GetChannelsAsync(cancellationToken);
             var channel = channels

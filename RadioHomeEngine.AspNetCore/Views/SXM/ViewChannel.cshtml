@@ -17,7 +17,7 @@
         @await Html.PartialAsync("_Channel", Model.Channel)
     </div>
 
-    @if (Model.ShowPlayer)
+    @if (Model.ShowPlayer && Model.Channel != null)
     {
         <hr />
 

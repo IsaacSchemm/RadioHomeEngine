@@ -10,6 +10,7 @@ open System.Threading
 open System.Threading.Channels
 open System.Threading.Tasks
 
+/// A media source that decrypts and proxies a SiriusXM stream.
 type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
     let sxm = new SiriusXMClient()
 

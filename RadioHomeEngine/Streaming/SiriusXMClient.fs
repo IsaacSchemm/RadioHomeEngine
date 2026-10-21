@@ -10,9 +10,10 @@ open System.Threading
 open System.Threading.Tasks
 
 exception LoginFailedException
-exception MissingCookieException
 exception RecievedErrorException of code: int * message: string
 
+/// A client object that provides access to live SiriusXM streams, given a username and password stored on disk.
+/// A single client object can only stream one channel at a time.
 type SiriusXMClient() =
     let usernameFile = "username.txt"
     let passwordFile = "password.txt"
@@ -497,6 +498,7 @@ type SiriusXMClient() =
     member _.GetFileAsync(uri, cancellationToken) =
         getFileAsync uri cancellationToken
 
+/// Provides access to the SiriusXM channel list and individual channels' information without affecting another active stream.
 module SiriusXMClient =
     let private sxm = lazy new SiriusXMClient()
 

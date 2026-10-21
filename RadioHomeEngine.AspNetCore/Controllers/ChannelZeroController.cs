@@ -1,14 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using RadioHomeEngine.AspNetCore.Models;
-using System.Text;
 
 namespace RadioHomeEngine.AspNetCore.Controllers
 {
-    public class ChannelZeroController(IHttpClientFactory httpClientFactory) : Controller
+    public class ChannelZeroController : Controller
     {
         public async Task<IActionResult> Index(CancellationToken cancellationToken)
         {
-            var channelNumber = StreamRepository.getChannelZero();
+            var channelNumber = StreamRepository.getActionCode();
 
             var channels = await SiriusXMClientModule.GetChannelsAsync(cancellationToken);
 
@@ -31,14 +30,14 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         [HttpPost]
         public async Task<IActionResult> SetChannel(int channelNumber)
         {
-            await StreamRepository.setChannelZeroAsync(channelNumber);
+            await StreamRepository.setActionCodeAsync(channelNumber);
             return RedirectToAction("ViewChannel", "SXM");
         }
 
         [HttpPost]
         public async Task<IActionResult> ClearChannel()
         {
-            await StreamRepository.setChannelZeroAsync(null);
+            await StreamRepository.setActionCodeAsync(0);
             return RedirectToAction("ViewChannel", "SXM");
         }
 
