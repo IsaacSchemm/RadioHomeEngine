@@ -30,7 +30,7 @@ type SegmentCache() =
         |> Seq.map (fun s -> s.data)
         |> Seq.tryHead
 
-    member _.Add(segment) =
+    member _.Add(segment: DownstreamSegment) =
         let threshold =
             match Seq.tryHead cache with
             | Some segment -> segment.dateTime

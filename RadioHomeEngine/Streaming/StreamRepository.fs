@@ -11,8 +11,20 @@ module StreamRepository =
     /// Channel 0. Defaults to silence.
     let private zeroChannel = new Composite(0, new SilenceSourceFactory())
 
+    let private noiseFactory =
+        FFmpegRawAudioSourceParameters.BrownNoise
+        |> FFmpegRawAudioSourceFactory
+        |> RawAudioSegmentSourceFactory
+
+    let private test1Factory =
+        FFmpegRawAudioSourceParameters.Test1
+        |> FFmpegRawAudioSourceFactory
+        |> RawAudioSegmentSourceFactory
+
     /// Channel 8000. Defaults to silence.
-    let private noise = new Composite(8000, new NoiseSourceFactory())
+    let private noise = new Composite(8000, noiseFactory)
+
+    let private steps = new Composite(8001, test1Factory)
 
     /// All active channels which match a SiriusXM channel number (expected to be within the range 1 through 1999).
     let private sxm = new ResizeArray<Composite>()
@@ -21,6 +33,7 @@ module StreamRepository =
     let private getAll () = seq {
         zeroChannel
         noise
+        steps
         yield! sxm
     }
 
@@ -41,9 +54,9 @@ module StreamRepository =
         | 0 ->
             ()
         | 8001 ->
-            do! zeroChannel.InterruptAsync(new NoiseSourceFactory())
+            do! zeroChannel.InterruptAsync(noiseFactory)
         | 8002 ->
-            do! zeroChannel.InterruptAsync(new TestSourceFactory())
+            do! zeroChannel.InterruptAsync(test1Factory)
         | n ->
             do! zeroChannel.InterruptAsync(new SiriusXMSourceFactory(n, 1))
     }
