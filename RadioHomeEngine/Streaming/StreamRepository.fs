@@ -12,14 +12,12 @@ module StreamRepository =
     let private zeroChannel = new Composite(0, new SilenceSourceFactory())
 
     let private noiseFactory =
-        FFmpegRawAudioSourceParameters.BrownNoise
-        |> FFmpegRawAudioSourceFactory
-        |> RawAudioSegmentSourceFactory
+        new RawAudioSegmentSourceFactory(
+            new BrownNoiseAudioFactory())
 
     let private test1Factory =
-        FFmpegRawAudioSourceParameters.Test1
-        |> FFmpegRawAudioSourceFactory
-        |> RawAudioSegmentSourceFactory
+        new RawAudioSegmentSourceFactory(
+            new FileAudioFactory("K:/Documents/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"))
 
     /// Channel 8000. Defaults to silence.
     let private noise = new Composite(8000, noiseFactory)

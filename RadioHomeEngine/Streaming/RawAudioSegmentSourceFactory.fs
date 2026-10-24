@@ -7,7 +7,7 @@ open System.Threading.Tasks
 open FSharp.Control
 open System.Threading.Channels
 
-type RawAudioSegmentSourceFactory(innerFactory: IRawAudioSourceFactory) =
+type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
     let path = Path.Combine([|
         Path.GetTempPath()
         $"RadioHomeEngine-Noise-{Guid.NewGuid()}"
@@ -19,23 +19,26 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioSourceFactory) =
     let parameters = String.concat " " [
         "-nostats"
         "-hide_banner"
-        "-loglevel warning"
-        "-readrate 1"
-        "-f f64le"
-        "-ac 2"
-        "-i -"
-        "-f hls"
-        $"-hls_time {segmentTimeSeconds}"
-        "-hls_segment_type mpegts"
-        "-hls_flags program_date_time+temp_file"
-        "-c:a aac"
-        "-ac 2"
-        $"-b:a {hlsBitrate}"
+        "-loglevel"; "warning"
+        "-readrate"; "1"
+        "-f"; "f64le"
+        "-ac"; "2"
+        "-i"; "-"
+        "-f"; "hls"
+        "-hls_time"; $"{segmentTimeSeconds}"
+        "-hls_segment_type"; "mpegts"
+        "-hls_flags"; "program_date_time+temp_file"
+        "-c:a"; "aac"
+        "-ac"; "2"
+        "-b:a"; $"{hlsBitrate}"
         Path.Combine(path, "chunklist.m3u8")
     ]
 
+    interface IProgramInformationSource with
+        member this.GetCurrentProgramInformationAsync(_) = Task.FromResult(innerFactory.ProgramInformation)
+
     interface ISegmentSourceFactory with
-        member this.ProgramInformationSource = innerFactory.ProgramInformationSource
+        member this.ProgramInformationSource = this
 
         member this.CreateAsync() = task {
             let channel = Channel.CreateBounded(3)
@@ -97,7 +100,7 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioSourceFactory) =
 
             return {
                 new ISegmentSource with
-                    member _.ProgramInformationSource = innerFactory.ProgramInformationSource
+                    member _.ProgramInformationSource = this
 
                     member _.ReadNextAsync(cancellationToken) = task {
                         try

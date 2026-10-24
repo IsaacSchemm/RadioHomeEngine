@@ -13,11 +13,13 @@
     <Compile Include="Utility.fs" />
     <Compile Include="ActivePatterns.fs" />
     <Compile Include="Network.fs" />
-    <Compile Include="streaming\IProgramInformationSource.fs" />
-    <Compile Include="Streaming\Raw Audio Sources\IRawAudioSource.fs" />
-    <Compile Include="Streaming\Raw Audio Sources\IRawAudioSourceFactory.fs" />
-    <Compile Include="Streaming\Raw Audio Sources\FFmpegRawAudioSourceParameters.fs" />
-    <Compile Include="Streaming\Raw Audio Sources\FFmpegRawAudioSourceFactory.fs" />
+    <Compile Include="Streaming\Program Information\ProgramInformation.fs" />
+    <Compile Include="Streaming\Program Information\IProgramInformationSource.fs" />
+    <Compile Include="Streaming\Raw Audio\IRawAudio.fs" />
+    <Compile Include="Streaming\Raw Audio\IRawAudioFactory.fs" />
+    <Compile Include="Streaming\Raw Audio\FFmpegRawAudioFactory.fs" />
+    <Compile Include="streaming\raw audio\BrownNoiseAudioFactory.fs" />
+    <Compile Include="streaming\raw audio\FileAudioFactory.fs" />
     <Compile Include="Streaming\DownstreamSegment.fs" />
     <Compile Include="Streaming\ISegmentSource.fs" />
     <Compile Include="Streaming\ISegmentSourceFactory.fs" />
@@ -70,7 +72,5 @@
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="10.1.401" />
   </ItemGroup>
-
-  <ItemGroup />
 
 </Project>
