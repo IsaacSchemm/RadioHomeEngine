@@ -34,6 +34,8 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
         Path.Combine(path, "chunklist.m3u8")
     ]
 
+    let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
+
     interface IProgramInformationSource with
         member this.GetCurrentProgramInformationAsync(_) = Task.FromResult(innerFactory.ProgramInformation)
 
@@ -59,40 +61,44 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
 
                     let mutable nextFileCheck = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1.0)
 
-                    while not disposing do
-                        use! innerSource = innerFactory.CreateAsync()
-                        use input = innerSource.Stream
+                    use! innerSource = innerFactory.CreateAsync()
+                    use input = innerSource.Stream
 
-                        let mutable streamFinished = false
+                    let mutable allSegmentsRead = false
 
-                        while not disposing && not streamFinished do
-                            let! len = input.ReadAsync(buffer)
-                            if len = 0 then
-                                streamFinished <- true
-                            else
-                                do! output.WriteAsync(buffer, 0, len)
+                    while not disposing && not allSegmentsRead do
+                        let! len = input.ReadAsync(buffer)
+                        let streamFinished = len = 0
 
-                            if nextFileCheck <= DateTimeOffset.UtcNow then
-                                nextFileCheck <- nextFileCheck + TimeSpan.FromSeconds(1.0)
+                        if streamFinished then
+                            do! output.WriteAsync(zeroes)
+                        else
+                            do! output.WriteAsync(buffer, 0, len)
 
-                                let mutable files = []
+                        if nextFileCheck <= DateTimeOffset.UtcNow then
+                            nextFileCheck <- nextFileCheck + TimeSpan.FromSeconds(1.0)
 
-                                for file in Directory.EnumerateFiles(path, "*.ts") do
-                                    let info = new FileInfo(file)
-                                    let time = new DateTimeOffset(info.CreationTime)
-                                    if DateTimeOffset.UtcNow - time > TimeSpan.FromSeconds(0.25) then
-                                        let! data = File.ReadAllBytesAsync(file)
-                                        let segment = {
-                                            dateTime = new DateTimeOffset(info.CreationTime)
-                                            duration = segmentTimeSeconds
-                                            data = data
-                                            mediaSequence = UInt128.Zero
-                                        }
-                                        do! channel.Writer.WriteAsync(segment)
-                                        files <- file :: files
+                            let mutable files = []
 
-                                for file in files do
-                                    File.Delete(file)
+                            for file in Directory.EnumerateFiles(path, "*.ts") do
+                                let info = new FileInfo(file)
+                                let time = new DateTimeOffset(info.CreationTime)
+                                if DateTimeOffset.UtcNow - time > TimeSpan.FromSeconds(0.25) then
+                                    let! data = File.ReadAllBytesAsync(file)
+                                    let segment = {
+                                        dateTime = new DateTimeOffset(info.CreationTime)
+                                        duration = segmentTimeSeconds
+                                        data = data
+                                        mediaSequence = UInt128.Zero
+                                    }
+                                    do! channel.Writer.WriteAsync(segment)
+                                    files <- file :: files
+
+                            for file in files do
+                                File.Delete(file)
+
+                            if streamFinished && files <> [] then
+                                allSegmentsRead <- true
                 with :? IOException when disposing -> ()
 
                 channel.Writer.Complete()
