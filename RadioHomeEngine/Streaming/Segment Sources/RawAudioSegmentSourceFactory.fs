@@ -14,7 +14,7 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
     |])
 
     let hlsBitrate = 65536
-    let segmentTimeSeconds = 10.0
+    let segmentTimeSeconds = 2.0
 
     let parameters = String.concat " " [
         "-nostats"

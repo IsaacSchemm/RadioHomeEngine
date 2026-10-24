@@ -23,6 +23,7 @@
     <Compile Include="Streaming\Segment Sources\DownstreamSegment.fs" />
     <Compile Include="Streaming\Segment Sources\ISegmentSource.fs" />
     <Compile Include="Streaming\Segment Sources\ISegmentSourceFactory.fs" />
+    <Compile Include="streaming\segment sources\ConcatenatedSegmentSourceFactory.fs" />
     <Compile Include="Streaming\Segment Sources\RawAudioSegmentSourceFactory.fs" />
     <Compile Include="Streaming\Silence\Silence.fs" />
     <Compile Include="Streaming\Silence\SilenceSourceFactory.fs" />

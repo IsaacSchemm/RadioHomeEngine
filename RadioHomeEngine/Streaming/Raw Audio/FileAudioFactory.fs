@@ -9,7 +9,6 @@ type FileAudioFactory(path: string) =
 
     override _.InputParameters = [
         "-i"; path
-        "-ss"; "150"
     ]
 
     override _.ProgramInformation = {

@@ -16,8 +16,12 @@ module StreamRepository =
             new BrownNoiseAudioFactory())
 
     let private test1Factory =
-        new RawAudioSegmentSourceFactory(
-            new FileAudioFactory("K:/Documents/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"))
+        new ConcatenatedSegmentSourceFactory([
+            new RawAudioSegmentSourceFactory(
+                new FileAudioFactory("K:/Documents/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"))
+            new RawAudioSegmentSourceFactory(
+                new FileAudioFactory("K:/Documents/Music/Steps - Gold Greatest Hits/02 One for Sorrow.flac"))
+        ])
 
     /// Channel 8000. Defaults to silence.
     let private noise = new Composite(8000, noiseFactory)
