@@ -8,7 +8,10 @@ open System.Threading.Tasks
 open FSharp.Control
 
 type SpeechSynthesisAudioFactory(title: string, text: string) =
+    let _ = printfn "[SpeechSynthesisAudioFactory] Constructing: %s" text
+
     let generator = lazy task {
+        printfn "[SpeechSynthesisAudioFactory] Generating: %s" text
         try
             use proc =
                 new ProcessStartInfo(
@@ -38,6 +41,8 @@ type SpeechSynthesisAudioFactory(title: string, text: string) =
     }
 
     let encoder = lazy task {
+        printfn "[SpeechSynthesisAudioFactory] Encoding"
+
         use proc =
             new ProcessStartInfo(
                 "ffmpeg",

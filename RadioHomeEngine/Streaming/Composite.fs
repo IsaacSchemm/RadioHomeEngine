@@ -107,7 +107,8 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
             stopWaitingForNextSegment ()
 
     member this.CheckForInactivity() =
-        if isActive && DateTimeOffset.UtcNow - lastActive > TimeSpan.FromMinutes(1.0) then
+        if isActive && DateTimeOffset.UtcNow - lastActive > TimeSpan.FromMinutes(1.0) && interruptions = [] then
+            // TODO: allow this to happen when interruptions <> [] without crashing
             printfn "[Composite] Marking inactive [%d]" channelNumber
             isActive <- false
             stopWaitingForNextSegment ()

@@ -9,7 +9,7 @@ open System.Threading.Channels
 
 type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
     let hlsBitrate = 65536
-    let segmentTimeSeconds = 2.0
+    let segmentTimeSeconds = 10.0
 
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
 
@@ -56,6 +56,8 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
 
             let pipe = task {
                 try
+                    let mutable mediaSequence = new UInt128(0UL, 500UL)
+
                     use output = reencoder.StandardInput.BaseStream
 
                     let buffer = Array.zeroCreate<byte> 81920
@@ -80,20 +82,24 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
 
                             let mutable files = []
 
-                            for file in Directory.EnumerateFiles(path, "*.ts") do
-                                let info = new FileInfo(file)
+                            let infos = [
+                                for file in Directory.EnumerateFiles(path, "*.ts") do
+                                    new FileInfo(file)
+                            ]
+                            for info in infos |> Seq.sortBy (fun i -> i.CreationTime) do
                                 let time = new DateTimeOffset(info.CreationTime)
                                 if DateTimeOffset.UtcNow - time > TimeSpan.FromSeconds(0.25) then
-                                    let! data = File.ReadAllBytesAsync(file)
+                                    let! data = File.ReadAllBytesAsync(info.FullName)
                                     let segment = {
                                         dateTime = new DateTimeOffset(info.CreationTime)
                                         duration = segmentTimeSeconds
                                         data = data
-                                        mediaSequence = UInt128.Zero
+                                        mediaSequence = mediaSequence
                                         important = true
                                     }
+                                    mediaSequence <- mediaSequence + UInt128.One
                                     do! channel.Writer.WriteAsync(segment)
-                                    files <- file :: files
+                                    files <- info.FullName :: files
 
                             for file in files do
                                 File.Delete(file)

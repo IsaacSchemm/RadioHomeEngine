@@ -7,6 +7,7 @@ open System.Threading.Tasks
 open FSharp.Control
 open System.Threading.Channels
 
+[<Obsolete("Not reliable; should be replaced with a concatentated IRawAudioFactory")>]
 type ConcatenatedSegmentSourceFactory(innerFactories: ISegmentSourceFactory list) =
     let mutable factoryStack = innerFactories
     let mutable currentSource = None

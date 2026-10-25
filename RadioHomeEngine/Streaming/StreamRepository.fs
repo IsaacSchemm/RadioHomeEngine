@@ -23,6 +23,8 @@ module StreamRepository =
                 new FileAudioFactory("K:/Documents/Music/Steps - Gold Greatest Hits/02 One for Sorrow.flac"))
             new RawAudioSegmentSourceFactory(
                 new FileAudioFactory("/media/usb/Music/Steps - Gold Greatest Hits/02 One for Sorrow.flac"))
+            new RawAudioSegmentSourceFactory(
+                new BrownNoiseAudioFactory())
         ])
 
     /// Channel 8000. Defaults to silence.

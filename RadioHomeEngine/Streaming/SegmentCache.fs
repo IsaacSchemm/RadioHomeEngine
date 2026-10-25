@@ -36,8 +36,11 @@ type SegmentCache() =
             | Some segment -> segment.dateTime
             | None -> DateTimeOffset.MinValue
 
-        if segment.dateTime > threshold || segment.important then
+        if segment.dateTime > threshold then
             add segment
+        else if segment.important then
+            printfn $"[SegmentCache] Adding important segment ({segment.dateTime} < {threshold})"
+            add { segment with dateTime = threshold.AddSeconds(0.1) }
         else
             printfn $"[SegmentCache] Skipping segment {segment.mediaSequence} because {segment.dateTime} <= {threshold}"
 
