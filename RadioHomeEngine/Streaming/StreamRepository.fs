@@ -21,6 +21,8 @@ module StreamRepository =
                 new FileAudioFactory("K:/Documents/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"))
             new RawAudioSegmentSourceFactory(
                 new FileAudioFactory("K:/Documents/Music/Steps - Gold Greatest Hits/02 One for Sorrow.flac"))
+            new RawAudioSegmentSourceFactory(
+                new FileAudioFactory("/media/usb/Music/Steps - Gold Greatest Hits/02 One for Sorrow.flac"))
         ])
 
     /// Channel 8000. Defaults to silence.
@@ -32,7 +34,7 @@ module StreamRepository =
     let private sxm = new ResizeArray<Composite>()
 
     /// All currently tracked channels.
-    let private getAll () = seq {
+    let getAll () = seq {
         zeroChannel
         noise
         steps

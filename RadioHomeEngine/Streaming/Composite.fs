@@ -28,7 +28,7 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
         try
             let mutable finished = false
             while not finished && not cancellationToken.IsCancellationRequested do
-                printfn "[Composite] Waiting for next segment [%d]" channelNumber
+                printfn "[Composite] Waiting for next segment from %A [%d]" source channelNumber
                 let! next = source.ReadNextAsync(cancellationToken)
                 match next with
                 | NextSegment segment ->

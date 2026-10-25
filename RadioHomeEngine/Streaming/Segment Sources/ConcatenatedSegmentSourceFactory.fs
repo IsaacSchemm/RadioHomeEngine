@@ -18,8 +18,8 @@ type ConcatenatedSegmentSourceFactory(innerFactories: ISegmentSourceFactory list
             let rec readNextAsync cancellationToken = task {
                 // TODO: make this prettier
 
-                if factoryStack = [] then
-                    factoryStack <- innerFactories
+                //if factoryStack = [] then
+                //    factoryStack <- innerFactories
 
                 if currentSource = None && not disposed then
                     match factoryStack with

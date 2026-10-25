@@ -49,6 +49,7 @@ type SilenceSourceFactory() =
                                 duration = interval.TotalSeconds
                                 data = data
                                 mediaSequence = mediaSequence
+                                important = false
                             }
                     }
 

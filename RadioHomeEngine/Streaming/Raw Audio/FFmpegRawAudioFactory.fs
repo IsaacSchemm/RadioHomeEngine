@@ -18,14 +18,13 @@ type FFmpegRawAudioFactory() =
         member this.CreateAsync() = task {
             let mutable disposed = false
 
-            //let color = "brown"
-
             let parameters = [
                 "-nostats"
                 "-hide_banner"
                 "-loglevel"; "warning"
                 yield! this.InputParameters
-                "-f"; "f64le"
+                "-f"; "s16le"
+                "-ar"; "44100"
                 "-ac"; "2"
                 "-"
             ]
@@ -35,6 +34,8 @@ type FFmpegRawAudioFactory() =
                 parameters,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true))
+
+            printfn "[FFmpegRawAudioSource] Generator started (e=%b)" generator.HasExited
 
             return {
                 new IRawAudio with

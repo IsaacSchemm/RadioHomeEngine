@@ -8,4 +8,5 @@ type DownstreamSegment = {
     duration: float
     data: byte array
     mediaSequence: UInt128
+    important: bool
 }

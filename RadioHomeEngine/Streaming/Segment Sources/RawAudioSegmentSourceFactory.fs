@@ -8,31 +8,8 @@ open FSharp.Control
 open System.Threading.Channels
 
 type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
-    let path = Path.Combine([|
-        Path.GetTempPath()
-        $"RadioHomeEngine-Noise-{Guid.NewGuid()}"
-    |])
-
     let hlsBitrate = 65536
     let segmentTimeSeconds = 2.0
-
-    let parameters = String.concat " " [
-        "-nostats"
-        "-hide_banner"
-        "-loglevel"; "warning"
-        "-readrate"; "1"
-        "-f"; "f64le"
-        "-ac"; "2"
-        "-i"; "-"
-        "-f"; "hls"
-        "-hls_time"; $"{segmentTimeSeconds}"
-        "-hls_segment_type"; "mpegts"
-        "-hls_flags"; "program_date_time+temp_file"
-        "-c:a"; "aac"
-        "-ac"; "2"
-        "-b:a"; $"{hlsBitrate}"
-        Path.Combine(path, "chunklist.m3u8")
-    ]
 
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
 
@@ -46,6 +23,30 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
             let channel = Channel.CreateBounded(3)
             let mutable disposing = false
 
+            let path = Path.Combine([|
+                Path.GetTempPath()
+                $"RadioHomeEngine-Noise-{Guid.NewGuid()}"
+            |])
+
+            let parameters = String.concat " " [
+                "-nostats"
+                "-hide_banner"
+                "-loglevel"; "warning"
+                "-readrate"; "1"
+                "-f"; "s16le"
+                "-ar"; "44100"
+                "-ac"; "2"
+                "-i"; "-"
+                "-f"; "hls"
+                "-hls_time"; $"{segmentTimeSeconds}"
+                "-hls_segment_type"; "mpegts"
+                "-hls_flags"; "program_date_time+temp_file"
+                "-c:a"; "aac"
+                "-ac"; "2"
+                "-b:a"; $"{hlsBitrate}"
+                Path.Combine(path, "chunklist.m3u8")
+            ]
+
             Directory.CreateDirectory(path) |> ignore
 
             let reencoder = Process.Start(new ProcessStartInfo(
@@ -58,7 +59,6 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
                     use output = reencoder.StandardInput.BaseStream
 
                     let buffer = Array.zeroCreate<byte> 81920
-
                     let mutable nextFileCheck = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1.0)
 
                     use! innerSource = innerFactory.CreateAsync()
@@ -90,6 +90,7 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
                                         duration = segmentTimeSeconds
                                         data = data
                                         mediaSequence = UInt128.Zero
+                                        important = true
                                     }
                                     do! channel.Writer.WriteAsync(segment)
                                     files <- file :: files
@@ -99,7 +100,9 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
 
                             if streamFinished && files <> [] then
                                 allSegmentsRead <- true
-                with :? IOException when disposing -> ()
+                with
+                | :? IOException when disposing -> ()
+                | ex -> printfn "%A" ex
 
                 channel.Writer.Complete()
             }
@@ -110,14 +113,11 @@ type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
 
                     member _.ReadNextAsync(cancellationToken) = task {
                         try
-                            printfn "[RawAudioSegmentSourceFactory] Waiting to read"
                             let! readable = channel.Reader.WaitToReadAsync(cancellationToken)
                             if readable then
-                                printfn "[RawAudioSegmentSourceFactory] Reading"
                                 let! segment = channel.Reader.ReadAsync(cancellationToken)
                                 return NextSegment segment
                             else
-                                printfn "[RawAudioSegmentSourceFactory] Ending"
                                 return NoMoreSegments
                         with :? OperationCanceledException when cancellationToken.IsCancellationRequested ->
                             printfn "[RawAudioSegmentSourceFactory] Cancelled"

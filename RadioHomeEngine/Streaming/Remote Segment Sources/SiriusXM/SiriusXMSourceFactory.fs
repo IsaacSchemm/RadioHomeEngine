@@ -154,8 +154,6 @@ type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
 
                         for chunk in chunklist do
                             if sequenceNumber < chunk.mediaSequence then
-                                printfn "[SiriusXMSourceFactory] Found new segment %A" chunk.mediaSequence
-
                                 sequenceNumber <- chunk.mediaSequence
 
                                 match chunk.dateTime, chunk.duration with
@@ -173,9 +171,8 @@ type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
                                         duration = duration
                                         data = recontainerized_data
                                         mediaSequence = chunk.mediaSequence
+                                        important = false
                                     }
-
-                                    printfn "[SiriusXMSourceFactory] Writing segment %A" segment.mediaSequence
 
                                     do! internalBuffer.Writer.WriteAsync(segment, cancellationToken)
                                 | _ -> ()
@@ -196,12 +193,10 @@ type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
                         let! more = internalBuffer.Reader.WaitToReadAsync(cancellationToken)
 
                         if more then
-                            printfn "[SiriusXMSourceFactory] Waiting for segment"
                             let! segment = internalBuffer.Reader.ReadAsync(cancellationToken)
                             printfn "[SiriusXMSourceFactory] Returning segment %A" segment.mediaSequence
                             return NextSegment segment
                         else
-                            printfn "[SiriusXMSourceFactory] No more segments"
                             return NoMoreSegments
                     }
 
