@@ -1,6 +1,7 @@
 namespace RadioHomeEngine
 
 open System
+open System.IO
 open System.Threading
 open System.Threading.Tasks
 open Microsoft.Extensions.Hosting
@@ -25,13 +26,19 @@ module StreamRepository =
     let private test1Factory =
         new ShellWrapperSegmentSourceFactory({
             inputs = [
+                let mediaDirs =
+                    ["K:/Documents/Music"; "/media/usb/Music"]
+                    |> List.where Directory.Exists
+
                 SpeechSynthesis "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce nec diam sed dolor pellentesque efficitur. Vivamus ullamcorper mi leo, at finibus nisl hendrerit eu. Sed porta tempus risus, a vehicula odio tincidunt nec. Donec porta sodales tortor, sed rutrum nunc cursus non. Phasellus iaculis dolor sapien, id aliquam purus gravida et. Etiam euismod ut leo in imperdiet. Etiam commodo varius aliquet. Sed facilisis elementum molestie. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Maecenas tempor sollicitudin suscipit. "
-                AudioFile "/media/usb/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"
+                for m in mediaDirs do
+                    AudioFile $"{m}/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"
                 SpeechSynthesis "Hello. This a test."
-                AudioFile "/media/usb/Music/Steps - Gold Greatest Hits/02 One for Sorrow.flac"
+                for m in mediaDirs do
+                    AudioFile $"{m}/Steps - Gold Greatest Hits/02 One for Sorrow.flac"
                 BrownNoise Infinite
             ]
-            loop = true
+            loop = false
         })
 
     /// Channel 8000. Defaults to silence.

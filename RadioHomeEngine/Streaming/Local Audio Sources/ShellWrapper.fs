@@ -5,27 +5,6 @@ open System.Diagnostics
 open System.IO
 open System.Threading.Tasks
 
-/// An audio source that provides a stream of CD-quality audio samples.
-type IShellWrapperAudio =
-    inherit IAsyncDisposable
-    abstract member Stream: Stream
-
-type ShellWrapperDuration =
-| Finite of TimeSpan
-| Infinite
-
-type ShellWrapperInput =
-| AudioCD of DiscDriveScope
-| AudioFile of path: string
-| BrownNoise of duration: ShellWrapperDuration
-| Silence of duration: ShellWrapperDuration
-| SpeechSynthesis of text: string
-
-type ShellWrapperParameters = {
-    inputs: ShellWrapperInput list
-    loop: bool
-}
-
 type ShellWrapper(parameters: ShellWrapperParameters) =
     member this.CreateAsync() = task {
         let tempPathDirName = $"RadioHomeEngine-ShellWrapper-{Guid.NewGuid()}"
@@ -36,11 +15,6 @@ type ShellWrapper(parameters: ShellWrapperParameters) =
             if Environment.OSVersion.Platform = PlatformID.Win32NT
             then "C:/Program Files/Git/bin/bash.exe"
             else "bash"
-
-        let ffmpeg =
-            if Environment.OSVersion.Platform = PlatformID.Win32NT
-            then "ffmpeg.exe"
-            else "ffmpeg"
 
         let unixTempPath = $"/tmp/{tempPathDirName}"
 
@@ -74,7 +48,7 @@ type ShellWrapper(parameters: ShellWrapperParameters) =
                                 $"-t 1+{List.length audioDisc.tracks}"
                                 "-"
                                 "|"
-                                ffmpeg
+                                "ffmpeg"
                                 quietParameters
                                 "-f wav"
                                 "-i -"
@@ -88,7 +62,7 @@ type ShellWrapper(parameters: ShellWrapperParameters) =
                     ignore (File.CreateSymbolicLink(tempFilePath, target))
 
                     String.concat " " [
-                        ffmpeg
+                        "ffmpeg"
                         quietParameters
                         $"-i {unixTempPath}/{tempFileName}"
                         outputParameters
@@ -96,7 +70,7 @@ type ShellWrapper(parameters: ShellWrapperParameters) =
 
                 | BrownNoise duration ->
                     String.concat " " [
-                        ffmpeg
+                        "ffmpeg"
                         quietParameters
                         "-f lavfi"
                         "-i anoisesrc=sample_rate=44100:color=brown"
@@ -110,7 +84,7 @@ type ShellWrapper(parameters: ShellWrapperParameters) =
 
                 | Silence duration ->
                     String.concat " " [
-                        ffmpeg
+                        "ffmpeg"
                         quietParameters
                         "-f lavfi"
                         "-i anullsrc=cl=stereo:sample_rate=44100"
@@ -135,7 +109,7 @@ type ShellWrapper(parameters: ShellWrapperParameters) =
                             "-s 140"
                             "-a 150"
                             "|"
-                            ffmpeg
+                            "ffmpeg"
                             quietParameters
                             "-f wav"
                             "-i -"
