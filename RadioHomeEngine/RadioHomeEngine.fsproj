@@ -32,11 +32,11 @@
     <Compile Include="Streaming\Segments\DownstreamSegment.fs" />
     <Compile Include="Streaming\Segments\ISegmentSource.fs" />
     <Compile Include="Streaming\Segments\ISegmentSourceFactory.fs" />
-    <Compile Include="streaming\local audio sources\IShellWrapperAudio.fs" />
-    <Compile Include="streaming\local audio sources\ShellWrapperDuration.fs" />
-    <Compile Include="streaming\local audio sources\ShellWrapperInput.fs" />
-    <Compile Include="streaming\local audio sources\ShellWrapperParameters.fs" />
-    <Compile Include="streaming\local audio sources\ShellSegmentSourceFactory.fs" />
+    <Compile Include="streaming\Local Audio Sources\IShellWrapperAudio.fs" />
+    <Compile Include="streaming\Local Audio Sources\ShellWrapperDuration.fs" />
+    <Compile Include="streaming\Local Audio Sources\ShellWrapperInput.fs" />
+    <Compile Include="streaming\Local Audio Sources\ShellWrapperParameters.fs" />
+    <Compile Include="streaming\Local Audio Sources\ShellSegmentSourceFactory.fs" />
     <Compile Include="Streaming\Remote HLS Streams\UpstreamSegment.fs" />
     <Compile Include="Streaming\Remote HLS Streams\ChunklistParser.fs" />
     <Compile Include="Streaming\Remote HLS Streams\ChunklistNormalizer.fs" />

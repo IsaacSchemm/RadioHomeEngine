@@ -16,7 +16,14 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
     let hlsParameters = "-f hls -hls_time 10 -hls_segment_type mpegts -hls_flags program_date_time+temp_file -c:a aac -ac 2 -b:a 327680"
 
     let scriptFileName = "script.sh"
-    let currentIndexFileName = "currentIndex.txt"
+    let programInformationMarkerFileName = "currentIndex.txt"
+
+    let mutable programInformation = {
+        channelName = "Local Audio Source"
+        title = "Nothing"
+        artists = []
+        albums = []
+    }
 
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
 
@@ -29,7 +36,7 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
         "while true; do"
 
         for (i, input) in Seq.indexed parameters.inputs do
-            $"echo {i} > {unixTempPath}/{currentIndexFileName}"
+            $"echo {i} > {unixTempPath}/{programInformationMarkerFileName}"
 
             match input with
             | AudioCD scope ->
@@ -121,8 +128,11 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
         "done"
     ]
 
+    interface IProgramInformationSource with
+        member _.GetCurrentProgramInformationAsync(_) = Task.FromResult(programInformation)
+
     interface ISegmentSourceFactory with
-        member this.ProgramInformationSource = failwith "?"
+        member this.ProgramInformationSource = this
 
         member this.CreateAsync() = task {
             let tempPathDirName = $"RadioHomeEngine-ShellWrapper-{Guid.NewGuid()}"
@@ -190,12 +200,46 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
                         if nextFileCheck <= DateTimeOffset.UtcNow then
                             nextFileCheck <- nextFileCheck + TimeSpan.FromSeconds(1.0)
 
+                            let markerPath = Path.Combine(realTempPath, programInformationMarkerFileName)
+                            if File.Exists(markerPath) then
+                                let! contents = File.ReadAllTextAsync(markerPath)
+
+                                let index =
+                                    match contents with
+                                    | Int32 index -> index
+                                    | _ -> -1
+
+                                match List.tryItem index parameters.inputs with
+                                | None ->
+                                    programInformation <- { programInformation with title = $"{index}" }
+                                | Some (AudioCD (SingleDrive drive)) ->
+                                    let! info = AudioCD.getInfoForDeviceAsync drive
+                                    programInformation <- {
+                                        programInformation with
+                                            title = "Audio CD"
+                                            artists = info.artists
+                                            albums = info.titles
+                                    }
+                                | Some (AudioCD _) ->
+                                    programInformation <- { programInformation with title = "Audio CD" }
+                                | Some (AudioFile path) ->
+                                    programInformation <- { programInformation with title = Path.GetFileNameWithoutExtension(path) }
+                                | Some (BrownNoise _) ->
+                                    programInformation <- { programInformation with title = "Brown Noise" }
+                                | Some (Silence _) ->
+                                    programInformation <- { programInformation with title = "Silence" }
+                                | Some (SpeechSynthesis text) ->
+                                    programInformation <- { programInformation with title = text }
+
+                                File.Delete(markerPath)
+
                             let mutable files = []
 
                             let infos = [
                                 for file in Directory.EnumerateFiles(realTempPath, "*.ts") do
                                     new FileInfo(file)
                             ]
+
                             for info in infos |> Seq.sortBy (fun i -> i.CreationTime) do
                                 let time = new DateTimeOffset(info.CreationTime)
                                 if DateTimeOffset.UtcNow - time > TimeSpan.FromSeconds(0.25) then
@@ -225,7 +269,7 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
 
             return {
                 new ISegmentSource with
-                    member _.ProgramInformationSource = failwith "?"
+                    member _.ProgramInformationSource = this
 
                     member _.ReadNextAsync(cancellationToken) = task {
                         try

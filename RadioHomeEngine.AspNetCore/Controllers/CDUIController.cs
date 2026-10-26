@@ -28,8 +28,8 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                     DiscDriveModule.fromId(id)));
 
         [HttpPost]
-        public void EjectCD(string id) =>
-            CD.beginRip(
+        public async Task EjectCD(string id) =>
+            await DiscDriveModule.ejectAsync(
                 DiscDriveScope.NewSingleDrive(
                     DiscDriveModule.fromId(id)));
     }
