@@ -8,5 +8,10 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         {
             return View();
         }
+
+        public IActionResult Player(int num)
+        {
+            return View(model: num);
+        }
     }
 }

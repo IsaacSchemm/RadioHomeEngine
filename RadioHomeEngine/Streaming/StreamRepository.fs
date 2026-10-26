@@ -12,48 +12,26 @@ module StreamRepository =
     /// Channel 0. Defaults to silence.
     let private zeroChannel = new Composite(
         0,
-        new ShellSegmentSourceFactory({
-            inputs = [Silence Infinite]
-            loop = true
-        }))
+        new ShellSegmentSourceFactory("Silence", [Silence Infinite]))
 
     let private noiseFactory =
-        new ShellSegmentSourceFactory({
-            inputs = [BrownNoise Infinite]
-            loop = true
-        })
+        new ShellSegmentSourceFactory("Brown Noise", [BrownNoise Infinite])
 
-    let private test1Factory =
-        new ShellSegmentSourceFactory({
-            inputs = [
-                let mediaDirs =
-                    ["K:/Documents/Music"; "/media/usb/Music"]
-                    |> List.where Directory.Exists
+    let private cdFactory =
+        new ShellSegmentSourceFactory("Audio CD", [AudioCD AllDrives])
 
-                SpeechSynthesis ("Message", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce nec diam sed dolor pellentesque efficitur. Vivamus ullamcorper mi leo, at finibus nisl hendrerit eu. Sed porta tempus risus, a vehicula odio tincidunt nec. Donec porta sodales tortor, sed rutrum nunc cursus non. Phasellus iaculis dolor sapien, id aliquam purus gravida et. Etiam euismod ut leo in imperdiet. Etiam commodo varius aliquet. Sed facilisis elementum molestie. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Maecenas tempor sollicitudin suscipit. ")
-                for m in mediaDirs do
-                    AudioFile $"{m}/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"
-                SpeechSynthesis ("Message", "Hello. This a test.")
-                for m in mediaDirs do
-                    AudioFile $"{m}/Steps - Gold Greatest Hits/02 One for Sorrow.flac"
-                BrownNoise Infinite
-            ]
-            loop = false
-        })
-
-    /// Channel 8000. Defaults to silence.
     let private noise = new Composite(8000, noiseFactory)
-
-    let private steps = new Composite(8001, test1Factory)
+    let private cd = new Composite(8001, cdFactory)
 
     /// All active channels which match a SiriusXM channel number (expected to be within the range 1 through 1999).
     let private sxm = new ResizeArray<Composite>()
 
+    let permanent = [noise; cd]
+
     /// All currently tracked channels.
     let getAll () = seq {
         zeroChannel
-        noise
-        steps
+        yield! permanent
         yield! sxm
     }
 
@@ -73,10 +51,10 @@ module StreamRepository =
         match lastActionCode with
         | 0 ->
             ()
-        | 8001 ->
+        | 8000 ->
             do! zeroChannel.InterruptAsync(noiseFactory)
-        | 8002 ->
-            do! zeroChannel.InterruptAsync(test1Factory)
+        | 8001 ->
+            do! zeroChannel.InterruptAsync(cdFactory)
         | n ->
             do! zeroChannel.InterruptAsync(new SiriusXMSourceFactory(n, 1))
     }

@@ -7,7 +7,7 @@ open System.Threading.Tasks
 open FSharp.Control
 open System.Threading.Channels
 
-type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
+type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput list) =
     let hlsBitrate = 320 * 1024
     let segmentTimeSeconds = 10.0
 
@@ -19,7 +19,7 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
     let programNameFileName = "currentIndex.txt"
 
     let mutable programInformation = {
-        channelName = "Local Audio Source"
+        channelName = displayName
         programName = "Nothing"
     }
 
@@ -55,11 +55,9 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
 
         "PATH=$PATH:$(pwd)"
 
-        "while true; do"
-
         let eof = $"{Guid.NewGuid()}"
 
-        for input in parameters.inputs do
+        for input in inputs do
             $"cat << {eof} > {unixTempPath}/{programNameFileName}"
             getProgramName input
             $"{eof}"
@@ -147,11 +145,6 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
                         formatParameters
                         "-"
                     ]
-
-        if not parameters.loop then
-            "break"
-
-        "done"
     ]
 
     interface IProgramInformationSource with

@@ -63,47 +63,36 @@ module AtomicActions =
             do! Playlist.setTimeAsync player SeekOrigin.Current -10m
 
         | PlayCD (scope, position) ->
-            //do! Players.simulateButtonAsync player "stop"
+            do! Players.simulateButtonAsync player "stop"
 
-            //if position = Now then
-            //    do! Playlist.clearAsync player
+            if position = Now then
+                do! Playlist.clearAsync player
 
-            //let! address = Network.getAddressAsync ()
+            let! address = Network.getAddressAsync ()
 
-            //let drives = CD.getDriveInfo scope
+            let drives = CD.getDriveInfo scope
 
-            //for info in drives do
-            //    match info.disc.audio with
-            //    | None -> ()
-            //    | Some audioDisc ->
-            //        for track in audioDisc.tracks do
-            //            let title =
-            //                match track.title with
-            //                | "" -> $"Track {track.position}"
-            //                | x -> x
-            //            do! Playlist.addItemAsync player $"http://{address}:{Config.port}/CD/PlayTrack?id={Uri.EscapeDataString(DiscDrive.getId info.device)}&track={track.position}" title
+            for info in drives do
+                match info.disc.audio with
+                | None -> ()
+                | Some audioDisc ->
+                    for track in audioDisc.tracks do
+                        let title =
+                            match track.title with
+                            | "" -> $"Track {track.position}"
+                            | x -> x
+                        do! Playlist.addItemAsync player $"http://{address}:{Config.port}/CD/PlayTrack?id={Uri.EscapeDataString(DiscDrive.getId info.device)}&track={track.position}" title
 
-            //    match info.disc.data with
-            //    | None -> ()
-            //    | Some dataDisc ->
-            //        for file in dataDisc.files do
-            //            match DataCD.tryGetPath info.device file with
-            //            | None -> ()
-            //            | Some path ->
-            //                do! Playlist.addItemAsync player $"file://{path}" file.name
+                match info.disc.data with
+                | None -> ()
+                | Some dataDisc ->
+                    for file in dataDisc.files do
+                        match DataCD.tryGetPath info.device file with
+                        | None -> ()
+                        | Some path ->
+                            do! Playlist.addItemAsync player $"file://{path}" file.name
 
-            //do! Playlist.playAsync player
-
-            let factory = new ShellSegmentSourceFactory(
-                {
-                    inputs = [
-                        SpeechSynthesis ("Message", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce nec diam sed dolor pellentesque efficitur. Vivamus ullamcorper mi leo, at finibus nisl hendrerit eu. Sed porta tempus risus, a vehicula odio tincidunt nec. Donec porta sodales tortor, sed rutrum nunc cursus non. Phasellus iaculis dolor sapien, id aliquam purus gravida et. Etiam euismod ut leo in imperdiet.")
-                        AudioCD scope
-                    ]
-                    loop = false
-                })
-            for stream in StreamRepository.getAll () |> Seq.where (fun c -> c.ChannelNumber = 4) do
-                do! stream.InterruptAsync(factory)
+            do! Playlist.playAsync player
 
         | RipCD scope ->
             CD.beginRip scope

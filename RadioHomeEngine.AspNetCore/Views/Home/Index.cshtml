@@ -22,9 +22,10 @@
         <a asp-controller="SXM" asp-action="Index">SiriusXM</a>
     </p>
 
-    <p>
-        <a asp-controller="ChannelZero" asp-action="Index">Channel 0</a>
-    </p>
+    @foreach (var channel in StreamRepository.permanent)
+    {
+        <a asp-action="Player" asp-route-num="@channel.ChannelNumber">Channel @channel.ChannelNumber</a>
+    }
 
     <p>
         <a asp-controller="CDUI" asp-action="Index">Disc drives</a>
