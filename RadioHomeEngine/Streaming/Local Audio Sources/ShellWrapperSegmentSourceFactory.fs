@@ -15,11 +15,20 @@ type ShellWrapperSegmentSourceFactory(parameters) =
 
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
 
-    interface IProgramInformationSource with
-        member this.GetCurrentProgramInformationAsync(_) = Task.FromResult(shellWrapper.ProgramInformation)
+    let defaultProgramInformationSource = {
+        new IProgramInformationSource with
+            member _.GetCurrentProgramInformationAsync(_) = Task.FromResult({
+                channelName = "Unknown"
+                title = "Unknown"
+                artists = []
+                albums = []
+            })
+    }
+
+    let mutable programInformationSource = defaultProgramInformationSource
 
     interface ISegmentSourceFactory with
-        member this.ProgramInformationSource = this
+        member this.ProgramInformationSource = programInformationSource
 
         member this.CreateAsync() = task {
             let channel = Channel.CreateBounded(3)
@@ -66,6 +75,8 @@ type ShellWrapperSegmentSourceFactory(parameters) =
                     let mutable nextFileCheck = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1.0)
 
                     use! innerSource = shellWrapper.CreateAsync()
+                    programInformationSource <- innerSource
+
                     use input = innerSource.Stream
 
                     let mutable allSegmentsRead = false
@@ -112,12 +123,14 @@ type ShellWrapperSegmentSourceFactory(parameters) =
                 | :? IOException when disposing -> ()
                 | ex -> printfn "%A" ex
 
+                programInformationSource <- defaultProgramInformationSource
+
                 channel.Writer.Complete()
             }
 
             return {
                 new ISegmentSource with
-                    member _.ProgramInformationSource = this
+                    member _.ProgramInformationSource = programInformationSource
 
                     member _.ReadNextAsync(cancellationToken) = task {
                         try
