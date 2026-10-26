@@ -5,9 +5,19 @@ open System.Diagnostics
 open System.IO
 open System.Threading.Tasks
 
+/// An audio source that provides a stream of CD-quality audio samples.
+type IShellWrapperAudio =
+    inherit IAsyncDisposable
+    abstract member Stream: Stream
+
+type ShellWrapperDuration =
+| Finite of TimeSpan
+| Infinite
+
 type ShellWrapperInput =
 | AudioFile of path: string
-| BrownNoise
+| BrownNoise of duration: ShellWrapperDuration
+| Silence of duration: ShellWrapperDuration
 | SpeechSynthesis of text: string
 
 type ShellWrapperParameters = {
@@ -19,22 +29,29 @@ type ShellWrapper(parameters: ShellWrapperParameters) =
     member this.CreateAsync() = task {
         let tempPathDirName = $"RadioHomeEngine-ShellWrapper-{Guid.NewGuid()}"
 
-        let unixTempPath = $"/tmp/{tempPathDirName}"
+        let isWindows = Environment.OSVersion.Platform = PlatformID.Win32NT
 
-        let realTempPath =
+        let bash =
             if Environment.OSVersion.Platform = PlatformID.Win32NT
-            then Path.Combine([|
-                Path.GetTempPath()
-                tempPathDirName
-            |])
-            else unixTempPath
+            then "C:/Program Files/Git/bin/bash.exe"
+            else "bash"
 
         let ffmpeg =
             if Environment.OSVersion.Platform = PlatformID.Win32NT
             then "ffmpeg.exe"
             else "ffmpeg"
 
+        let unixTempPath = $"/tmp/{tempPathDirName}"
+
+        let realTempPath =
+            if isWindows
+            then Path.Combine(Path.GetTempPath(), tempPathDirName)
+            else unixTempPath
+
         ignore (Directory.CreateDirectory(realTempPath))
+
+        let quietParameters = "-nostats -hide_banner -loglevel warning"
+        let outputParameters = "-f s16le -ar 44100 -ac 2 -"
 
         let scriptLines = [
             "#!/bin/sh"
@@ -50,16 +67,61 @@ type ShellWrapper(parameters: ShellWrapperParameters) =
                     let tempFileName = $"{Guid.NewGuid()}{Path.GetExtension(target)}"
                     let tempFilePath = Path.Combine(realTempPath, tempFileName)
                     ignore (File.CreateSymbolicLink(tempFilePath, target))
-                    $"{ffmpeg} -i {unixTempPath}/{tempFileName} -ss 170 -f s16le -ar 44100 -ac 2 -"
-                | BrownNoise ->
-                    $"{ffmpeg} -nostats -hide_banner -loglevel warning -f lavfi -i anoisesrc=sample_rate=44100:color=brown -f s16le -ar 44100 -ac 2 -"
+
+                    String.concat " " [
+                        ffmpeg
+                        quietParameters
+                        $"-i {unixTempPath}/{tempFileName}"
+                        outputParameters
+                    ]
+
+                | BrownNoise duration ->
+                    String.concat " " [
+                        ffmpeg
+                        quietParameters
+                        "-f lavfi"
+                        "-i anoisesrc=sample_rate=44100:color=brown"
+
+                        match duration with
+                        | Infinite -> ()
+                        | Finite ts -> $"-t {ts.TotalSeconds}"
+
+                        outputParameters
+                    ]
+
+                | Silence duration ->
+                    String.concat " " [
+                        ffmpeg
+                        quietParameters
+                        "-f lavfi"
+                        "-i anullsrc=cl=stereo:sample_rate=44100"
+
+                        match duration with
+                        | Infinite -> ()
+                        | Finite ts -> $"-t {ts.TotalSeconds}"
+
+                        outputParameters
+                    ]
+
                 | SpeechSynthesis text ->
                     if Environment.OSVersion.Platform <> PlatformID.Win32NT then
                         let textFileName = $"{Guid.NewGuid()}.txt"
                         File.WriteAllText(textFileName, text)
-                        $"espeak -f {textFileName} --stdout -v us-mbrola-2 -s 140 -a 150 | {ffmpeg} -nostats -hide_banner -loglevel warning -f wav -i - -f s16le -ar 44100 -ac 2 -"
 
-            $"{ffmpeg} -nostats -hide_banner -loglevel warning -f lavfi -i anullsrc=cl=stereo:sample_rate=44100 -t 2 -f s16le -ar 44100 -ac 2 -"
+                        String.concat " " [
+                            "espeak"
+                            $"-f {textFileName}"
+                            "--stdout"
+                            "-v us-mbrola-2"
+                            "-s 140"
+                            "-a 150"
+                            "|"
+                            ffmpeg
+                            quietParameters
+                            "-f wav"
+                            "-i -"
+                            outputParameters
+                        ]
 
             if not parameters.loop then
                 "break"
@@ -70,11 +132,6 @@ type ShellWrapper(parameters: ShellWrapperParameters) =
         let scriptPath = Path.Combine(realTempPath, "script.sh")
         do! File.WriteAllLinesAsync(scriptPath, scriptLines)
 
-        let bash =
-            if Environment.OSVersion.Platform = PlatformID.Win32NT
-            then "C:/Program Files/Git/bin/bash.exe"
-            else "bash"
-
         let proc =
             new ProcessStartInfo(
                 bash,
@@ -84,7 +141,7 @@ type ShellWrapper(parameters: ShellWrapperParameters) =
             |> Process.Start
 
         return {
-            new IRawAudio with
+            new IShellWrapperAudio with
                 member _.Stream = proc.StandardOutput.BaseStream
                 member _.DisposeAsync() = new ValueTask(task {
                     try

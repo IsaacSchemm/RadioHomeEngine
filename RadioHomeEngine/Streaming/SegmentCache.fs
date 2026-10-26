@@ -1,6 +1,8 @@
 namespace RadioHomeEngine
 
 open System
+open System.Diagnostics
+open System.IO
 
 /// An in-memory cache of HLS media segments associated with a specific radio channel number.
 type SegmentCache() =
@@ -30,6 +32,25 @@ type SegmentCache() =
         |> Seq.map (fun s -> s.data)
         |> Seq.tryHead
 
+    /// Wraps a task that will generate a single HLS segment consisting of ten seconds of silence.
+    let fallbackSegmentTask = lazy task {
+        let ffmpeg =
+            new ProcessStartInfo(
+                "ffmpeg",
+                $"-nostats -hide_banner -loglevel warning -f lavfi -i anullsrc=cl=stereo:sample_rate=44100 -t 10 -c:a aac -b:a 65536 -f mpegts -",
+                RedirectStandardOutput = true)
+            |> Process.Start
+
+        use buffer = new MemoryStream()
+
+        let readTask = ffmpeg.StandardOutput.BaseStream.CopyToAsync(buffer)
+
+        do! readTask
+        do! ffmpeg.WaitForExitAsync()
+
+        return buffer.ToArray()
+    }
+
     member _.Add(segment: DownstreamSegment) =
         let threshold =
             match Seq.tryHead cache with
@@ -56,5 +77,5 @@ type SegmentCache() =
         | Some s ->
             return s
         | _ ->
-            return! Silence.segmentTask.Value
+            return! fallbackSegmentTask.Value
     }

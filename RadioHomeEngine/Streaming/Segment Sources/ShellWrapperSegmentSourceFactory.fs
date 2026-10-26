@@ -7,14 +7,16 @@ open System.Threading.Tasks
 open FSharp.Control
 open System.Threading.Channels
 
-type RawAudioSegmentSourceFactory(innerFactory: ShellWrapper) =
-    let hlsBitrate = 65536
+type ShellWrapperSegmentSourceFactory(parameters) =
+    let shellWrapper = new ShellWrapper(parameters)
+
+    let hlsBitrate = 320 * 1024
     let segmentTimeSeconds = 10.0
 
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
 
     interface IProgramInformationSource with
-        member this.GetCurrentProgramInformationAsync(_) = Task.FromResult(innerFactory.ProgramInformation)
+        member this.GetCurrentProgramInformationAsync(_) = Task.FromResult(shellWrapper.ProgramInformation)
 
     interface ISegmentSourceFactory with
         member this.ProgramInformationSource = this
@@ -63,7 +65,7 @@ type RawAudioSegmentSourceFactory(innerFactory: ShellWrapper) =
                     let buffer = Array.zeroCreate<byte> 81920
                     let mutable nextFileCheck = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1.0)
 
-                    use! innerSource = innerFactory.CreateAsync()
+                    use! innerSource = shellWrapper.CreateAsync()
                     use input = innerSource.Stream
 
                     let mutable allSegmentsRead = false

@@ -9,27 +9,30 @@ open FSharp.Control
 /// A module which keeps track of all active radio channels.
 module StreamRepository =
     /// Channel 0. Defaults to silence.
-    let private zeroChannel = new Composite(0, new SilenceSourceFactory())
+    let private zeroChannel = new Composite(
+        0,
+        new ShellWrapperSegmentSourceFactory({
+            inputs = [Silence Infinite]
+            loop = true
+        }))
 
     let private noiseFactory =
-        new RawAudioSegmentSourceFactory(
-            new ShellWrapper({
-                inputs = [BrownNoise]
-                loop = true
-            }))
+        new ShellWrapperSegmentSourceFactory({
+            inputs = [BrownNoise Infinite]
+            loop = true
+        })
 
     let private test1Factory =
-        new RawAudioSegmentSourceFactory(
-            new ShellWrapper({
-                inputs = [
-                    SpeechSynthesis "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce nec diam sed dolor pellentesque efficitur. Vivamus ullamcorper mi leo, at finibus nisl hendrerit eu. Sed porta tempus risus, a vehicula odio tincidunt nec. Donec porta sodales tortor, sed rutrum nunc cursus non. Phasellus iaculis dolor sapien, id aliquam purus gravida et. Etiam euismod ut leo in imperdiet. Etiam commodo varius aliquet. Sed facilisis elementum molestie. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Maecenas tempor sollicitudin suscipit. "
-                    AudioFile "/media/usb/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"
-                    SpeechSynthesis "Hello. This a test."
-                    AudioFile "/media/usb/Music/Steps - Gold Greatest Hits/02 One for Sorrow.flac"
-                    BrownNoise
-                ]
-                loop = true
-            }))
+        new ShellWrapperSegmentSourceFactory({
+            inputs = [
+                SpeechSynthesis "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce nec diam sed dolor pellentesque efficitur. Vivamus ullamcorper mi leo, at finibus nisl hendrerit eu. Sed porta tempus risus, a vehicula odio tincidunt nec. Donec porta sodales tortor, sed rutrum nunc cursus non. Phasellus iaculis dolor sapien, id aliquam purus gravida et. Etiam euismod ut leo in imperdiet. Etiam commodo varius aliquet. Sed facilisis elementum molestie. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Maecenas tempor sollicitudin suscipit. "
+                AudioFile "/media/usb/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"
+                SpeechSynthesis "Hello. This a test."
+                AudioFile "/media/usb/Music/Steps - Gold Greatest Hits/02 One for Sorrow.flac"
+                BrownNoise Infinite
+            ]
+            loop = true
+        })
 
     /// Channel 8000. Defaults to silence.
     let private noise = new Composite(8000, noiseFactory)
