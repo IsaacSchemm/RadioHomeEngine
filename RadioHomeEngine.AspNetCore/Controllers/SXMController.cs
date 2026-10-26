@@ -36,8 +36,6 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                 await AtomicActions.performActionAsync(
                     playerConnection.Player,
                     AtomicAction.NewPlayChannel(num, PlaylistPosition.Now));
-
-            throw new NotImplementedException();
         }
 
         public async Task<IActionResult> ChannelImage(int num, CancellationToken cancellationToken)

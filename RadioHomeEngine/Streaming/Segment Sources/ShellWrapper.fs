@@ -15,6 +15,7 @@ type ShellWrapperDuration =
 | Infinite
 
 type ShellWrapperInput =
+| AudioCD of DiscDriveScope
 | AudioFile of path: string
 | BrownNoise of duration: ShellWrapperDuration
 | Silence of duration: ShellWrapperDuration
@@ -63,6 +64,24 @@ type ShellWrapper(parameters: ShellWrapperParameters) =
 
             for input in parameters.inputs do
                 match input with
+                | AudioCD scope ->
+                    for info in CD.getDriveInfo scope do
+                        match info.disc.audio with
+                        | Some audioDisc when not (List.isEmpty audioDisc.tracks) ->
+                            String.concat " " [
+                                "icedax"
+                                $"-D {DiscDrive.getPath info.device}"
+                                $"-t 1+{List.length audioDisc.tracks}"
+                                "-"
+                                "|"
+                                ffmpeg
+                                quietParameters
+                                "-f wav"
+                                "-i -"
+                                outputParameters
+                            ]
+                        | _ -> ()
+
                 | AudioFile target ->
                     let tempFileName = $"{Guid.NewGuid()}{Path.GetExtension(target)}"
                     let tempFilePath = Path.Combine(realTempPath, tempFileName)
