@@ -11,28 +11,40 @@ type WeatherService() =
 
     override _.ExecuteAsync cancellationToken = task {
         let! forecasts = Weather.getForecastsAsync cancellationToken
-        for forecast in forecasts |> Seq.take 2 do
-            do! Task.Delay(15000)
-            let factory = new RawAudioSegmentSourceFactory(
-                new SpeechSynthesisAudioFactory(
-                    forecast.screen,
-                    Speech.retrieveSpeech forecast.speech))
-            for stream in StreamRepository.getAll () do
-                do! stream.InterruptAsync(factory)
+        do! Task.Delay(15000)
+        let factory = new RawAudioSegmentSourceFactory(
+            new ShellWrapperRawAudioFactory({
+                inputs = [for f in forecasts |> Seq.truncate 3 do SpeechSynthesis (Speech.retrieveSpeech f.speech)]
+                loop = false
+            }))
+        for stream in StreamRepository.getAll () do
+            do! stream.InterruptAsync(factory)
 
         while not cancellationToken.IsCancellationRequested do
             try
-                let mutable players = []
-                for playerData in PlayerConnections.GetAll() do
-                    if playerData.PowerState then
-                        let! mode = Playlist.getModeAsync playerData.Player
-                        if mode = Playlist.Mode.Playing then
-                            players <- playerData.Player :: players
-                if not (List.isEmpty players) then
+                //let mutable players = []
+                //for playerData in PlayerConnections.GetAll() do
+                //    if playerData.PowerState then
+                //        let! mode = Playlist.getModeAsync playerData.Player
+                //        if mode = Playlist.Mode.Playing then
+                //            players <- playerData.Player :: players
+                //if not (List.isEmpty players) then
+                //    let! alerts = Weather.getNewAlertsAsync cancellationToken
+                //    if not (List.isEmpty alerts) then
+                //        for player in players do
+                //            do! Speech.readAsync player [for alert in alerts do alert.info]
+
+                let streams = StreamRepository.getAll () |> Seq.toList
+                if not (List.isEmpty streams) then
                     let! alerts = Weather.getNewAlertsAsync cancellationToken
                     if not (List.isEmpty alerts) then
-                        for player in players do
-                            do! Speech.readAsync player [for alert in alerts do alert.info]
+                        let factory = new RawAudioSegmentSourceFactory(
+                            new ShellWrapperRawAudioFactory({
+                                inputs = [for f in forecasts do SpeechSynthesis (Speech.retrieveSpeech f.speech)]
+                                loop = false
+                            }))
+                        for stream in streams do
+                            do! stream.InterruptAsync(factory)
             with ex -> Console.Error.WriteLine(ex)
 
             do! Task.Delay(TimeSpan.FromMinutes(5.0), cancellationToken)
