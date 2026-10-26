@@ -12,19 +12,19 @@ module StreamRepository =
     /// Channel 0. Defaults to silence.
     let private zeroChannel = new Composite(
         0,
-        new ShellWrapperSegmentSourceFactory({
+        new ShellSegmentSourceFactory({
             inputs = [Silence Infinite]
             loop = true
         }))
 
     let private noiseFactory =
-        new ShellWrapperSegmentSourceFactory({
+        new ShellSegmentSourceFactory({
             inputs = [BrownNoise Infinite]
             loop = true
         })
 
     let private test1Factory =
-        new ShellWrapperSegmentSourceFactory({
+        new ShellSegmentSourceFactory({
             inputs = [
                 let mediaDirs =
                     ["K:/Documents/Music"; "/media/usb/Music"]

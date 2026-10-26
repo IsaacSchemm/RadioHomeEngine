@@ -36,8 +36,7 @@
     <Compile Include="streaming\local audio sources\ShellWrapperDuration.fs" />
     <Compile Include="streaming\local audio sources\ShellWrapperInput.fs" />
     <Compile Include="streaming\local audio sources\ShellWrapperParameters.fs" />
-    <Compile Include="Streaming\Local Audio Sources\ShellWrapper.fs" />
-    <Compile Include="Streaming\Local Audio Sources\ShellWrapperSegmentSourceFactory.fs" />
+    <Compile Include="streaming\local audio sources\ShellSegmentSourceFactory.fs" />
     <Compile Include="Streaming\Remote HLS Streams\UpstreamSegment.fs" />
     <Compile Include="Streaming\Remote HLS Streams\ChunklistParser.fs" />
     <Compile Include="Streaming\Remote HLS Streams\ChunklistNormalizer.fs" />

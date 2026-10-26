@@ -26,7 +26,7 @@ type WeatherService() =
                 if not (List.isEmpty streams) then
                     let! alerts = Weather.getNewAlertsAsync cancellationToken
                     if not (List.isEmpty alerts) then
-                        let factory = new ShellWrapperSegmentSourceFactory({
+                        let factory = new ShellSegmentSourceFactory({
                             inputs = [for a in alerts do SpeechSynthesis (Speech.retrieveSpeech a.info.speech)]
                             loop = false
                         })
