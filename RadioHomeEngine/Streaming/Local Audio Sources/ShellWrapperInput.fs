@@ -7,4 +7,4 @@ type ShellWrapperInput =
 | AudioFile of path: string
 | BrownNoise of duration: ShellWrapperDuration
 | Silence of duration: ShellWrapperDuration
-| SpeechSynthesis of text: string
+| SpeechSynthesis of display: string * text: string

@@ -97,7 +97,7 @@ module AtomicActions =
             let factory = new ShellSegmentSourceFactory(
                 {
                     inputs = [
-                        SpeechSynthesis "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce nec diam sed dolor pellentesque efficitur. Vivamus ullamcorper mi leo, at finibus nisl hendrerit eu. Sed porta tempus risus, a vehicula odio tincidunt nec. Donec porta sodales tortor, sed rutrum nunc cursus non. Phasellus iaculis dolor sapien, id aliquam purus gravida et. Etiam euismod ut leo in imperdiet. Etiam commodo varius aliquet. Sed facilisis elementum molestie. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Maecenas tempor sollicitudin suscipit."
+                        SpeechSynthesis ("Message", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce nec diam sed dolor pellentesque efficitur. Vivamus ullamcorper mi leo, at finibus nisl hendrerit eu. Sed porta tempus risus, a vehicula odio tincidunt nec. Donec porta sodales tortor, sed rutrum nunc cursus non. Phasellus iaculis dolor sapien, id aliquam purus gravida et. Etiam euismod ut leo in imperdiet.")
                         AudioCD scope
                     ]
                     loop = false
@@ -137,14 +137,7 @@ module AtomicActions =
 
             let! info = composite.GetCurrentStreamInformationAsync(CancellationToken.None)
 
-            let programName = String.concat " - " [
-                if info.artists <> [] then
-                    String.concat " / " info.artists
-
-                info.title
-            ]
-
-            do! Players.setDisplayAsync player info.channelName programName (TimeSpan.FromSeconds(15.0))
+            do! Players.setDisplayAsync player $"[{channelNumber}] {info.channelName}" info.programName (TimeSpan.FromSeconds(15.0))
 
         | PlayCD (scope, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))

@@ -30,10 +30,10 @@ module StreamRepository =
                     ["K:/Documents/Music"; "/media/usb/Music"]
                     |> List.where Directory.Exists
 
-                SpeechSynthesis "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce nec diam sed dolor pellentesque efficitur. Vivamus ullamcorper mi leo, at finibus nisl hendrerit eu. Sed porta tempus risus, a vehicula odio tincidunt nec. Donec porta sodales tortor, sed rutrum nunc cursus non. Phasellus iaculis dolor sapien, id aliquam purus gravida et. Etiam euismod ut leo in imperdiet. Etiam commodo varius aliquet. Sed facilisis elementum molestie. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Maecenas tempor sollicitudin suscipit. "
+                SpeechSynthesis ("Message", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce nec diam sed dolor pellentesque efficitur. Vivamus ullamcorper mi leo, at finibus nisl hendrerit eu. Sed porta tempus risus, a vehicula odio tincidunt nec. Donec porta sodales tortor, sed rutrum nunc cursus non. Phasellus iaculis dolor sapien, id aliquam purus gravida et. Etiam euismod ut leo in imperdiet. Etiam commodo varius aliquet. Sed facilisis elementum molestie. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Maecenas tempor sollicitudin suscipit. ")
                 for m in mediaDirs do
                     AudioFile $"{m}/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"
-                SpeechSynthesis "Hello. This a test."
+                SpeechSynthesis ("Message", "Hello. This a test.")
                 for m in mediaDirs do
                     AudioFile $"{m}/Steps - Gold Greatest Hits/02 One for Sorrow.flac"
                 BrownNoise Infinite

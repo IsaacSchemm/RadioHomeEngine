@@ -33,17 +33,16 @@ type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
             match (channel, cut) with
             | Some ch, Some s ->
                 return {
-                    channelName = $"[{ch.channelNumber}] {ch.name}"
-                    title = s.title
-                    artists = s.artists
-                    albums = [for a in s.albums do a.title]
+                    channelName = ch.name
+                    programName = String.concat " - " [
+                        if s.artists <> [] then String.concat ", " s.artists
+                        s.title
+                    ]
                 }
             | _ ->
                 return {
-                    channelName = $"{channelNumber}"
-                    title = $"{channelNumber}"
-                    artists = []
-                    albums = []
+                    channelName = $"[{channelNumber}] Unknown"
+                    programName = "Unknown"
                 }
         }
 

@@ -16,16 +16,38 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
     let hlsParameters = "-f hls -hls_time 10 -hls_segment_type mpegts -hls_flags program_date_time+temp_file -c:a aac -ac 2 -b:a 327680"
 
     let scriptFileName = "script.sh"
-    let programInformationMarkerFileName = "currentIndex.txt"
+    let programNameFileName = "currentIndex.txt"
 
     let mutable programInformation = {
         channelName = "Local Audio Source"
-        title = "Nothing"
-        artists = []
-        albums = []
+        programName = "Nothing"
     }
 
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
+
+    let getProgramName input =
+        match input with
+        | AudioCD scope ->
+            String.concat " // " [
+                for i in CD.getDriveInfo scope do
+                    match i.disc.audio with
+                    | None -> ()
+                    | Some a -> String.concat " - " [
+                        if a.artists <> [] then String.concat ", " a.artists
+
+                        match a.titles with
+                        | _ :: _ -> String.concat " / " a.titles
+                        | [] -> "Unknown disc"
+                    ]
+            ]
+        | AudioFile path ->
+            Path.GetFileNameWithoutExtension(path)
+        | BrownNoise _ ->
+            "Brown Noise"
+        | Silence _ ->
+            "Silence"
+        | SpeechSynthesis (title, _) ->
+            title
 
     let buildGeneratorScript (realTempPath: string) (unixTempPath: string) = [
         "#!/bin/sh"
@@ -35,8 +57,12 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
 
         "while true; do"
 
-        for (i, input) in Seq.indexed parameters.inputs do
-            $"echo {i} > {unixTempPath}/{programInformationMarkerFileName}"
+        let eof = $"{Guid.NewGuid()}"
+
+        for input in parameters.inputs do
+            $"cat << {eof} > {unixTempPath}/{programNameFileName}"
+            getProgramName input
+            $"{eof}"
 
             match input with
             | AudioCD scope ->
@@ -101,7 +127,7 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
                     "-"
                 ]
 
-            | SpeechSynthesis text ->
+            | SpeechSynthesis (_, text) ->
                 if Environment.OSVersion.Platform <> PlatformID.Win32NT then
                     let textFileName = $"{Guid.NewGuid()}.txt"
                     File.WriteAllText(textFileName, text)
@@ -200,38 +226,11 @@ type ShellSegmentSourceFactory(parameters: ShellWrapperParameters) =
                         if nextFileCheck <= DateTimeOffset.UtcNow then
                             nextFileCheck <- nextFileCheck + TimeSpan.FromSeconds(1.0)
 
-                            let markerPath = Path.Combine(realTempPath, programInformationMarkerFileName)
-                            if File.Exists(markerPath) then
-                                let! contents = File.ReadAllTextAsync(markerPath)
-
-                                let index =
-                                    match contents with
-                                    | Int32 index -> index
-                                    | _ -> -1
-
-                                match List.tryItem index parameters.inputs with
-                                | None ->
-                                    programInformation <- { programInformation with title = $"{index}" }
-                                | Some (AudioCD (SingleDrive drive)) ->
-                                    let! info = AudioCD.getInfoForDeviceAsync drive
-                                    programInformation <- {
-                                        programInformation with
-                                            title = "Audio CD"
-                                            artists = info.artists
-                                            albums = info.titles
-                                    }
-                                | Some (AudioCD _) ->
-                                    programInformation <- { programInformation with title = "Audio CD" }
-                                | Some (AudioFile path) ->
-                                    programInformation <- { programInformation with title = Path.GetFileNameWithoutExtension(path) }
-                                | Some (BrownNoise _) ->
-                                    programInformation <- { programInformation with title = "Brown Noise" }
-                                | Some (Silence _) ->
-                                    programInformation <- { programInformation with title = "Silence" }
-                                | Some (SpeechSynthesis text) ->
-                                    programInformation <- { programInformation with title = text }
-
-                                File.Delete(markerPath)
+                            let programInformationFilePath = Path.Combine(realTempPath, programNameFileName)
+                            if File.Exists(programInformationFilePath) then
+                                let! contents = File.ReadAllTextAsync(programInformationFilePath)
+                                programInformation <- { programInformation with programName = contents.Trim() }
+                                File.Delete(programInformationFilePath)
 
                             let mutable files = []
 
