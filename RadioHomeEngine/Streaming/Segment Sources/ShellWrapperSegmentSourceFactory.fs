@@ -7,7 +7,7 @@ open System.Threading.Tasks
 open FSharp.Control
 open System.Threading.Channels
 
-type RawAudioSegmentSourceFactory(innerFactory: IRawAudioFactory) =
+type RawAudioSegmentSourceFactory(innerFactory: ShellWrapper) =
     let hlsBitrate = 65536
     let segmentTimeSeconds = 10.0
 

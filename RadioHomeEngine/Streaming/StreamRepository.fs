@@ -13,16 +13,19 @@ module StreamRepository =
 
     let private noiseFactory =
         new RawAudioSegmentSourceFactory(
-            new BrownNoiseAudioFactory())
+            new ShellWrapper({
+                inputs = [BrownNoise]
+                loop = true
+            }))
 
     let private test1Factory =
         new RawAudioSegmentSourceFactory(
-            new ShellWrapperRawAudioFactory({
+            new ShellWrapper({
                 inputs = [
                     SpeechSynthesis "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce nec diam sed dolor pellentesque efficitur. Vivamus ullamcorper mi leo, at finibus nisl hendrerit eu. Sed porta tempus risus, a vehicula odio tincidunt nec. Donec porta sodales tortor, sed rutrum nunc cursus non. Phasellus iaculis dolor sapien, id aliquam purus gravida et. Etiam euismod ut leo in imperdiet. Etiam commodo varius aliquet. Sed facilisis elementum molestie. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Maecenas tempor sollicitudin suscipit. "
-                    SymlinkTo "/media/usb/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"
+                    AudioFile "/media/usb/Music/Steps - Gold Greatest Hits/05 Love’s Got a Hold on My Heart.flac"
                     SpeechSynthesis "Hello. This a test."
-                    SymlinkTo "/media/usb/Music/Steps - Gold Greatest Hits/02 One for Sorrow.flac"
+                    AudioFile "/media/usb/Music/Steps - Gold Greatest Hits/02 One for Sorrow.flac"
                     BrownNoise
                 ]
                 loop = true
