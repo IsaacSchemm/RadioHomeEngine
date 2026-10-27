@@ -22,7 +22,7 @@ type WeatherService() =
 
         while not cancellationToken.IsCancellationRequested do
             try
-                let streams = StreamRepository.getAll () |> Seq.toList
+                let streams = StreamRepository.getCurrentChannels () |> Seq.toList
                 if not (List.isEmpty streams) then
                     let! alerts = Weather.getNewAlertsAsync cancellationToken
                     if not (List.isEmpty alerts) then

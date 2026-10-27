@@ -151,6 +151,8 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
         member _.GetCurrentProgramInformationAsync(_) = Task.FromResult(programInformation)
 
     interface ISegmentSourceFactory with
+        member this.ChannelName = displayName
+
         member this.ProgramInformationSource = this
 
         member this.CreateAsync() = task {

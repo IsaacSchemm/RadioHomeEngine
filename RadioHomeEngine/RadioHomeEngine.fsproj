@@ -27,6 +27,7 @@
     <Compile Include="CD\DiscDriveChangeDetectionService.fs" />
     <Compile Include="CD\DataCD.fs" />
     <Compile Include="CD\CD.fs" />
+    <Compile Include="streaming\channel listing\AvailableChannel.fs" />
     <Compile Include="Streaming\Program Information\ProgramInformation.fs" />
     <Compile Include="Streaming\Program Information\IProgramInformationSource.fs" />
     <Compile Include="Streaming\Segments\DownstreamSegment.fs" />
@@ -67,6 +68,10 @@
 
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="10.1.401" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Streaming\Channel Listing\" />
   </ItemGroup>
 
 </Project>

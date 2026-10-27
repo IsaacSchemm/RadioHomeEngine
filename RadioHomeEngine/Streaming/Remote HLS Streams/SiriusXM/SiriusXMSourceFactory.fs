@@ -14,6 +14,8 @@ open System.Threading.Tasks
 type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
     let sxm = new SiriusXMClient()
 
+    let mutable channelName = None
+
     interface IProgramInformationSource with
         member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
             let! channels = sxm.GetChannelsAsync(cancellationToken)
@@ -47,9 +49,21 @@ type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
         }
 
     interface ISegmentSourceFactory with
+        member this.ChannelName =
+            channelName
+            |> Option.defaultValue $"SiriusXM {channelNumber}"
+
         member this.ProgramInformationSource = this
 
         member this.CreateAsync() = task {
+            let! channels = sxm.GetChannelsAsync(CancellationToken.None)
+
+            channelName <-
+                channels
+                |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
+                |> Seq.map (fun c -> c.name)
+                |> Seq.tryHead
+
             let mutable sequenceNumber = UInt128.Zero
 
             let! playlist = sxm.GetPlaylistAsync(channelNumber, CancellationToken.None)

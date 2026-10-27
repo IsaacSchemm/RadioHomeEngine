@@ -20,17 +20,34 @@ module StreamRepository =
     /// All active channels which match a SiriusXM channel number (expected to be within the range 1 through 1999).
     let private sxm = new ResizeArray<Composite>()
 
-    let permanent = [noise; cd]
+    let private permanent = [noise; cd]
+
+    let getAvailableChannelsAsync () = asyncSeq {
+        for c in permanent do {
+            channelName = c.ChannelName
+            channelNumber = c.ChannelNumber
+        }
+
+        let! token = Async.CancellationToken
+        let! sxm = SiriusXMClient.GetChannelsAsync(token) |> Async.AwaitTask
+        for c in sxm do
+            match Int32.TryParse(c.channelNumber) with
+            | (false, _) -> ()
+            | (true, num) -> {
+                channelName = c.name
+                channelNumber = num
+            }
+    }
 
     /// All currently tracked channels.
-    let getAll () = seq {
+    let getCurrentChannels () = seq {
         yield! permanent
         yield! sxm
     }
 
     /// Gets the tracked composite stream for the given channel number, or creates a new one pointed at the corresponding SiriusXM channel.
     let getOrCreate channelNumber =
-        getAll()
+        getCurrentChannels ()
         |> Seq.where (fun s -> s.ChannelNumber = channelNumber)
         |> Seq.tryHead
         |> Option.defaultWith (fun () ->
@@ -108,7 +125,7 @@ module StreamRepository =
             while not cancellationToken.IsCancellationRequested do
                 // Mark composite streams as inactive if they have not been streamed recently.
                 // This will tell them to stop listening for new segments from their audio source, and - if the source is the root - to dispose of it, creating a new one later if needed.
-                for composite in getAll () do
+                for composite in getCurrentChannels () do
                     composite.CheckForInactivity()
 
                 // Remove and dispose of any inactive SiriusXM streams.
