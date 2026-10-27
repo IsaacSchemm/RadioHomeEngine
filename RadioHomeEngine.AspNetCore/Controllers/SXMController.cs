@@ -73,28 +73,26 @@ namespace RadioHomeEngine.AspNetCore.Controllers
             return Redirect($"/Stream/playlist-{num}.m3u8");
         }
 
-        public async Task<IActionResult> ViewChannel(int? num, CancellationToken cancellationToken)
+        public async Task<IActionResult> ViewChannel(int num, CancellationToken cancellationToken)
         {
-            var channelNumber = num ?? StreamRepository.getActionCode();
-
             var channels = await SiriusXMClientModule.GetChannelsAsync(cancellationToken);
             var channel = channels
-                .FirstOrDefault(c => c.channelNumber == $"{channelNumber}");
+                .FirstOrDefault(c => c.channelNumber == $"{num}");
 
             if (channel == null)
                 return View("Blank");
 
             var playlist = await SiriusXMClientModule.GetPlaylistAsync(
-                channelNumber,
+                num,
                 cancellationToken);
 
             return View(new RecentlyPlayingModel
             {
-                ShowPlayer = num != null,
+                ShowPlayer = true,
                 Channel = new PlayingChannelModel
                 {
                     Name = channel.name,
-                    Number = channelNumber,
+                    Number = num,
                     Description = channel.mediumDescription
                 },
                 Songs = [

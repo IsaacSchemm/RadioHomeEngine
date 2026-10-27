@@ -9,19 +9,13 @@ open FSharp.Control
 
 /// A module which keeps track of all active radio channels.
 module StreamRepository =
-    /// Channel 0. Defaults to silence.
-    let private zeroChannel = new Composite(
-        0,
-        new ShellSegmentSourceFactory("Silence", [Silence Infinite]))
+    let private noise = new Composite(
+        8000,
+        new ShellSegmentSourceFactory("Brown Noise", [BrownNoise Infinite]))
 
-    let private noiseFactory =
-        new ShellSegmentSourceFactory("Brown Noise", [BrownNoise Infinite])
-
-    let private cdFactory =
-        new ShellSegmentSourceFactory("Audio CD", [AudioCD AllDrives])
-
-    let private noise = new Composite(8000, noiseFactory)
-    let private cd = new Composite(8001, cdFactory)
+    let private cd = new Composite(
+        8001,
+        new ShellSegmentSourceFactory("Audio CD", [AudioCD AllDrives]))
 
     /// All active channels which match a SiriusXM channel number (expected to be within the range 1 through 1999).
     let private sxm = new ResizeArray<Composite>()
@@ -30,33 +24,8 @@ module StreamRepository =
 
     /// All currently tracked channels.
     let getAll () = seq {
-        zeroChannel
         yield! permanent
         yield! sxm
-    }
-
-    /// The most recently used action code for channel 0.
-    let mutable private lastActionCode = 0
-
-    /// Checks the most recently used action code for channel 0.
-    let getActionCode () =
-        lastActionCode
-
-    /// Assigns a new action code for channel 0, and updates the channel's audio source accordingly.
-    let setActionCodeAsync channelNumber = task {
-        lastActionCode <- channelNumber
-
-        do! zeroChannel.ClearAllInterruptionsAsync()
-
-        match lastActionCode with
-        | 0 ->
-            ()
-        | 8000 ->
-            do! zeroChannel.InterruptAsync(noiseFactory)
-        | 8001 ->
-            do! zeroChannel.InterruptAsync(cdFactory)
-        | n ->
-            do! zeroChannel.InterruptAsync(new SiriusXMSourceFactory(n, 1))
     }
 
     /// Gets the tracked composite stream for the given channel number, or creates a new one pointed at the corresponding SiriusXM channel.
