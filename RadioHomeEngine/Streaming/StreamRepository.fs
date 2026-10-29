@@ -9,18 +9,22 @@ open FSharp.Control
 
 /// A module which keeps track of all active radio channels.
 module StreamRepository =
-    let private noise = new Composite(
-        8000,
-        new ShellSegmentSourceFactory("Brown Noise", [BrownNoise Infinite]))
+    let private permanent = [
+        new Composite(
+            8000,
+            new ShellSegmentSourceFactory(
+                "Brown Noise",
+                [BrownNoise Infinite]))
 
-    let private cd = new Composite(
-        8001,
-        new ShellSegmentSourceFactory("Audio CD", [AudioCD AllDrives]))
+        new Composite(
+            8001,
+            new ShellSegmentSourceFactory(
+                "Audio CD",
+                [AudioCD AllDrives]))
+    ]
 
     /// All active channels which match a SiriusXM channel number (expected to be within the range 1 through 1999).
     let private sxm = new ResizeArray<Composite>()
-
-    let private permanent = [noise; cd]
 
     let getAvailableChannelsAsync () = asyncSeq {
         for c in permanent do c.ChannelListing
@@ -40,10 +44,16 @@ module StreamRepository =
     }
 
     /// All currently tracked channels.
-    let getCurrentChannels () = seq {
+    let private getCurrentChannels () = seq {
         yield! permanent
         yield! sxm
     }
+
+    /// All active channels.
+    let getActiveChannels () =
+        getCurrentChannels ()
+        |> Seq.where (fun c -> c.IsActive())
+        |> Seq.toList
 
     /// Gets the tracked composite stream for the given channel number, or creates a new one pointed at the corresponding SiriusXM channel.
     let private getOrCreate channelNumber =
@@ -110,6 +120,8 @@ module StreamRepository =
         try
             let composite = getOrCreate channelNumber
 
+            composite.MarkActive()
+
             while composite.Cache.GetSegments() = [] && not cancellationToken.IsCancellationRequested do
                 do! Task.Delay(TimeSpan.FromSeconds(0.5), cancellationToken)
 
@@ -120,6 +132,8 @@ module StreamRepository =
 
     let getChannelListingAndProgramInformationAsync channelNumber (cancellationToken: CancellationToken) = task {
         let composite = getOrCreate channelNumber
+
+        composite.MarkActive()
 
         while composite.Cache.GetSegments() = [] && not cancellationToken.IsCancellationRequested do
             do! Task.Delay(TimeSpan.FromSeconds(0.5), cancellationToken)

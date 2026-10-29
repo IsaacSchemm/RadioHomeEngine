@@ -10,7 +10,7 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
     let cache = new SegmentCache()
 
     let mutable interruptions: ISegmentSource list = []
-    let mutable isActive = true
+    let mutable isActive = false
     let mutable lastActive = DateTimeOffset.UtcNow
     let mutable stopWaitingForNextSegment = fun () -> ()
 

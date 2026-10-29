@@ -46,7 +46,7 @@ type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
                 }
             | _ ->
                 return {
-                    ChannelName = $"[{channelNumber}] Unknown"
+                    ChannelName = "Unknown"
                     Program = Program "Unknown"
                 }
         }
