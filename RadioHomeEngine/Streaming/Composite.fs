@@ -69,8 +69,10 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
     }
 
     member _.Cache = cache
-    member _.ChannelName = rootFactory.ChannelName
-    member _.ChannelNumber = channelNumber
+    member _.ChannelListing = {
+        ChannelNumber = channelNumber
+        ChannelInformation = rootFactory.ChannelInformation
+    }
 
     member _.GetCurrentStreamInformationAsync(cancellationToken) = task {
         let programInformationSource =

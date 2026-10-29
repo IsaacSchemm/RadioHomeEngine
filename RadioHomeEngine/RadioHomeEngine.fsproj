@@ -27,7 +27,10 @@
     <Compile Include="CD\DiscDriveChangeDetectionService.fs" />
     <Compile Include="CD\DataCD.fs" />
     <Compile Include="CD\CD.fs" />
-    <Compile Include="streaming\channel listing\AvailableChannel.fs" />
+    <Compile Include="streaming\channel listing\ChannelInformation.fs" />
+    <Compile Include="streaming\channel listing\ChannelListing.fs" />
+    <Compile Include="streaming\program information\Song.fs" />
+    <Compile Include="streaming\program information\Program.fs" />
     <Compile Include="Streaming\Program Information\ProgramInformation.fs" />
     <Compile Include="Streaming\Program Information\IProgramInformationSource.fs" />
     <Compile Include="Streaming\Segments\DownstreamSegment.fs" />

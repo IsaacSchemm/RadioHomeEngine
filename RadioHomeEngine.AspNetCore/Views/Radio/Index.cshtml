@@ -46,7 +46,7 @@
 
             <input type="number"
                    min="1"
-                   max="@Model.Channels.Select(c => c.channelNumber).DefaultIfEmpty(1).Max()"
+                   max="@Model.Channels.Select(c => c.ChannelNumber).DefaultIfEmpty(1).Max()"
                    name="num"
                    value=""
                    class="pad" />
@@ -72,8 +72,8 @@
             <select name="num">
                 @foreach (var channel in Model.Channels)
                 {
-                    <option value="@channel.channelNumber">
-                        @channel.channelNumber | @channel.channelName
+                    <option value="@channel.ChannelNumber">
+                        @channel.ChannelNumber | @channel.ChannelInformation.ChannelName
                     </option>
                 }
             </select>

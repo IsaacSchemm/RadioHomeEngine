@@ -19,8 +19,8 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
     let programNameFileName = "currentIndex.txt"
 
     let mutable programInformation = {
-        channelName = displayName
-        programName = "Nothing"
+        ChannelName = displayName
+        Program = Program "Nothing"
     }
 
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
@@ -151,7 +151,10 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
         member _.GetCurrentProgramInformationAsync(_) = Task.FromResult(programInformation)
 
     interface ISegmentSourceFactory with
-        member this.ChannelName = displayName
+        member this.ChannelInformation = {
+            ChannelName = displayName
+            ChannelDescriptions = []
+        }
 
         member this.ProgramInformationSource = this
 
@@ -224,7 +227,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
                             let programInformationFilePath = Path.Combine(realTempPath, programNameFileName)
                             if File.Exists(programInformationFilePath) then
                                 let! contents = File.ReadAllTextAsync(programInformationFilePath)
-                                programInformation <- { programInformation with programName = contents.Trim() }
+                                programInformation <- { programInformation with Program = Program (contents.Trim()) }
                                 File.Delete(programInformationFilePath)
 
                             let mutable files = []

@@ -126,7 +126,7 @@ module AtomicActions =
 
             let! info = composite.GetCurrentStreamInformationAsync(CancellationToken.None)
 
-            do! Players.setDisplayAsync player $"[{channelNumber}] {info.channelName}" info.programName (TimeSpan.FromSeconds(15.0))
+            do! Players.setDisplayAsync player $"[{channelNumber}] {info.ChannelName}" info.ProgramName (TimeSpan.FromSeconds(15.0))
 
         | PlayCD (scope, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))

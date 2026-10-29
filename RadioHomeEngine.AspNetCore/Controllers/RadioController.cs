@@ -8,7 +8,7 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         public async Task<IActionResult> Index(CancellationToken cancellationToken)
         {
             var channels = await StreamRepository.getAvailableChannelsAsync()
-                .OrderBy(c => c.channelNumber)
+                .OrderBy(c => c.ChannelNumber)
                 .ToListAsync(cancellationToken);
 
             var model = new RadioIndexModel
@@ -39,23 +39,17 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 
         public async Task<IActionResult> ViewChannel(int num, CancellationToken cancellationToken)
         {
-            var availableChannel = await StreamRepository.getAvailableChannelsAsync()
-                .Where(c => c.channelNumber == num)
-                .FirstOrDefaultAsync(cancellationToken);
+            var activeChannel = StreamRepository.getOrCreate(num);
+            if (activeChannel == null)
+                return NotFound();
 
-            if (availableChannel == null)
-                return View("Blank");
+            await StreamRepository.waitForSegmentsAsync(num, cancellationToken);
 
-            var activeChannel = StreamRepository.getCurrentChannels()
-                .FirstOrDefault(c => c.ChannelNumber == num);
-
-            var programInformation = activeChannel != null
-                ? await activeChannel.GetCurrentStreamInformationAsync(cancellationToken)
-                : null;
+            var programInformation = await activeChannel.GetCurrentStreamInformationAsync(cancellationToken);
 
             return View(new NowPlayingModel
             {
-                Channel = availableChannel,
+                Channel = activeChannel.ChannelListing,
                 ProgramInformation = programInformation
             });
         }

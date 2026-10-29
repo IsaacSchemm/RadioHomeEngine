@@ -9,7 +9,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
-    <title>@Model.Channel.channelName - Now Playing</title>
+    <title>@Model.Channel.ChannelInformation.ChannelName - Now Playing</title>
     @await Html.PartialAsync("_Styles")
 </head>
 <body>
@@ -18,26 +18,29 @@
             <img id="currentImage"
                  width="180"
                  height="144"
-                 src="/SXM/ChannelImage?num=@Model.Channel.channelNumber"
-                 alt="@Model.Channel.channelName" />
+                 src="/SXM/ChannelImage?num=@Model.Channel.ChannelNumber"
+                 alt="@Model.Channel.ChannelInformation.ChannelName" />
         </div>
 
         <div style="font-size: 200%">
-            @Model.Channel.channelNumber
+            @Model.Channel.ChannelNumber
         </div>
 
         <div>
-            @Model.Channel.channelName
+            @Model.Channel.ChannelInformation.ChannelName
         </div>
 
-        <div style="font-size: 75%">
-            @Model.Channel.channelName
+        @foreach (var description in Model.Channel.ChannelInformation.ChannelDescriptions)
+        {
+            <div style="font-size: 75%">
+                @description
+            </div>
+        }
         </div>
-    </div>
 
     <hr />
 
-    <audio controls src="/SXM/PlayChannel?num=@Model.Channel.channelNumber">
+    <audio controls src="/SXM/PlayChannel?num=@Model.Channel.ChannelNumber">
         HTML5 audio is not supported in this browser.
     </audio>
 
@@ -76,17 +79,33 @@
     {
         <hr />
 
-        <div style="font-size: 125%; margin: 0.5em 0">
-            @programInformation.programName
-        </div>
+            @if (programInformation.Program is Program.Song song)
+            {
+                if (song.Item.Images.FirstOrDefault() is string imageUrl)
+                {
+                    <div>
+                        <img src="@imageUrl" alt="" width="225" height="225" />
+                    </div>
+                }
 
-        <div>
-            @programInformation.programName
-        </div>
+                <div style="font-size: 125%; margin: 0.5em 0">
+                    @song.Item.Title
+                </div>
 
-        <div style="font-size: 75%">
-            @programInformation.programName
-        </div>
-    }
+                <div>
+                    @string.Join(" / ", song.Item.Artists)
+                </div>
+
+                <div style="font-size: 75%">
+                    @string.Join(" / ", song.Item.Albums)
+                </div>
+            }
+            else
+            {
+                <div style="font-size: 125%; margin: 0.5em 0">
+                    @programInformation.ProgramName
+                </div>
+            }
+        }
 </body>
 </html>

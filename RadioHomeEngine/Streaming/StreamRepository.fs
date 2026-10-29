@@ -23,10 +23,7 @@ module StreamRepository =
     let private permanent = [noise; cd]
 
     let getAvailableChannelsAsync () = asyncSeq {
-        for c in permanent do {
-            channelName = c.ChannelName
-            channelNumber = c.ChannelNumber
-        }
+        for c in permanent do c.ChannelListing
 
         let! token = Async.CancellationToken
         let! sxm = SiriusXMClient.GetChannelsAsync(token) |> Async.AwaitTask
@@ -34,8 +31,11 @@ module StreamRepository =
             match Int32.TryParse(c.channelNumber) with
             | (false, _) -> ()
             | (true, num) -> {
-                channelName = c.name
-                channelNumber = num
+                ChannelInformation = {
+                    ChannelName = c.name
+                    ChannelDescriptions = [c.shortDescription; c.mediumDescription]
+                }
+                ChannelNumber = num
             }
     }
 
@@ -48,7 +48,7 @@ module StreamRepository =
     /// Gets the tracked composite stream for the given channel number, or creates a new one pointed at the corresponding SiriusXM channel.
     let getOrCreate channelNumber =
         getCurrentChannels ()
-        |> Seq.where (fun s -> s.ChannelNumber = channelNumber)
+        |> Seq.where (fun s -> s.ChannelListing.ChannelNumber = channelNumber)
         |> Seq.tryHead
         |> Option.defaultWith (fun () ->
             let composite = new Composite(channelNumber, new SiriusXMSourceFactory(channelNumber, 3))
@@ -129,10 +129,9 @@ module StreamRepository =
                     composite.CheckForInactivity()
 
                 // Remove and dispose of any inactive SiriusXM streams.
-                // This does not apply to SiriusXM channels playing on channel 0, but those will be disposed by the cancellation of the task that reads from them in Composite.fs.
                 for composite in List.ofSeq sxm do
                     if not (composite.IsActive()) then
-                        printfn "[SegmentCacheRepository] Dropping [%d]" composite.ChannelNumber
+                        printfn "[SegmentCacheRepository] Dropping [%d]" composite.ChannelListing.ChannelNumber
                         sxm.Remove(composite) |> ignore
                         do! (composite :> IAsyncDisposable).DisposeAsync()
 

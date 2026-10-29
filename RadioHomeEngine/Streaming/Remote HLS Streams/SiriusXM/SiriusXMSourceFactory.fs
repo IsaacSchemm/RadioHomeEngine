@@ -14,6 +14,7 @@ open System.Threading.Tasks
 type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
     let sxm = new SiriusXMClient()
 
+    let mutable channelDescriptions = []
     let mutable channelName = None
 
     interface IProgramInformationSource with
@@ -35,34 +36,38 @@ type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
             match (channel, cut) with
             | Some ch, Some s ->
                 return {
-                    channelName = ch.name
-                    programName = String.concat " - " [
-                        if s.artists <> [] then String.concat ", " s.artists
-                        s.title
-                    ]
+                    ChannelName = ch.name
+                    Program = Song {
+                        Title = s.title
+                        Artists = s.artists
+                        Albums = [for a in s.albums do a.title]
+                        Images = [for a in s.albums do yield! a.images]
+                    }
                 }
             | _ ->
                 return {
-                    channelName = $"[{channelNumber}] Unknown"
-                    programName = "Unknown"
+                    ChannelName = $"[{channelNumber}] Unknown"
+                    Program = Program "Unknown"
                 }
         }
 
     interface ISegmentSourceFactory with
-        member this.ChannelName =
-            channelName
-            |> Option.defaultValue $"SiriusXM {channelNumber}"
+        member this.ChannelInformation = {
+            ChannelName =
+                channelName
+                |> Option.defaultValue $"SiriusXM {channelNumber}"
+            ChannelDescriptions = channelDescriptions
+        }
 
         member this.ProgramInformationSource = this
 
         member this.CreateAsync() = task {
             let! channels = sxm.GetChannelsAsync(CancellationToken.None)
 
-            channelName <-
-                channels
-                |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
-                |> Seq.map (fun c -> c.name)
-                |> Seq.tryHead
+            for c in channels do
+                if c.channelNumber = $"{channelNumber}" then
+                    channelName <- Some c.name
+                    channelDescriptions <- [c.mediumDescription]
 
             let mutable sequenceNumber = UInt128.Zero
 

@@ -10,16 +10,6 @@ type WeatherService() =
     inherit BackgroundService()
 
     override _.ExecuteAsync cancellationToken = task {
-        //let! forecasts = Weather.getForecastsAsync cancellationToken
-        //do! Task.Delay(15000)
-        //let factory = new RawAudioSegmentSourceFactory(
-        //    new ShellWrapper({
-        //        inputs = [for f in forecasts |> Seq.truncate 3 do SpeechSynthesis (Speech.retrieveSpeech f.speech)]
-        //        loop = false
-        //    }))
-        //for stream in StreamRepository.getAll () do
-        //    do! stream.InterruptAsync(factory)
-
         while not cancellationToken.IsCancellationRequested do
             try
                 let streams = StreamRepository.getCurrentChannels () |> Seq.toList
@@ -30,7 +20,8 @@ type WeatherService() =
                             "Weather",
                             [for a in alerts do SpeechSynthesis (a.info.screen, Speech.retrieveSpeech a.info.speech)])
                         for stream in streams do
-                            do! stream.InterruptAsync(factory)
+                            if stream.IsActive() then
+                                do! stream.InterruptAsync(factory)
             with ex -> Console.Error.WriteLine(ex)
 
             do! Task.Delay(TimeSpan.FromMinutes(5.0), cancellationToken)
