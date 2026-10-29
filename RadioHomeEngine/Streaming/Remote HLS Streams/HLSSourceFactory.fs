@@ -12,74 +12,33 @@ open System.Threading
 open System.Threading.Channels
 open System.Threading.Tasks
 
-//https://wpnedt2.lls.pbs.org/wpnedt2-hls.m3u8 38.2
-//https://wpnedt3.lls.pbs.org/wpnedt3-hls.m3u8 38.3
-
-module private HLSSourceFactory =
-    let handler = new HttpClientHandler()
-    handler.AutomaticDecompression <- DecompressionMethods.GZip ||| DecompressionMethods.Deflate
-
-    let client = new HttpClient(handler)
-
-/// A media source that proxies an unencrypted HLS stream.
-type HLSSourceFactory(name: string, url: string) =
+/// A media source that proxies an HLS stream.
+[<AbstractClass>]
+type HLSSourceFactory() =
     let initialCount = 3
 
-    let getTextFileAsync (uri: Uri) (cancellationToken: CancellationToken) = task {
-        use! finalResponse = HLSSourceFactory.client.GetAsync(
-            uri,
-            cancellationToken)
+    abstract member ChannelInformation: ChannelInformation with get
+    abstract member ProgramInformationSource: IProgramInformationSource with get
 
-        let! text = finalResponse.EnsureSuccessStatusCode().Content.ReadAsStringAsync(cancellationToken)
-
-        return {|
-            content = text
-            contentType = finalResponse.Content.Headers.ContentType.MediaType
-        |}
-    }
-
-    let getFileAsync (uri: Uri) (cancellationToken: CancellationToken) = task {
-        use! finalResponse = HLSSourceFactory.client.GetAsync(
-            uri,
-            cancellationToken)
-
-        use! stream = finalResponse.EnsureSuccessStatusCode().Content.ReadAsStreamAsync(cancellationToken)
-
-        use ms = new MemoryStream()
-        do! stream.CopyToAsync(ms)
-        let data = ms.ToArray()
-
-        return {|
-            content = data
-            contentType = finalResponse.Content.Headers.ContentType.MediaType
-        |}
-    }
-
-    interface IProgramInformationSource with
-        member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
-            return {
-                ChannelName = name
-                Program = Program name
-            }
-        }
+    abstract member DecryptSegmentAsync: UpstreamSegment * byte array -> byte array Task
+    abstract member GetFileAsync: Uri * CancellationToken -> byte array Task
+    abstract member GetPlaylistUriAsync: unit -> Uri Task
+    abstract member GetTextFileAsync: Uri * CancellationToken -> string Task
 
     interface ISegmentSourceFactory with
-        member this.ChannelInformation = {
-            ChannelName = name
-            ChannelDescriptions = []
-        }
+        member this.ChannelInformation = this.ChannelInformation
 
-        member this.ProgramInformationSource = this
+        member this.ProgramInformationSource = this.ProgramInformationSource
 
         member this.CreateAsync() = task {
             let mutable sequenceNumber = UInt128.Zero
 
-            let playlistUri = new Uri(url)
+            let! playlistUri = this.GetPlaylistUriAsync()
 
-            let! playlistData = getTextFileAsync playlistUri CancellationToken.None
+            let! playlistData = this.GetTextFileAsync(playlistUri, CancellationToken.None)
 
             let chunklistPath =
-                playlistData.content
+                playlistData
                 |> Utility.split '\n'
                 |> Seq.where (fun line -> not (line.StartsWith('#')))
                 |> Seq.head
@@ -87,10 +46,10 @@ type HLSSourceFactory(name: string, url: string) =
             let chunklistUri = new Uri(playlistUri, chunklistPath)
 
             let getChunklistAsync count cancellationToken = task {
-                let! chunklistData = getTextFileAsync chunklistUri cancellationToken
+                let! chunklistData = this.GetTextFileAsync(chunklistUri, cancellationToken)
 
                 let chunklist =
-                    chunklistData.content
+                    chunklistData
                     |> ChunklistParser.parse
                     |> ChunklistNormalizer.normalize chunklistUri
                     |> Seq.rev
@@ -98,14 +57,6 @@ type HLSSourceFactory(name: string, url: string) =
                     |> Seq.rev
 
                 return chunklist
-            }
-
-            let decryptAsync (chunk: UpstreamSegment) (data: byte array) = task {
-                match chunk.encryption with
-                | Clear ->
-                    return data
-                | x ->
-                    return failwithf "Unrecognized stream encryption: %A" x
             }
 
             let recontainerizeAsync (data: byte array) = task {
@@ -155,9 +106,9 @@ type HLSSourceFactory(name: string, url: string) =
                                 | Some dateTime, Some duration ->
                                     let chunkUri = new Uri(chunklistUri, chunk.path)
 
-                                    let! file = getFileAsync chunkUri cancellationToken
+                                    let! file = this.GetFileAsync(chunkUri, cancellationToken)
 
-                                    let! data = decryptAsync chunk file.content
+                                    let! data = this.DecryptSegmentAsync(chunk, file)
 
                                     let! recontainerized_data = recontainerizeAsync data
 
@@ -182,7 +133,8 @@ type HLSSourceFactory(name: string, url: string) =
 
             return {
                 new ISegmentSource with
-                    member _.ProgramInformationSource = this
+                    member _.ProgramInformationSource =
+                        this.ProgramInformationSource
 
                     member _.ReadNextAsync(cancellationToken) =  task {
                         let! more = internalBuffer.Reader.WaitToReadAsync(cancellationToken)
