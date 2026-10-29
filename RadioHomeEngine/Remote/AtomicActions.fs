@@ -122,11 +122,11 @@ module AtomicActions =
         | PlayChannel (channelNumber, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
 
-            let composite = StreamRepository.getOrCreate channelNumber
+            let! info = StreamRepository.getChannelListingAndProgramInformationAsync channelNumber CancellationToken.None
+            let listing = info.channelListing
+            let program = info.programInformation
 
-            let! info = composite.GetCurrentStreamInformationAsync(CancellationToken.None)
-
-            do! Players.setDisplayAsync player $"[{channelNumber}] {info.ChannelName}" info.ProgramName (TimeSpan.FromSeconds(15.0))
+            do! Players.setDisplayAsync player $"[{listing.ChannelNumber}] {program.ChannelName}" program.ProgramName (TimeSpan.FromSeconds(15.0))
 
         | PlayCD (scope, _) ->
             do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))

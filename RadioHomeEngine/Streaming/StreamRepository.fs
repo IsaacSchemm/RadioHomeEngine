@@ -33,7 +33,7 @@ module StreamRepository =
             | (true, num) -> {
                 ChannelInformation = {
                     ChannelName = c.name
-                    ChannelDescriptions = [c.shortDescription; c.mediumDescription]
+                    ChannelDescriptions = [c.mediumDescription]
                 }
                 ChannelNumber = num
             }
@@ -46,7 +46,7 @@ module StreamRepository =
     }
 
     /// Gets the tracked composite stream for the given channel number, or creates a new one pointed at the corresponding SiriusXM channel.
-    let getOrCreate channelNumber =
+    let private getOrCreate channelNumber =
         getCurrentChannels ()
         |> Seq.where (fun s -> s.ChannelListing.ChannelNumber = channelNumber)
         |> Seq.tryHead
@@ -116,6 +116,22 @@ module StreamRepository =
             if composite.Cache.GetSegments().Length < 3 then
                 do! Task.Delay(TimeSpan.FromSeconds(1.0), cancellationToken)
         with :? OperationCanceledException -> ()
+    }
+
+    let getChannelListingAndProgramInformationAsync channelNumber (cancellationToken: CancellationToken) = task {
+        let composite = getOrCreate channelNumber
+
+        while composite.Cache.GetSegments() = [] && not cancellationToken.IsCancellationRequested do
+            do! Task.Delay(TimeSpan.FromSeconds(0.5), cancellationToken)
+
+        if composite.Cache.GetSegments().Length < 3 then
+            do! Task.Delay(TimeSpan.FromSeconds(1.0), cancellationToken)
+
+        let! programInformation = composite.GetCurrentStreamInformationAsync(cancellationToken)
+        return {|
+            channelListing = composite.ChannelListing
+            programInformation = programInformation
+        |}
     }
 
     type Service() =

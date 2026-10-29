@@ -3,7 +3,7 @@ using RadioHomeEngine.AspNetCore.Models;
 
 namespace RadioHomeEngine.AspNetCore.Controllers
 {
-    public class RadioController(IHttpClientFactory httpClientFactory) : Controller
+    public class RadioController : Controller
     {
         public async Task<IActionResult> Index(CancellationToken cancellationToken)
         {
@@ -32,27 +32,17 @@ namespace RadioHomeEngine.AspNetCore.Controllers
                     AtomicAction.NewPlayChannel(num, PlaylistPosition.Now));
         }
 
-        public async Task<IActionResult> ChannelImage(int num, CancellationToken cancellationToken)
-        {
-            return NotFound();
-        }
-
         public async Task<IActionResult> ViewChannel(int num, CancellationToken cancellationToken)
         {
-            var activeChannel = StreamRepository.getOrCreate(num);
-            if (activeChannel == null)
-                return NotFound();
+            var info = await StreamRepository.getChannelListingAndProgramInformationAsync(num, cancellationToken);
 
             await StreamRepository.waitForSegmentsAsync(num, cancellationToken);
 
-            var programInformation = await activeChannel.GetCurrentStreamInformationAsync(cancellationToken);
-
             return View(new NowPlayingModel
             {
-                Channel = activeChannel.ChannelListing,
-                ProgramInformation = programInformation
+                Channel = info.channelListing,
+                ProgramInformation = info.programInformation
             });
         }
     }
 }
-    
