@@ -3,11 +3,15 @@ namespace RadioHomeEngine
 open System
 open System.Diagnostics
 open System.IO
+open System.Threading
 open System.Threading.Tasks
-open FSharp.Control
 open System.Threading.Channels
 
 type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput list) =
+    let _ = printfn "[ShellSegmentSourceFactory] Creating"
+
+    let factoryCancellationTokenSource = new CancellationTokenSource()
+
     let hlsBitrate = 320 * 1024
     let segmentTimeSeconds = 10.0
 
@@ -18,37 +22,53 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
     let scriptFileName = "script.sh"
     let programNameFileName = "currentIndex.txt"
 
-    let mutable programInformation = {
-        ChannelName = displayName
-        Program = Program "Nothing"
-    }
+    let mutable currentInput = None
+
+    //let staticProgramInformationSource str = {
+    //    new IProgramInformationSource with
+    //        member _.GetCurrentProgramInformationAsync(_) = Task.FromResult({
+    //            ChannelName = displayName
+    //            Program = str
+    //        })
+    //}
+
+    //let mutable programInformationSource = {
+    //    new IProgramInformationSource with
+    //        member _.GetCurrentProgramInformationAsync(_) = Task.FromResult({
+    //            ChannelName = displayName
+    //            Program = Program "Nothing"
+    //        })
+    //}
 
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
 
-    let getProgramNameAsync input = task {
-        match input with
-        | AudioCD scope ->
-            return String.concat " // " [
-                for i in CD.getDriveInfo scope do
-                    match i.disc.audio with
-                    | None -> ()
-                    | Some a -> String.concat " - " [
-                        if a.artists <> [] then String.concat ", " a.artists
+    //let getProgramNameAsync input = task {
+    //    match input with
+    //    | AudioCD scope ->
+    //        return String.concat " // " [
+    //            for i in CD.getDriveInfo scope do
+    //                match i.disc.audio with
+    //                | None -> ()
+    //                | Some a -> String.concat " - " [
+    //                    if a.artists <> [] then String.concat ", " a.artists
 
-                        match a.titles with
-                        | _ :: _ -> String.concat " / " a.titles
-                        | [] -> "Unknown disc"
-                    ]
-            ]
-        | AudioFile path ->
-            return Path.GetFileNameWithoutExtension(path)
-        | BrownNoise _ ->
-            return "Brown Noise"
-        | Silence _ ->
-            return "Silence"
-        | SpeechSynthesis (title, _) ->
-            return title
-    }
+    //                    match a.titles with
+    //                    | _ :: _ -> String.concat " / " a.titles
+    //                    | [] -> "Unknown disc"
+    //                ]
+    //        ]
+    //    | AudioFile path ->
+    //        return Path.GetFileNameWithoutExtension(path)
+    //    | BrownNoise _ ->
+    //        return "Brown Noise"
+    //    | Silence _ ->
+    //        return "Silence"
+    //    | SpeechSynthesis (title, _) ->
+    //        return title
+    //    | Stream (_, getNameAsync) ->
+    //        let! name = getNameAsync ()
+    //        return name
+    //}
 
     let buildGeneratorScript (realTempPath: string) (unixTempPath: string) = [
         "#!/bin/sh"
@@ -144,10 +164,53 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
                         formatParameters
                         "-"
                     ]
+
+            | RemoteStream source ->
+                if source.Url.Contains('\'') then raise (new NotImplementedException())
+
+                String.concat " " [
+                    "ffmpeg"
+                    quietParameters
+                    $"-i '{source.Url}'"
+                    formatParameters
+                    "-"
+                ]
     ]
 
     interface IProgramInformationSource with
-        member _.GetCurrentProgramInformationAsync(_) = Task.FromResult(programInformation)
+        member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
+            let forName str = {
+                ChannelName = displayName
+                Program = Program str
+            }
+
+            match currentInput with
+            | None ->
+                return forName "Unknown"
+            | Some (AudioCD scope) ->
+                return forName (String.concat " // " [
+                    for i in CD.getDriveInfo scope do
+                        match i.disc.audio with
+                        | None -> ()
+                        | Some a -> String.concat " - " [
+                            if a.artists <> [] then String.concat ", " a.artists
+
+                            match a.titles with
+                            | _ :: _ -> String.concat " / " a.titles
+                            | [] -> "Unknown disc"
+                        ]
+                ])
+            | Some (AudioFile path) ->
+                return forName (Path.GetFileNameWithoutExtension(path))
+            | Some (BrownNoise _) ->
+                return forName "Brown Noise"
+            | Some (RemoteStream source) ->
+                return! source.ProgramInformationSource.GetCurrentProgramInformationAsync(cancellationToken)
+            | Some (Silence _) ->
+                return forName "Silence"
+            | Some (SpeechSynthesis (title, _)) ->
+                return forName title
+        }
 
     interface ISegmentSourceFactory with
         member this.ChannelInformation = {
@@ -158,6 +221,8 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
         member this.ProgramInformationSource = this
 
         member this.CreateAsync() = task {
+            factoryCancellationTokenSource.Token.ThrowIfCancellationRequested()
+
             let tempPathDirName = $"RadioHomeEngine-ShellWrapper-{Guid.NewGuid()}"
 
             let isWindows = Environment.OSVersion.Platform = PlatformID.Win32NT
@@ -210,34 +275,31 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
                     let mutable nextFileCheck = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1.0)
 
                     let mutable allSegmentsRead = false
+                    
+                    let cancellationToken = factoryCancellationTokenSource.Token
 
-                    while not disposing && not allSegmentsRead do
-                        let! len = input.ReadAsync(buffer)
+                    while not disposing && not allSegmentsRead && not cancellationToken.IsCancellationRequested do
+                        let! len = input.ReadAsync(buffer, cancellationToken)
                         let streamFinished = len = 0
 
                         if streamFinished then
-                            do! output.WriteAsync(zeroes)
+                            do! output.WriteAsync(zeroes, cancellationToken)
                         else
-                            do! output.WriteAsync(buffer, 0, len)
+                            do! output.WriteAsync(buffer, 0, len, cancellationToken)
 
                         if nextFileCheck <= DateTimeOffset.UtcNow then
                             nextFileCheck <- nextFileCheck + TimeSpan.FromSeconds(1.0)
 
                             let programInformationFilePath = Path.Combine(realTempPath, programNameFileName)
                             if File.Exists(programInformationFilePath) then
-                                let! contents = File.ReadAllTextAsync(programInformationFilePath)
+                                let! contents = File.ReadAllTextAsync(programInformationFilePath, cancellationToken)
 
                                 let index =
                                     match contents.Trim() with
                                     | Int32 i -> i
                                     | _ -> -1
 
-                                match List.tryItem index inputs with
-                                | Some input ->
-                                    let! program = getProgramNameAsync input
-                                    programInformation <- { programInformation with Program = Program program }
-                                | None ->
-                                    programInformation <- { programInformation with Program = Program "Unknown" }
+                                currentInput <- List.tryItem index inputs
 
                                 File.Delete(programInformationFilePath)
 
@@ -251,7 +313,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
                             for info in infos |> Seq.sortBy (fun i -> i.CreationTime) do
                                 let time = new DateTimeOffset(info.CreationTime)
                                 if DateTimeOffset.UtcNow - time > TimeSpan.FromSeconds(0.25) then
-                                    let! data = File.ReadAllBytesAsync(info.FullName)
+                                    let! data = File.ReadAllBytesAsync(info.FullName, cancellationToken)
                                     let segment = {
                                         dateTime = new DateTimeOffset(info.CreationTime)
                                         duration = segmentTimeSeconds
@@ -260,7 +322,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
                                         important = true
                                     }
                                     mediaSequence <- mediaSequence + UInt128.One
-                                    do! channel.Writer.WriteAsync(segment)
+                                    do! channel.Writer.WriteAsync(segment, cancellationToken)
                                     files <- info.FullName :: files
 
                             for file in files do
@@ -296,6 +358,8 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
                         printfn "[ShellSegmentSourceFactory] Disposing"
 
                         disposing <- true
+
+                        factoryCancellationTokenSource.Cancel()
 
                         do! pipe
 
