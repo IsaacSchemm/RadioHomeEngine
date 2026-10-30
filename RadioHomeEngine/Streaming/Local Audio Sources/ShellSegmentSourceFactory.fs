@@ -25,10 +25,10 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
 
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
 
-    let getProgramName input =
+    let getProgramNameAsync input = task {
         match input with
         | AudioCD scope ->
-            String.concat " // " [
+            return String.concat " // " [
                 for i in CD.getDriveInfo scope do
                     match i.disc.audio with
                     | None -> ()
@@ -41,13 +41,14 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
                     ]
             ]
         | AudioFile path ->
-            Path.GetFileNameWithoutExtension(path)
+            return Path.GetFileNameWithoutExtension(path)
         | BrownNoise _ ->
-            "Brown Noise"
+            return "Brown Noise"
         | Silence _ ->
-            "Silence"
+            return "Silence"
         | SpeechSynthesis (title, _) ->
-            title
+            return title
+    }
 
     let buildGeneratorScript (realTempPath: string) (unixTempPath: string) = [
         "#!/bin/sh"
@@ -57,10 +58,8 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
 
         let eof = $"{Guid.NewGuid()}"
 
-        for input in inputs do
-            $"cat << {eof} > {unixTempPath}/{programNameFileName}"
-            getProgramName input
-            $"{eof}"
+        for (i, input) in Seq.indexed inputs do
+            $"echo {i} > {unixTempPath}/{programNameFileName}"
 
             match input with
             | AudioCD scope ->
@@ -227,7 +226,19 @@ type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput li
                             let programInformationFilePath = Path.Combine(realTempPath, programNameFileName)
                             if File.Exists(programInformationFilePath) then
                                 let! contents = File.ReadAllTextAsync(programInformationFilePath)
-                                programInformation <- { programInformation with Program = Program (contents.Trim()) }
+
+                                let index =
+                                    match contents.Trim() with
+                                    | Int32 i -> i
+                                    | _ -> -1
+
+                                match List.tryItem index inputs with
+                                | Some input ->
+                                    let! program = getProgramNameAsync input
+                                    programInformation <- { programInformation with Program = Program program }
+                                | None ->
+                                    programInformation <- { programInformation with Program = Program "Unknown" }
+
                                 File.Delete(programInformationFilePath)
 
                             let mutable files = []
