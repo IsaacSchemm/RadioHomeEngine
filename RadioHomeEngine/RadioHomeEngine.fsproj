@@ -33,12 +33,13 @@
     <Compile Include="Streaming\Program Information\Program.fs" />
     <Compile Include="Streaming\Program Information\ProgramInformation.fs" />
     <Compile Include="Streaming\Program Information\IProgramInformationSource.fs" />
-    <Folder Include="Streaming\Remote Streams\" />
-    <Compile Include="streaming\remote streams\IRemoteStreamSource.fs" />
-    <Compile Include="streaming\remote streams\SampleRemoteStreamSource.fs" />
     <Compile Include="Streaming\Segments\DownstreamSegment.fs" />
     <Compile Include="Streaming\Segments\ISegmentSource.fs" />
     <Compile Include="Streaming\Segments\ISegmentSourceFactory.fs" />
+    <Folder Include="Streaming\Remote Streams\" />
+    <Compile Include="streaming\remote streams\IRemoteStreamSource.fs" />
+    <Compile Include="streaming\remote streams\SampleRemoteStreamSource.fs" />
+    <Compile Include="streaming\remote streams\WPRStreamSource.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperDuration.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperInput.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperParameters.fs" />

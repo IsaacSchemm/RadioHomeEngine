@@ -7,68 +7,23 @@ open System.Threading
 open System.Threading.Tasks
 open System.Threading.Channels
 
-type ShellSegmentSourceFactory(displayName: string, inputs: ShellWrapperInput list) =
+type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inputs: ShellWrapperInput list) =
     let _ = printfn "[ShellSegmentSourceFactory] Creating"
 
     let factoryCancellationTokenSource = new CancellationTokenSource()
 
     let hlsBitrate = 320 * 1024
-    let segmentTimeSeconds = 10.0
 
     let quietParameters = "-nostats -hide_banner -loglevel warning"
     let formatParameters = "-f s16le -ar 44100 -ac 2"
-    let hlsParameters = "-f hls -hls_time 10 -hls_segment_type mpegts -hls_flags program_date_time+temp_file -c:a aac -ac 2 -b:a 327680"
+    let hlsParameters = $"-f hls -hls_time {segmentTimeSeconds} -hls_segment_type mpegts -hls_flags program_date_time+temp_file -c:a aac -ac 2 -b:a 327680"
 
     let scriptFileName = "script.sh"
     let programNameFileName = "currentIndex.txt"
 
     let mutable currentInput = None
 
-    //let staticProgramInformationSource str = {
-    //    new IProgramInformationSource with
-    //        member _.GetCurrentProgramInformationAsync(_) = Task.FromResult({
-    //            ChannelName = displayName
-    //            Program = str
-    //        })
-    //}
-
-    //let mutable programInformationSource = {
-    //    new IProgramInformationSource with
-    //        member _.GetCurrentProgramInformationAsync(_) = Task.FromResult({
-    //            ChannelName = displayName
-    //            Program = Program "Nothing"
-    //        })
-    //}
-
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
-
-    //let getProgramNameAsync input = task {
-    //    match input with
-    //    | AudioCD scope ->
-    //        return String.concat " // " [
-    //            for i in CD.getDriveInfo scope do
-    //                match i.disc.audio with
-    //                | None -> ()
-    //                | Some a -> String.concat " - " [
-    //                    if a.artists <> [] then String.concat ", " a.artists
-
-    //                    match a.titles with
-    //                    | _ :: _ -> String.concat " / " a.titles
-    //                    | [] -> "Unknown disc"
-    //                ]
-    //        ]
-    //    | AudioFile path ->
-    //        return Path.GetFileNameWithoutExtension(path)
-    //    | BrownNoise _ ->
-    //        return "Brown Noise"
-    //    | Silence _ ->
-    //        return "Silence"
-    //    | SpeechSynthesis (title, _) ->
-    //        return title
-    //    | Stream (_, getNameAsync) ->
-    //        let! name = getNameAsync ()
-    //        return name
-    //}
 
     let buildGeneratorScript (realTempPath: string) (unixTempPath: string) = [
         "#!/bin/sh"

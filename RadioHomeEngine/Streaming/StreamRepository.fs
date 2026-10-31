@@ -14,12 +14,14 @@ module StreamRepository =
             8000,
             new ShellSegmentSourceFactory(
                 "Brown Noise",
+                3,
                 [BrownNoise Infinite]))
 
         new Composite(
             8001,
             new ShellSegmentSourceFactory(
                 "Audio CD",
+                10,
                 [AudioCD AllDrives]))
     ]
 
@@ -142,10 +144,17 @@ module StreamRepository =
                     for c in sxm do
                         match Int32.TryParse(c.channelNumber) with
                         | (false, _) -> ()
-                        | (true, num) -> ephemeral.Add(
-                            new Composite(
+                        | (true, num) ->
+                            ephemeral.Add(new Composite(
                                 num,
                                 new SiriusXMSourceFactory(c.name, c.mediumDescription, num)))
+
+                    let! wpr = WPRStreamSource.all |> AsyncSeq.indexed |> AsyncSeq.toListAsync
+                    for (i, c) in wpr do
+                        let num = 8010 + int i
+                        ephemeral.Add(new Composite(
+                            num,
+                            new ShellSegmentSourceFactory(c.Name, 3, [RemoteStream c])))
 
                 do! Task.Delay(TimeSpan.FromHours(12.0), cancellationToken)
         }

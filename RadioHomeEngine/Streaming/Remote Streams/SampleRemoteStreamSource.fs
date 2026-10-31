@@ -11,5 +11,6 @@ type SampleRemoteStreamSource(url: string) =
         })
 
     interface IRemoteStreamSource with
+        member this.Name = url
         member this.ProgramInformationSource = this
         member this.Url = url
