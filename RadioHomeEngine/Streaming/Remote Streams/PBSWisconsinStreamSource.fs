@@ -6,7 +6,7 @@ open System.Threading.Tasks
 open FSharp.Control
 open FSharp.Data
 
-module PBSWisconsin =
+module PBSWisconsinStreamSource =
     type ScheduleResponse = JsonProvider<"""{
       "collections": [
         {
@@ -123,12 +123,10 @@ module PBSWisconsin =
         for channel in channels do
             match channel.NonDrmUrl with
             | None -> ()
-            | Some url ->
-                yield {|
-                    channelNumber = channel.DigitalChannel
-                    factory = new HLSSourceFactory(
-                        channel.FullName,
-                        url,
-                        Some (getProgramInformationSource channel.Profile))
-                |}
+            | Some url -> yield {
+                new IRemoteStreamSource with
+                    member _.Name = channel.FullName
+                    member _.ProgramInformationSource = getProgramInformationSource channel.Profile
+                    member _.Url = url
+            }
     }

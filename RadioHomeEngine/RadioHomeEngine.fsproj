@@ -40,6 +40,7 @@
     <Compile Include="Streaming\Remote Streams\IRemoteStreamSource.fs" />
     <Compile Include="Streaming\Remote Streams\SampleRemoteStreamSource.fs" />
     <Compile Include="Streaming\Remote Streams\WPRStreamSource.fs" />
+    <Compile Include="streaming\remote streams\PBSWisconsinStreamSource.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperDuration.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperInput.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperParameters.fs" />
@@ -49,7 +50,6 @@
     <Compile Include="Streaming\Remote HLS Streams\ChunklistNormalizer.fs" />
     <Compile Include="Streaming\Remote HLS Streams\AbstractHLSSourceFactory.fs" />
     <Compile Include="Streaming\Remote HLS Streams\HLSSourceFactory.fs" />
-    <Compile Include="Streaming\Remote HLS Streams\PBSWisconsin.fs" />
     <Compile Include="Streaming\Remote HLS Streams\SiriusXM\SiriusXMClient.fs" />
     <Compile Include="Streaming\Remote HLS Streams\SiriusXM\SiriusXMSourceFactory.fs" />
     <Compile Include="Streaming\SegmentCache.fs" />
