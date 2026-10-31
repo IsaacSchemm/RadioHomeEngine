@@ -6,7 +6,7 @@ open System.Threading.Tasks
 open FSharp.Control
 open FSharp.Data
 
-module PBSWisconsinStreamSource =
+module PBSWisconsin =
     type ScheduleResponse = JsonProvider<"""{
       "collections": [
         {

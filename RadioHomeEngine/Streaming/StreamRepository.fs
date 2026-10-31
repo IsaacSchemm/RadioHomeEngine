@@ -190,30 +190,38 @@ module StreamRepository =
                         "https://streamingengineservice-prod01-v1.fuelmedia.io/play/6a60c7ae-75e2-465f-bd30-1b1506880293.m3u8",
                         None))
 
-                    let! pbs = PBSWisconsinStreamSource.all |> AsyncSeq.toListAsync
-                    for source in pbs do
-                        let desiredNumber =
-                            match source.Name with
-                            | "WPNE HDTV" -> 2801
-                            | "The Wisconsin Channel" -> 2802
-                            | "WPNE Create" -> 2803
-                            | "PBS KIDS" -> 2804
-                            | _ -> 1000
+                    try
+                        let! pbs = PBSWisconsin.all |> AsyncSeq.toListAsync
+                        for source in pbs do
+                            let desiredNumber =
+                                match source.Name with
+                                | "WPNE HDTV" -> 2801
+                                | "The Wisconsin Channel" -> 2802
+                                | "WPNE Create" -> 2803
+                                | "PBS KIDS" -> 2804
+                                | _ -> 1000
 
-                        add desiredNumber (new ShellSegmentSourceFactory(source.Name, 4, [RemoteStream source]))
+                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, 4, [RemoteStream source]))
+                    with ex -> Console.Error.WriteLine(ex)
 
-                    let! wpr = WPRStreamSource.all |> AsyncSeq.toListAsync
-                    for source in wpr do
-                        let desiredNumber =
-                            match source.Name with
-                            | "WPR Music" -> 8970
-                            | "WPR News" -> 8830
-                            | _ -> 1000
+                    try
+                        let! wpr = WPR.all |> AsyncSeq.toListAsync
+                        for source in wpr do
+                            let desiredNumber =
+                                match source.Name with
+                                | "WPR Music" -> 8970
+                                | "WPR News" -> 8830
+                                | _ -> 1000
 
-                        add desiredNumber (new ShellSegmentSourceFactory(source.Name, 4, [RemoteStream source]))
+                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, 4, [RemoteStream source]))
+                    with ex -> Console.Error.WriteLine(ex)
 
-                    add 9630 (new ShellSegmentSourceFactory("WHYS 96.3 FM", 4, [RemoteStream (new SampleRemoteStreamSource("https://whysradio.org/live"))]))
-                    add 10190 (new ShellSegmentSourceFactory("Converge Radio 101.9 FM", 4, [RemoteStream (new SampleRemoteStreamSource("https://stream.radio.co/s5fa0df0d2/listen"))]))
+                    add 9630 (new ShellSegmentSourceFactory("WHYS 96.3 FM", 4, [RemoteStream WHYS.source]))
+
+                    try
+                        let! converge = RadioCo.getByStationIdAsync "Converge Radio" "s5fa0df0d2" cancellationToken
+                        add 10190 (new ShellSegmentSourceFactory("Converge Radio 101.9 FM", 4, [RemoteStream converge]))
+                    with ex -> Console.Error.WriteLine(ex)
 
                 do! Task.Delay(TimeSpan.FromHours(6.0), cancellationToken)
         }

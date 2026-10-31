@@ -6,7 +6,7 @@ open System.Threading.Tasks
 open FSharp.Control
 open FSharp.Data
 
-module WPRStreamSource =
+module WPR =
     type PlayerResponse = JsonProvider<"""[
       {
         "id": 99999,
