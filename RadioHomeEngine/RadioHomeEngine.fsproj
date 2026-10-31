@@ -27,6 +27,7 @@
     <Compile Include="CD\DiscDriveChangeDetectionService.fs" />
     <Compile Include="CD\DataCD.fs" />
     <Compile Include="CD\CD.fs" />
+    <Folder Include="Streaming\Channel Listing\" />
     <Compile Include="Streaming\Channel Listing\ChannelInformation.fs" />
     <Compile Include="Streaming\Channel Listing\ChannelListing.fs" />
     <Compile Include="Streaming\Program Information\Song.fs" />
@@ -36,7 +37,6 @@
     <Compile Include="Streaming\Segments\DownstreamSegment.fs" />
     <Compile Include="Streaming\Segments\ISegmentSource.fs" />
     <Compile Include="Streaming\Segments\ISegmentSourceFactory.fs" />
-    <Folder Include="Streaming\Remote Streams\" />
     <Compile Include="streaming\remote streams\IRemoteStreamSource.fs" />
     <Compile Include="streaming\remote streams\SampleRemoteStreamSource.fs" />
     <Compile Include="streaming\remote streams\WPRStreamSource.fs" />
@@ -51,6 +51,7 @@
     <Compile Include="Streaming\Remote HLS Streams\UnauthenticatedHLSSourceFactory.fs" />
     <Compile Include="Streaming\Remote HLS Streams\SiriusXM\SiriusXMClient.fs" />
     <Compile Include="Streaming\Remote HLS Streams\SiriusXM\SiriusXMSourceFactory.fs" />
+    <Compile Include="Streaming\Remote HLS Streams\PBSWisconsin.fs" />
     <Compile Include="Streaming\SegmentCache.fs" />
     <Compile Include="Streaming\Composite.fs" />
     <Compile Include="Streaming\StreamRepository.fs" />
@@ -79,8 +80,6 @@
     <PackageReference Update="FSharp.Core" Version="10.1.401" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Streaming\Channel Listing\" />
-  </ItemGroup>
+  <ItemGroup />
 
 </Project>

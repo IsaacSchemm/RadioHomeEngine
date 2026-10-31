@@ -27,6 +27,7 @@ module WPRStreamSource =
     ]""">
 
     let all = asyncSeq {
+        let tz = TimeZoneInfo.FindSystemTimeZoneById("America/Chicago")
         let! resp = PlayerResponse.AsyncLoad("https://www.wpr.org/wp-json/wpr/v1/player?_locale=user")
 
         for stream in resp do yield {
@@ -37,10 +38,13 @@ module WPRStreamSource =
                     new IProgramInformationSource with
                         member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
                             let id = stream.Id
-                            let time = int (DateTime.Now - DateTime.Today).TotalSeconds
-                            //let! resp = Async.StartAsTask(
-                            //    PlayerResponse.AsyncLoad("https://www.wpr.org/wp-json/wpr/v1/player?_locale=user"),
-                            //    cancellationToken = cancellationToken)
+                            let local = TimeZoneInfo.ConvertTimeFromUtc(
+                                DateTime.UtcNow,
+                                tz)
+                            let time = int (local - local.Date).TotalSeconds
+                            let! resp = Async.StartAsTask(
+                                PlayerResponse.AsyncLoad("https://www.wpr.org/wp-json/wpr/v1/player?_locale=user"),
+                                cancellationToken = cancellationToken)
                             let streamNow =
                                 resp
                                 |> Seq.where (fun s -> s.Id = id)

@@ -19,7 +19,7 @@ module private UnauthenticatedHLSSourceFactory =
     let client = new HttpClient(handler)
 
 /// A media source that proxies an unencrypted HLS stream.
-type UnauthenticatedHLSSourceFactory(name: string, url: string) =
+type UnauthenticatedHLSSourceFactory(name: string, url: string, programInformationSource: IProgramInformationSource option) =
     inherit HLSSourceFactory()
 
     override this.ChannelInformation = {
@@ -27,15 +27,17 @@ type UnauthenticatedHLSSourceFactory(name: string, url: string) =
         ChannelDescriptions = []
     }
 
-    override this.ProgramInformationSource = {
-        new IProgramInformationSource with
-            member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
-                return {
-                    ChannelName = name
-                    Program = Program name
+    override this.ProgramInformationSource =
+        programInformationSource
+        |> Option.defaultWith (fun () -> {
+            new IProgramInformationSource with
+                member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
+                    return {
+                        ChannelName = name
+                        Program = Program name
+                    }
                 }
-            }
-    }
+        })
 
     override this.DecryptSegmentAsync(segment, data) = task {
         match segment.encryption with
@@ -57,8 +59,13 @@ type UnauthenticatedHLSSourceFactory(name: string, url: string) =
         return data
     }
 
-    override this.GetPlaylistUriAsync() =
-        Task.FromResult(new Uri(url))
+    override this.GetPlaylistUriAsync() = task {
+        use! finalResponse = UnauthenticatedHLSSourceFactory.client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Head, url),
+            CancellationToken.None)
+
+        return finalResponse.RequestMessage.RequestUri
+    }
 
     override this.GetTextFileAsync(uri, cancellationToken) = task {
         use! finalResponse = UnauthenticatedHLSSourceFactory.client.GetAsync(

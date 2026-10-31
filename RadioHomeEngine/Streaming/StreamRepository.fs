@@ -156,6 +156,11 @@ module StreamRepository =
                             num,
                             new ShellSegmentSourceFactory(c.Name, 3, [RemoteStream c])))
 
+                    let! pbs = PBSWisconsin.all |> AsyncSeq.indexed |> AsyncSeq.toListAsync
+                    for (i, f) in pbs do
+                        let num = 8020 + int i
+                        ephemeral.Add(new Composite(num, f))
+
                 do! Task.Delay(TimeSpan.FromHours(12.0), cancellationToken)
         }
 
