@@ -14,7 +14,8 @@ if (Environment.OSVersion.Platform == PlatformID.Unix)
 }
 
 builder.Services.AddHostedService<WeatherService>();
-builder.Services.AddHostedService<StreamRepository.Service>();
+builder.Services.AddHostedService<StreamRepository.ChannelListingRefreshService>();
+builder.Services.AddHostedService<StreamRepository.CleanupService>();
 
 builder.Services.AddOpenApi();
 

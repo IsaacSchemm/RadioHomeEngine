@@ -5,11 +5,12 @@ namespace RadioHomeEngine.AspNetCore.Controllers
 {
     public class RadioController : Controller
     {
-        public async Task<IActionResult> Index(CancellationToken cancellationToken)
+        public IActionResult Index()
         {
-            var channels = await StreamRepository.getAvailableChannelsAsync()
+            var channels = StreamRepository.getCurrentChannels()
+                .Select(c => c.ChannelListing)
                 .OrderBy(c => c.ChannelNumber)
-                .ToListAsync(cancellationToken);
+                .ToList();
 
             var model = new RadioIndexModel
             {

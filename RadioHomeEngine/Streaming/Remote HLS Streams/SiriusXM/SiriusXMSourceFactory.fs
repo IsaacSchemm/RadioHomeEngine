@@ -11,13 +11,12 @@ open System.Threading.Channels
 open System.Threading.Tasks
 
 /// A media source that decrypts and proxies a SiriusXM stream.
-type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
+type SiriusXMSourceFactory(name: string, description: string, channelNumber: int) =
     inherit HLSSourceFactory()
 
-    let sxm = new SiriusXMClient()
+    let initialCount = 3
 
-    let mutable channelDescriptions = []
-    let mutable channelName = None
+    let sxm = new SiriusXMClient()
 
     interface IProgramInformationSource with
         member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
@@ -54,10 +53,8 @@ type SiriusXMSourceFactory(channelNumber: int, initialCount: int) =
         }
 
     override this.ChannelInformation = {
-        ChannelName =
-            channelName
-            |> Option.defaultValue $"SiriusXM {channelNumber}"
-        ChannelDescriptions = channelDescriptions
+        ChannelName = name
+        ChannelDescriptions = [description]
     }
 
     override this.ProgramInformationSource =

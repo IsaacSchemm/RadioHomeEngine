@@ -44,13 +44,10 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
     let runningTask = task {
         let overallToken = overallCancellationTokenSource.Token
         while not overallToken.IsCancellationRequested do
-            printfn "[Composite] Starting outer loop [%d]" channelNumber
-
             use cts = CancellationTokenSource.CreateLinkedTokenSource(overallToken)
             stopWaitingForNextSegment <- fun () -> cts.Cancel()
 
             try
-                printfn "[Composite] Starting inner loop [%d]" channelNumber
                 while not cts.IsCancellationRequested do
                     if not isActive then
                         do! Task.Delay(-1, cts.Token)

@@ -23,30 +23,12 @@ module StreamRepository =
                 [AudioCD AllDrives]))
     ]
 
-    /// All active channels which match a SiriusXM channel number (expected to be within the range 1 through 1999).
-    let private sxm = new ResizeArray<Composite>()
-
-    let getAvailableChannelsAsync () = asyncSeq {
-        for c in permanent do c.ChannelListing
-
-        let! token = Async.CancellationToken
-        let! sxm = SiriusXMClient.GetChannelsAsync(token) |> Async.AwaitTask
-        for c in sxm do
-            match Int32.TryParse(c.channelNumber) with
-            | (false, _) -> ()
-            | (true, num) -> {
-                ChannelInformation = {
-                    ChannelName = c.name
-                    ChannelDescriptions = [c.mediumDescription]
-                }
-                ChannelNumber = num
-            }
-    }
+    let private ephemeral = new ResizeArray<Composite>()
 
     /// All currently tracked channels.
-    let private getCurrentChannels () = seq {
+    let getCurrentChannels () = seq {
         yield! permanent
-        yield! sxm
+        yield! ephemeral
     }
 
     /// All active channels.
@@ -59,11 +41,7 @@ module StreamRepository =
     let private getOrCreate channelNumber =
         getCurrentChannels ()
         |> Seq.where (fun s -> s.ChannelListing.ChannelNumber = channelNumber)
-        |> Seq.tryHead
-        |> Option.defaultWith (fun () ->
-            let composite = new Composite(channelNumber, new SiriusXMSourceFactory(channelNumber, 3))
-            sxm.Add(composite)
-            composite)
+        |> Seq.head
 
     let getPlaylist channelNumber = String.concat "\n" [
         let composite = getOrCreate channelNumber
@@ -148,7 +126,31 @@ module StreamRepository =
         |}
     }
 
-    type Service() =
+    type ChannelListingRefreshService() =
+        inherit BackgroundService()
+
+        override _.ExecuteAsync(cancellationToken) = task {
+            while not cancellationToken.IsCancellationRequested do
+                if ephemeral |> Seq.where (fun c -> c.IsActive()) |> Seq.isEmpty then
+                    let old = List.ofSeq ephemeral
+                    ephemeral.Clear()
+                    for c in old do
+                        printfn "[SegmentCacheRepository] Dropping [%d]" c.ChannelListing.ChannelNumber
+                        do! (c :> IAsyncDisposable).DisposeAsync()
+
+                    let! sxm = SiriusXMClient.GetChannelsAsync(cancellationToken) |> Async.AwaitTask
+                    for c in sxm do
+                        match Int32.TryParse(c.channelNumber) with
+                        | (false, _) -> ()
+                        | (true, num) -> ephemeral.Add(
+                            new Composite(
+                                num,
+                                new SiriusXMSourceFactory(c.name, c.mediumDescription, num)))
+
+                do! Task.Delay(TimeSpan.FromHours(12.0), cancellationToken)
+        }
+
+    type CleanupService() =
         inherit BackgroundService()
 
         override _.ExecuteAsync(cancellationToken) = task {
@@ -157,13 +159,6 @@ module StreamRepository =
                 // This will tell them to stop listening for new segments from their audio source, and - if the source is the root - to dispose of it, creating a new one later if needed.
                 for composite in getCurrentChannels () do
                     composite.CheckForInactivity()
-
-                // Remove and dispose of any inactive SiriusXM streams.
-                for composite in List.ofSeq sxm do
-                    if not (composite.IsActive()) then
-                        printfn "[SegmentCacheRepository] Dropping [%d]" composite.ChannelListing.ChannelNumber
-                        sxm.Remove(composite) |> ignore
-                        do! (composite :> IAsyncDisposable).DisposeAsync()
 
                 do! Task.Delay(TimeSpan.FromMinutes(1.0), cancellationToken)
         }
