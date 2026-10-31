@@ -42,7 +42,7 @@ module StreamRepository =
         "#EXT-X-ALLOW-CACHE:NO"
         "#EXT-X-VERSION:1"
 
-        "#EXT-X-STREAM-INF:CODECS=\"mp4a.40.2\""
+        $"#EXT-X-STREAM-INF:BANDWIDTH={composite.Cache.NominalBitrate},CODECS=\"mp4a.40.2\""
 
         $"chunklist-{channelNumber}.m3u8"
     ]
@@ -72,10 +72,7 @@ module StreamRepository =
         for segment in segments do
             $"#EXT-X-PROGRAM-DATE-TIME:{segment.dateTime:o}"
             $"#EXTINF:{segment.duration},"
-            $"/Stream/chunk-{channelNumber}-{segment.mediaSequence}.ts"
-
-        //if stream.IsComplete then
-        //    "#EXT-X-ENDLIST"
+            $"chunk-{channelNumber}-{segment.mediaSequence}.ts"
     ]
 
     let getChunkAsync channelNumber sequenceNumber = task {

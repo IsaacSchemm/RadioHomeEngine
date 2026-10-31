@@ -12,9 +12,14 @@ type SegmentCache() =
     /// The sequence number that will be used for the next segment.
     let mutable nextSequenceNumber = UInt128.One
 
+    /// The bitrate shown alongside the chunklist entry in the playlist file. Should not change once segments exist.
+    let mutable nominalBitrate = 327680
+
     // Stores a decrypted audio segment to the cache, along with the metadata and its new sequence number.
     let add (segment: DownstreamSegment) =
         printfn "[SegmentCache] Adding %A -> %A (%A)" segment.mediaSequence nextSequenceNumber segment.dateTime
+        if cache = [] then
+            nominalBitrate <- segment.BitsPerSecond
         let cacheItem = {
             segment with mediaSequence = nextSequenceNumber
         }
@@ -50,6 +55,9 @@ type SegmentCache() =
 
         return buffer.ToArray()
     }
+
+    member _.NominalBitrate =
+        nominalBitrate
 
     member _.Add(segment: DownstreamSegment) =
         let threshold =

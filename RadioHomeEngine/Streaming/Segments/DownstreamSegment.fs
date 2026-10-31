@@ -9,4 +9,6 @@ type DownstreamSegment = {
     data: byte array
     mediaSequence: UInt128
     important: bool
-}
+} with
+    member this.BitsPerSecond =
+        int (float (8 * this.data.Length) / this.duration)
