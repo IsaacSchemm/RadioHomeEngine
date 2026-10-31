@@ -180,12 +180,12 @@ module StreamRepository =
                             10,
                             [AudioCD (SingleDrive d)]))
 
-                    add 1300 (new UnauthenticatedHLSSourceFactory(
+                    add 1300 (new HLSSourceFactory(
                         "WEAU 13 News",
                         "https://dai.google.com/linear/hls/pa/event/oXo4JAFUT_aIXI11n21Rtw/stream/10bfd9f3-70ce-4423-b3ec-62bf008750b1:ATL/master.m3u8",
                         None))
 
-                    add 1800 (new UnauthenticatedHLSSourceFactory(
+                    add 1800 (new HLSSourceFactory(
                         "WQOW 18 News",
                         "https://streamingengineservice-prod01-v1.fuelmedia.io/play/6a60c7ae-75e2-465f-bd30-1b1506880293.m3u8",
                         None))

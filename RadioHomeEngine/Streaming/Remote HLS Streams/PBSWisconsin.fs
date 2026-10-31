@@ -126,7 +126,7 @@ module PBSWisconsin =
             | Some url ->
                 yield {|
                     channelNumber = channel.DigitalChannel
-                    factory = new UnauthenticatedHLSSourceFactory(
+                    factory = new HLSSourceFactory(
                         channel.FullName,
                         url,
                         Some (getProgramInformationSource channel.Profile))

@@ -12,9 +12,7 @@ open System.Threading.Tasks
 
 /// A media source that decrypts and proxies a SiriusXM stream.
 type SiriusXMSourceFactory(name: string, description: string, channelNumber: int) =
-    inherit HLSSourceFactory()
-
-    let initialCount = 3
+    inherit AbstractHLSSourceFactory()
 
     let sxm = new SiriusXMClient()
 
