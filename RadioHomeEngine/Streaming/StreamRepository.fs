@@ -135,7 +135,7 @@ module StreamRepository =
                             |> Seq.contains n
 
                         let channelNumber = Seq.head (seq {
-                            for i in desiredChannelNumber .. 9999 do
+                            for i in desiredChannelNumber .. 99999 do
                                 if not (inUse i) then i
                             for i in Int32.MinValue .. -1 do
                                 if not (inUse i) then i
@@ -174,22 +174,30 @@ module StreamRepository =
                             Silence (Finite sec)
                         ]))
 
-                    //add 1000 (new ShellSegmentSourceFactory(
-                    //    "Audio CD",
-                    //    10,
-                    //    [AudioCD AllDrives]))
-
                     for d in DiscDrive.getAll () do
                         add 1000 (new ShellSegmentSourceFactory(
                             DiscDrive.getPath d,
                             10,
                             [AudioCD (SingleDrive d)]))
 
+                    add 1300 (new UnauthenticatedHLSSourceFactory(
+                        "WEAU 13 News",
+                        "https://dai.google.com/linear/hls/pa/event/oXo4JAFUT_aIXI11n21Rtw/stream/10bfd9f3-70ce-4423-b3ec-62bf008750b1:ATL/master.m3u8",
+                        None))
+
+                    add 1800 (new UnauthenticatedHLSSourceFactory(
+                        "WQOW 18 News",
+                        "https://streamingengineservice-prod01-v1.fuelmedia.io/play/6a60c7ae-75e2-465f-bd30-1b1506880293.m3u8",
+                        None))
+
                     let! pbs = PBSWisconsin.all |> AsyncSeq.toListAsync
                     for c in pbs do
                         let desiredNumber =
-                            match c.channelNumber.Split('.') with
-                            | [| Int32 38; Int32 minor |] -> 3800 + minor
+                            match c.channelNumber with
+                            | "38.1" -> 2801
+                            | "38.2" -> 2802
+                            | "38.3" -> 2803
+                            | "38.4" -> 2804
                             | _ -> 1000
 
                         add desiredNumber (c.factory)
@@ -198,11 +206,14 @@ module StreamRepository =
                     for c in wpr do
                         let desiredNumber =
                             match c.Name with
-                            | "WPR Music" -> 9300
-                            | "WPR News" -> 9700
+                            | "WPR Music" -> 8970
+                            | "WPR News" -> 8830
                             | _ -> 1000
 
                         add desiredNumber (new ShellSegmentSourceFactory(c.Name, 4, [RemoteStream c]))
+
+                    add 9630 (new ShellSegmentSourceFactory("WHYS 96.3 FM", 4, [RemoteStream (new SampleRemoteStreamSource("https://whysradio.org/live"))]))
+                    add 10190 (new ShellSegmentSourceFactory("Converge Radio 101.9 FM", 4, [RemoteStream (new SampleRemoteStreamSource("https://stream.radio.co/s5fa0df0d2/listen"))]))
 
                 do! Task.Delay(TimeSpan.FromHours(6.0), cancellationToken)
         }

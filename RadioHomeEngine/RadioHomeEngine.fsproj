@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -37,9 +37,9 @@
     <Compile Include="Streaming\Segments\DownstreamSegment.fs" />
     <Compile Include="Streaming\Segments\ISegmentSource.fs" />
     <Compile Include="Streaming\Segments\ISegmentSourceFactory.fs" />
-    <Compile Include="streaming\remote streams\IRemoteStreamSource.fs" />
-    <Compile Include="streaming\remote streams\SampleRemoteStreamSource.fs" />
-    <Compile Include="streaming\remote streams\WPRStreamSource.fs" />
+    <Compile Include="Streaming\Remote Streams\IRemoteStreamSource.fs" />
+    <Compile Include="Streaming\Remote Streams\SampleRemoteStreamSource.fs" />
+    <Compile Include="Streaming\Remote Streams\WPRStreamSource.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperDuration.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperInput.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperParameters.fs" />
