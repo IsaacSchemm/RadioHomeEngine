@@ -128,6 +128,21 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
                     formatParameters
                     "-"
                 ]
+
+            | WWVSimulator ->
+                String.concat " " [
+                    "wwvsim"
+                    "-r 44100"
+                    "|"
+                    "ffmpeg"
+                    quietParameters
+                    "-f s16le"
+                    "-ar 44100"
+                    "-ac 1"
+                    "-i -"
+                    formatParameters
+                    "-"
+                ]
     ]
 
     interface IProgramInformationSource with
@@ -138,31 +153,34 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
             }
 
             match currentInput with
-            | None ->
-                return forName "Unknown"
-            | Some (AudioCD scope) ->
-                return forName (String.concat " // " [
-                    for i in CD.getDriveInfo scope do
-                        match i.disc.audio with
-                        | None -> ()
-                        | Some a -> String.concat " - " [
-                            if a.artists <> [] then String.concat ", " a.artists
+            | None -> return forName "Unknown"
+            | Some input ->
+                match input with
+                | AudioCD scope ->
+                    return forName (String.concat " // " [
+                        for i in CD.getDriveInfo scope do
+                            match i.disc.audio with
+                            | None -> ()
+                            | Some a -> String.concat " - " [
+                                if a.artists <> [] then String.concat ", " a.artists
 
-                            match a.titles with
-                            | _ :: _ -> String.concat " / " a.titles
-                            | [] -> "Unknown disc"
-                        ]
-                ])
-            | Some (AudioFile path) ->
-                return forName (Path.GetFileNameWithoutExtension(path))
-            | Some (BrownNoise _) ->
-                return forName "Brown Noise"
-            | Some (RemoteStream source) ->
-                return! source.ProgramInformationSource.GetCurrentProgramInformationAsync(cancellationToken)
-            | Some (Silence _) ->
-                return forName "Silence"
-            | Some (SpeechSynthesis (title, _)) ->
-                return forName title
+                                match a.titles with
+                                | _ :: _ -> String.concat " / " a.titles
+                                | [] -> "Unknown disc"
+                            ]
+                    ])
+                | AudioFile path ->
+                    return forName (Path.GetFileNameWithoutExtension(path))
+                | BrownNoise _ ->
+                    return forName "Brown Noise"
+                | RemoteStream source ->
+                    return! source.ProgramInformationSource.GetCurrentProgramInformationAsync(cancellationToken)
+                | Silence _ ->
+                    return forName "Silence"
+                | SpeechSynthesis (title, _) ->
+                    return forName title
+                | WWVSimulator ->
+                    return forName "Time Signal"
         }
 
     interface ISegmentSourceFactory with

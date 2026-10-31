@@ -155,29 +155,24 @@ module StreamRepository =
 
                     add 1000 (new ShellSegmentSourceFactory(
                         "Silence",
-                        10,
+                        4,
                         [Silence Infinite]))
 
                     add 1000 (new ShellSegmentSourceFactory(
                         "Brown Noise",
-                        10,
+                        4,
                         [BrownNoise Infinite]))
 
-                    add 1000 (new ShellSegmentSourceFactory(
-                        "Alternating Noise",
-                        4,
-                        [
-                            let sec = TimeSpan.FromSeconds(1.0)
-                            BrownNoise (Finite sec)
-                            Silence (Finite sec)
-                            BrownNoise (Finite sec)
-                            Silence (Finite sec)
-                        ]))
+                    if File.Exists("/usr/bin/wwvsim") || File.Exists("/usr/local/bin/wwvsim") then
+                        add 1000 (new ShellSegmentSourceFactory(
+                            "Time Signal",
+                            4,
+                            [WWVSimulator]))
 
                     for d in DiscDrive.getAll () do
                         add 1000 (new ShellSegmentSourceFactory(
                             DiscDrive.getPath d,
-                            10,
+                            4,
                             [AudioCD (SingleDrive d)]))
 
                     add 1300 (new HLSSourceFactory(

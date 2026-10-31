@@ -10,3 +10,4 @@ type ShellWrapperInput =
 | RemoteStream of IRemoteStreamSource
 | Silence of duration: ShellWrapperDuration
 | SpeechSynthesis of display: string * text: string
+| WWVSimulator
