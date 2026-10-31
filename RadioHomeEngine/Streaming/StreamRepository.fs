@@ -9,51 +9,17 @@ open FSharp.Control
 
 /// A module which keeps track of all active radio channels.
 module StreamRepository =
-    let silence = new Composite(
-        2000,
+    let defaultChannel = new Composite(
+        0,
         new ShellSegmentSourceFactory(
-            "Silence",
+            "Channel Not Found",
             10,
             [Silence Infinite]))
-
-    let private permanent = [
-        silence
-
-        new Composite(
-            2001,
-            new ShellSegmentSourceFactory(
-                "Brown Noise",
-                10,
-                [BrownNoise Infinite]))
-
-        let sec = TimeSpan.FromSeconds(1.0)
-
-        new Composite(
-            2002,
-            new ShellSegmentSourceFactory(
-                "Seconds Counter",
-                10,
-                [
-                    for _ in [0 .. 4] do
-                        BrownNoise (Finite sec)
-                        Silence (Finite sec)
-                ]))
-
-        new Composite(
-            2003,
-            new ShellSegmentSourceFactory(
-                "Audio CD",
-                10,
-                [AudioCD AllDrives]))
-    ]
 
     let private ephemeral = new ResizeArray<Composite>()
 
     /// All currently tracked channels.
-    let getCurrentChannels () = seq {
-        yield! permanent
-        yield! ephemeral
-    }
+    let getCurrentChannels () = ephemeral :> Composite seq
 
     /// All active channels.
     let getActiveChannels () =
@@ -66,7 +32,7 @@ module StreamRepository =
         getCurrentChannels ()
         |> Seq.where (fun s -> s.ChannelListing.ChannelNumber = channelNumber)
         |> Seq.tryHead
-        |> Option.defaultValue silence
+        |> Option.defaultValue defaultChannel
 
     let getPlaylist channelNumber = String.concat "\n" [
         let composite = get channelNumber
@@ -158,42 +124,90 @@ module StreamRepository =
             while not cancellationToken.IsCancellationRequested do
                 if ephemeral |> Seq.where (fun c -> c.IsActive()) |> Seq.isEmpty then
                     let old = List.ofSeq ephemeral
+
                     ephemeral.Clear()
+
                     for c in old do
                         printfn "[SegmentCacheRepository] Dropping [%d]" c.ChannelListing.ChannelNumber
                         do! (c :> IAsyncDisposable).DisposeAsync()
 
-                    let channelExists n =
-                        getCurrentChannels ()
-                        |> Seq.exists (fun c -> c.ChannelListing.ChannelNumber = n)
+                    let add desiredChannelNumber factory =
+                        let inUse n =
+                            getCurrentChannels ()
+                            |> Seq.map (fun c -> c.ChannelListing.ChannelNumber)
+                            |> Seq.contains n
+
+                        let channelNumber = Seq.head (seq {
+                            for i in desiredChannelNumber .. 9999 do
+                                if not (inUse i) then i
+                            for i in Int32.MinValue .. -1 do
+                                if not (inUse i) then i
+                        })
+
+                        ephemeral.Add(
+                            new Composite(
+                                channelNumber,
+                                factory))
 
                     let! sxm = SiriusXMClient.GetChannelsAsync(cancellationToken) |> Async.AwaitTask
                     for c in sxm do
                         match Int32.TryParse(c.channelNumber) with
-                        | (true, num) when not (channelExists num) ->
-                            ephemeral.Add(new Composite(
-                                num,
-                                new SiriusXMSourceFactory(c.name, c.mediumDescription, num)))
+                        | (true, num) ->
+                             add num (new SiriusXMSourceFactory(c.name, c.mediumDescription, num))
                         | _ -> ()
 
-                    let mutable nextChannelNumber =
-                        getCurrentChannels ()
-                        |> Seq.map (fun c -> c.ChannelListing.ChannelNumber + 1)
-                        |> Seq.max
+                    add 1000 (new ShellSegmentSourceFactory(
+                        "Silence",
+                        10,
+                        [Silence Infinite]))
+
+                    add 1000 (new ShellSegmentSourceFactory(
+                        "Brown Noise",
+                        10,
+                        [BrownNoise Infinite]))
+
+                    add 1000 (new ShellSegmentSourceFactory(
+                        "Alternating Noise",
+                        4,
+                        [
+                            let sec = TimeSpan.FromSeconds(1.0)
+                            BrownNoise (Finite sec)
+                            Silence (Finite sec)
+                            BrownNoise (Finite sec)
+                            Silence (Finite sec)
+                        ]))
+
+                    //add 1000 (new ShellSegmentSourceFactory(
+                    //    "Audio CD",
+                    //    10,
+                    //    [AudioCD AllDrives]))
+
+                    for d in DiscDrive.getAll () do
+                        add 1000 (new ShellSegmentSourceFactory(
+                            DiscDrive.getPath d,
+                            10,
+                            [AudioCD (SingleDrive d)]))
+
+                    let! pbs = PBSWisconsin.all |> AsyncSeq.toListAsync
+                    for c in pbs do
+                        let desiredNumber =
+                            match c.channelNumber.Split('.') with
+                            | [| Int32 38; Int32 minor |] -> 3800 + minor
+                            | _ -> 1000
+
+                        add desiredNumber (c.factory)
 
                     let! wpr = WPRStreamSource.all |> AsyncSeq.toListAsync
                     for c in wpr do
-                        ephemeral.Add(new Composite(
-                            nextChannelNumber,
-                            new ShellSegmentSourceFactory(c.Name, 4, [RemoteStream c])))
-                        nextChannelNumber <- nextChannelNumber + 1
+                        let desiredNumber =
+                            match c.Name with
+                            | "WPR Music" -> 9300
+                            | "WPR News" -> 9700
+                            | _ -> 1000
 
-                    let! pbs = PBSWisconsin.all |> AsyncSeq.toListAsync
-                    for f in pbs do
-                        ephemeral.Add(new Composite(nextChannelNumber, f))
-                        nextChannelNumber <- nextChannelNumber + 1
+                        add desiredNumber (new ShellSegmentSourceFactory(c.Name, 4, [RemoteStream c]))
 
-                do! Task.Delay(TimeSpan.FromHours(12.0), cancellationToken)
+                do! Task.Delay(TimeSpan.FromHours(6.0), cancellationToken)
         }
 
     type CleanupService() =

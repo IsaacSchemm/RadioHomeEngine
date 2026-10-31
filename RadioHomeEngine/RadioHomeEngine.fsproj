@@ -49,9 +49,9 @@
     <Compile Include="Streaming\Remote HLS Streams\ChunklistNormalizer.fs" />
     <Compile Include="Streaming\Remote HLS Streams\HLSSourceFactory.fs" />
     <Compile Include="Streaming\Remote HLS Streams\UnauthenticatedHLSSourceFactory.fs" />
+    <Compile Include="Streaming\Remote HLS Streams\PBSWisconsin.fs" />
     <Compile Include="Streaming\Remote HLS Streams\SiriusXM\SiriusXMClient.fs" />
     <Compile Include="Streaming\Remote HLS Streams\SiriusXM\SiriusXMSourceFactory.fs" />
-    <Compile Include="Streaming\Remote HLS Streams\PBSWisconsin.fs" />
     <Compile Include="Streaming\SegmentCache.fs" />
     <Compile Include="Streaming\Composite.fs" />
     <Compile Include="Streaming\StreamRepository.fs" />

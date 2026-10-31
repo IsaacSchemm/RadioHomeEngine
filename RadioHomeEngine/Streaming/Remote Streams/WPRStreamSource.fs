@@ -9,14 +9,14 @@ open FSharp.Data
 module WPRStreamSource =
     type PlayerResponse = JsonProvider<"""[
       {
-        "id": 87969,
-        "name": "WPR Music",
-        "audioUrl": "https:\/\/wpr-ice.streamguys1.com\/wpr-music-mp3-96",
-        "scheduleUrl": "https:\/\/www.wpr.org\/network\/wpr-music",
+        "id": 99999,
+        "name": "Name",
+        "audioUrl": "https:\/\/www.example.com",
+        "scheduleUrl": "https:\/\/www.example.com",
         "schedule": [
           {
-            "showTitle": "Overnight Classics",
-            "showUrl": "https:\/\/www.wpr.org\/shows\/overnight-classics",
+            "showTitle": "Title",
+            "showUrl": "https:\/\/www.example.com",
             "startTime": 0,
             "endTime": 21540,
             "daysOfWeek": [ 1, 2, 3, 4, 5 ],
@@ -34,7 +34,7 @@ module WPRStreamSource =
 
     let private asyncGetStreams =
         let tz = TimeZoneInfo.FindSystemTimeZoneById("America/Chicago")
-        PlayerResponse.AsyncLoad("https://www.wpr.org/wp-json/wpr/v1/player?_locale=user")
+        PlayerResponse.AsyncLoad("https://www.wpr.org/wp-json/wpr/v1/player")
 
     let private getProgramInformationSource id = {
         new IProgramInformationSource with

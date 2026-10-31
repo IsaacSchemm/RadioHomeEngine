@@ -22,7 +22,7 @@ module PBSWisconsin =
                     "color_logo": "https://www.example.com",
                     "white_logo": "https://www.example.com"
                   },
-                  "digital_channel": "2.1",
+                  "digital_channel": "xxx",
                   "full_name": "Name",
                   "timezone": "America/Chicago",
                   "listings": [
@@ -43,7 +43,7 @@ module PBSWisconsin =
                   "profile": "xyz",
                   "non_drm_url": "https://www.example.com",
                   "feed_image": {},
-                  "digital_channel": "2.1",
+                  "digital_channel": "xxx",
                   "full_name": "Name",
                   "timezone": "America/Chicago",
                   "listings": [
@@ -124,8 +124,11 @@ module PBSWisconsin =
             match channel.NonDrmUrl with
             | None -> ()
             | Some url ->
-                yield new UnauthenticatedHLSSourceFactory(
-                    channel.FullName,
-                    url,
-                    Some (getProgramInformationSource channel.Profile))
+                yield {|
+                    channelNumber = channel.DigitalChannel
+                    factory = new UnauthenticatedHLSSourceFactory(
+                        channel.FullName,
+                        url,
+                        Some (getProgramInformationSource channel.Profile))
+                |}
     }
