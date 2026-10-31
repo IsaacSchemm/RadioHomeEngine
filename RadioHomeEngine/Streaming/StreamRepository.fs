@@ -155,24 +155,29 @@ module StreamRepository =
 
                     add 1000 (new ShellSegmentSourceFactory(
                         "Silence",
-                        4,
+                        10,
                         [Silence Infinite]))
 
                     add 1000 (new ShellSegmentSourceFactory(
                         "Brown Noise",
-                        4,
+                        10,
                         [BrownNoise Infinite]))
+
+                    add 1000 (new ShellSegmentSourceFactory(
+                        "Forecast",
+                        10,
+                        [Forecast]))
 
                     if File.Exists("/usr/bin/wwvsim") || File.Exists("/usr/local/bin/wwvsim") then
                         add 1000 (new ShellSegmentSourceFactory(
                             "Time Signal",
-                            4,
+                            10,
                             [WWVSimulator]))
 
                     for d in DiscDrive.getAll () do
                         add 1000 (new ShellSegmentSourceFactory(
                             DiscDrive.getPath d,
-                            4,
+                            10,
                             [AudioCD (SingleDrive d)]))
 
                     add 1300 (new HLSSourceFactory(
@@ -196,7 +201,7 @@ module StreamRepository =
                                 | "PBS KIDS" -> 2804
                                 | _ -> 1000
 
-                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, 4, [RemoteStream source]))
+                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, 10, [RemoteStream source]))
                     with ex -> Console.Error.WriteLine(ex)
 
                     try
@@ -208,14 +213,14 @@ module StreamRepository =
                                 | "WPR News" -> 8830
                                 | _ -> 1000
 
-                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, 4, [RemoteStream source]))
+                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, 10, [RemoteStream source]))
                     with ex -> Console.Error.WriteLine(ex)
 
-                    add 9630 (new ShellSegmentSourceFactory("WHYS 96.3 FM", 4, [RemoteStream WHYS.source]))
+                    add 9630 (new ShellSegmentSourceFactory("WHYS 96.3 FM", 10, [RemoteStream WHYS.source]))
 
                     try
                         let! converge = RadioCo.getByStationIdAsync "Converge Radio" "s5fa0df0d2" cancellationToken
-                        add 10190 (new ShellSegmentSourceFactory("Converge Radio 101.9 FM", 4, [RemoteStream converge]))
+                        add 10190 (new ShellSegmentSourceFactory("Converge Radio 101.9 FM", 10, [RemoteStream converge]))
                     with ex -> Console.Error.WriteLine(ex)
 
                 do! Task.Delay(TimeSpan.FromHours(6.0), cancellationToken)

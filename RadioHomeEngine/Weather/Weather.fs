@@ -3,9 +3,12 @@
 open System
 open System.Runtime.Caching
 
-open Speech
-
 module Weather =
+    type Readable = {
+        screen: string
+        speech: string
+    }
+
     type Alert = {
         id: string
         expires: DateTimeOffset
@@ -17,7 +20,7 @@ module Weather =
         return [
             for f in obj.properties.periods do {
                 screen = $"{f.name}: {f.temperature}°{f.temperatureUnit}, {f.shortForecast}"
-                speech = storeSpeech $"{f.name}: {f.detailedForecast}"
+                speech = $"{f.name}: {f.detailedForecast}"
             }
         ]
     }
@@ -30,11 +33,11 @@ module Weather =
                 expires = f.properties.expires
                 info = {
                     screen = f.properties.headline
-                    speech = storeSpeech (String.concat "\n" [
+                    speech = String.concat "\n" [
                         f.properties.headline
                         f.properties.description
                         f.properties.instruction
-                    ])
+                    ]
                 }
             }
         ]

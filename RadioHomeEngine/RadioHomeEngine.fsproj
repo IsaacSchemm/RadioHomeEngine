@@ -27,6 +27,9 @@
     <Compile Include="CD\DiscDriveChangeDetectionService.fs" />
     <Compile Include="CD\DataCD.fs" />
     <Compile Include="CD\CD.fs" />
+    <Compile Include="Weather\NWS.fs" />
+    <Compile Include="Weather\Weather.fs" />
+    <Compile Include="Weather\ForecastService.fs" />
     <Folder Include="Streaming\Channel Listing\" />
     <Compile Include="Streaming\Channel Listing\ChannelInformation.fs" />
     <Compile Include="Streaming\Channel Listing\ChannelListing.fs" />
@@ -56,11 +59,7 @@
     <Compile Include="Streaming\SegmentCache.fs" />
     <Compile Include="Streaming\Composite.fs" />
     <Compile Include="Streaming\StreamRepository.fs" />
-    <Compile Include="Info\Speech.fs" />
-    <Compile Include="Info\SpeechSynthesis.fs" />
-    <Compile Include="Info\NWS.fs" />
-    <Compile Include="Info\Weather.fs" />
-    <Compile Include="Info\WeatherManager.fs" />
+    <Compile Include="Streaming\WeatherAlertService.fs" />
     <Compile Include="Remote\AtomicActions.fs" />
     <Compile Include="Remote\LyrionIR.fs" />
     <Compile Include="Remote\LyrionIRHandler.fs" />

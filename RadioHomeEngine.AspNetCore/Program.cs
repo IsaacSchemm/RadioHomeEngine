@@ -13,7 +13,8 @@ if (Environment.OSVersion.Platform == PlatformID.Unix)
     builder.Services.AddHostedService<DiscDriveChangeDetectionService>();
 }
 
-builder.Services.AddHostedService<WeatherService>();
+builder.Services.AddHostedService<ForecastService>();
+builder.Services.AddHostedService<WeatherAlertService>();
 builder.Services.AddHostedService<StreamRepository.ChannelListingRefreshService>();
 builder.Services.AddHostedService<StreamRepository.CleanupService>();
 

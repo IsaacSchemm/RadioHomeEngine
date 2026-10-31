@@ -207,12 +207,6 @@ namespace RadioHomeEngine.AspNetCore.Controllers
         public async Task AppendSXMChannel(string playerId, string driveId) =>
             await AddCDAsync(playerId, PlaylistPosition.Last, driveId);
 
-        [HttpPost("players/{playerId}/play/forecast")]
-        public async Task PlayForecast(string playerId) =>
-            await AtomicActions.performActionAsync(
-                LyrionCLI.Player.NewPlayer(playerId),
-                AtomicAction.Forecast);
-
         [HttpPost("players/{playerId}/clear")]
         public async Task Clear(string playerId) =>
             await LyrionCLI.Playlist.clearAsync(

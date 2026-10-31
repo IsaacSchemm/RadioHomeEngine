@@ -18,15 +18,13 @@ type AtomicAction =
 | PlayCD of DiscDriveScope * PlaylistPosition
 | RipCD of DiscDriveScope
 | EjectCD of DiscDriveScope
-| Forecast
 | Stop
 
 module AtomicActions =
     let tryGetAction (entry: string) = Seq.tryHead (seq {
         match entry with
-        | "000" -> Forecast
-        | "00" -> PlayCD (AllDrives, Now)
-        | "9999" -> Stop
+        | "0" -> PlayCD (AllDrives, Now)
+        | "00" -> Stop
         | Int32 n when n >= 0 -> PlayChannel (n, Now)
         | _ -> ()
     })
@@ -96,19 +94,6 @@ module AtomicActions =
 
         | EjectCD scope ->
             do! DiscDrive.ejectAsync scope
-
-        | Forecast ->
-            do! Players.setDisplayAsync player "Forecast" "Please wait..." (TimeSpan.FromSeconds(5.0))
-
-            let! forecasts = Weather.getForecastsAsync CancellationToken.None
-            let! alerts = Weather.getAlertsAsync CancellationToken.None
-
-            do! Speech.readAsync player [
-                for forecast in Seq.truncate 2 forecasts do
-                    forecast
-                for alert in alerts do
-                    alert.info
-            ]
 
         | Stop ->
             do! Players.simulateButtonAsync player "stop"

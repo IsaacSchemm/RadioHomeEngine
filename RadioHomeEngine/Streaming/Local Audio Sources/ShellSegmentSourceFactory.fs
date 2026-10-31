@@ -82,6 +82,29 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
                     "-"
                 ]
 
+            | Forecast ->
+                if Environment.OSVersion.Platform <> PlatformID.Win32NT then
+                    let textFileName = $"{Guid.NewGuid()}.txt"
+                    File.WriteAllText(textFileName, ForecastService.getBody ())
+
+                    String.concat " " [
+                        "espeak"
+                        $"-f {textFileName}"
+                        "--stdout"
+                        "-v us-mbrola-2"
+                        "-s 140"
+                        "-a 150"
+                        "|"
+                        "ffmpeg"
+                        quietParameters
+                        "-f wav"
+                        "-i -"
+                        formatParameters
+                        "-"
+                    ]
+
+                    $"rm {textFileName}"
+
             | Silence duration ->
                 String.concat " " [
                     "ffmpeg"
@@ -117,6 +140,8 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
                         formatParameters
                         "-"
                     ]
+
+                    $"rm {textFileName}"
 
             | RemoteStream source ->
                 if source.Url.Contains('\'') then raise (new NotImplementedException())
@@ -173,6 +198,8 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
                     return forName (Path.GetFileNameWithoutExtension(path))
                 | BrownNoise _ ->
                     return forName "Brown Noise"
+                | Forecast ->
+                    return forName (ForecastService.getTitle ())
                 | RemoteStream source ->
                     return! source.ProgramInformationSource.GetCurrentProgramInformationAsync(cancellationToken)
                 | Silence _ ->
