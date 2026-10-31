@@ -9,16 +9,38 @@ open FSharp.Control
 
 /// A module which keeps track of all active radio channels.
 module StreamRepository =
+    let silence = new Composite(
+        2000,
+        new ShellSegmentSourceFactory(
+            "Silence",
+            10,
+            [Silence Infinite]))
+
     let private permanent = [
-        new Composite(
-            8000,
-            new ShellSegmentSourceFactory(
-                "Brown Noise",
-                3,
-                [BrownNoise Infinite]))
+        silence
 
         new Composite(
-            8001,
+            2001,
+            new ShellSegmentSourceFactory(
+                "Brown Noise",
+                10,
+                [BrownNoise Infinite]))
+
+        let sec = TimeSpan.FromSeconds(1.0)
+
+        new Composite(
+            2002,
+            new ShellSegmentSourceFactory(
+                "Seconds Counter",
+                10,
+                [
+                    for _ in [0 .. 4] do
+                        BrownNoise (Finite sec)
+                        Silence (Finite sec)
+                ]))
+
+        new Composite(
+            2003,
             new ShellSegmentSourceFactory(
                 "Audio CD",
                 10,
@@ -40,13 +62,14 @@ module StreamRepository =
         |> Seq.toList
 
     /// Gets the tracked composite stream for the given channel number, or creates a new one pointed at the corresponding SiriusXM channel.
-    let private getOrCreate channelNumber =
+    let private get channelNumber =
         getCurrentChannels ()
         |> Seq.where (fun s -> s.ChannelListing.ChannelNumber = channelNumber)
-        |> Seq.head
+        |> Seq.tryHead
+        |> Option.defaultValue silence
 
     let getPlaylist channelNumber = String.concat "\n" [
-        let composite = getOrCreate channelNumber
+        let composite = get channelNumber
         composite.MarkActive()
 
         "#EXTM3U"
@@ -59,7 +82,7 @@ module StreamRepository =
     ]
 
     let getChunklist channelNumber = String.concat "\n" [
-        let composite = getOrCreate channelNumber
+        let composite = get channelNumber
         composite.MarkActive()
 
         let segments = composite.Cache.GetSegments()
@@ -90,7 +113,7 @@ module StreamRepository =
     ]
 
     let getChunkAsync channelNumber sequenceNumber = task {
-        let composite = getOrCreate channelNumber
+        let composite = get channelNumber
         composite.MarkActive()
         return! composite.Cache.GetSegmentDataAsync(sequenceNumber)
     }
@@ -98,7 +121,7 @@ module StreamRepository =
     /// Creates a task which starts tracking a channel number (if necessary), then waits until at least one segment is available for it.
     let waitForSegmentsAsync channelNumber (cancellationToken: CancellationToken) = task {
         try
-            let composite = getOrCreate channelNumber
+            let composite = get channelNumber
 
             composite.MarkActive()
 
@@ -111,7 +134,7 @@ module StreamRepository =
     }
 
     let getChannelListingAndProgramInformationAsync channelNumber (cancellationToken: CancellationToken) = task {
-        let composite = getOrCreate channelNumber
+        let composite = get channelNumber
 
         composite.MarkActive()
 
@@ -140,26 +163,35 @@ module StreamRepository =
                         printfn "[SegmentCacheRepository] Dropping [%d]" c.ChannelListing.ChannelNumber
                         do! (c :> IAsyncDisposable).DisposeAsync()
 
+                    let channelExists n =
+                        getCurrentChannels ()
+                        |> Seq.exists (fun c -> c.ChannelListing.ChannelNumber = n)
+
                     let! sxm = SiriusXMClient.GetChannelsAsync(cancellationToken) |> Async.AwaitTask
                     for c in sxm do
                         match Int32.TryParse(c.channelNumber) with
-                        | (false, _) -> ()
-                        | (true, num) ->
+                        | (true, num) when not (channelExists num) ->
                             ephemeral.Add(new Composite(
                                 num,
                                 new SiriusXMSourceFactory(c.name, c.mediumDescription, num)))
+                        | _ -> ()
 
-                    let! wpr = WPRStreamSource.all |> AsyncSeq.indexed |> AsyncSeq.toListAsync
-                    for (i, c) in wpr do
-                        let num = 8010 + int i
+                    let mutable nextChannelNumber =
+                        getCurrentChannels ()
+                        |> Seq.map (fun c -> c.ChannelListing.ChannelNumber + 1)
+                        |> Seq.max
+
+                    let! wpr = WPRStreamSource.all |> AsyncSeq.toListAsync
+                    for c in wpr do
                         ephemeral.Add(new Composite(
-                            num,
-                            new ShellSegmentSourceFactory(c.Name, 3, [RemoteStream c])))
+                            nextChannelNumber,
+                            new ShellSegmentSourceFactory(c.Name, 4, [RemoteStream c])))
+                        nextChannelNumber <- nextChannelNumber + 1
 
-                    let! pbs = PBSWisconsin.all |> AsyncSeq.indexed |> AsyncSeq.toListAsync
-                    for (i, f) in pbs do
-                        let num = 8020 + int i
-                        ephemeral.Add(new Composite(num, f))
+                    let! pbs = PBSWisconsin.all |> AsyncSeq.toListAsync
+                    for f in pbs do
+                        ephemeral.Add(new Composite(nextChannelNumber, f))
+                        nextChannelNumber <- nextChannelNumber + 1
 
                 do! Task.Delay(TimeSpan.FromHours(12.0), cancellationToken)
         }

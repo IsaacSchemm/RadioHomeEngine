@@ -25,49 +25,53 @@ module WPRStreamSource =
         ]
       }
     ]""">
+    
+    let private tzid = "America/Chicago"
+
+    let private getLocalTime () = TimeZoneInfo.ConvertTimeFromUtc(
+        DateTime.UtcNow,
+        TimeZoneInfo.FindSystemTimeZoneById(tzid))
+
+    let private asyncGetStreams =
+        let tz = TimeZoneInfo.FindSystemTimeZoneById("America/Chicago")
+        PlayerResponse.AsyncLoad("https://www.wpr.org/wp-json/wpr/v1/player?_locale=user")
+
+    let private getProgramInformationSource id = {
+        new IProgramInformationSource with
+            member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
+                let local = getLocalTime ()
+                let time = int (local - local.Date).TotalSeconds
+                let! streams = asyncGetStreams
+                let streamNow =
+                    streams
+                    |> Seq.where (fun s -> s.Id = id)
+                    |> Seq.tryHead
+                return {
+                    ChannelName =
+                        streams
+                        |> Seq.where (fun s -> s.Id = id)
+                        |> Seq.map (fun s -> s.Name)
+                        |> Seq.tryHead
+                        |> Option.defaultValue $"{id}"
+                    Program =
+                        streams
+                        |> Seq.where (fun s -> s.Id = id)
+                        |> Seq.collect (fun s -> s.Schedule)
+                        |> Seq.where (fun p -> time >= p.StartTime && time < p.EndTime)
+                        |> Seq.map (fun p -> Program p.ShowTitle)
+                        |> Seq.tryHead
+                        |> Option.defaultValue (Program "Unknown")
+                }
+            }
+    }
 
     let all = asyncSeq {
-        let tz = TimeZoneInfo.FindSystemTimeZoneById("America/Chicago")
-        let! resp = PlayerResponse.AsyncLoad("https://www.wpr.org/wp-json/wpr/v1/player?_locale=user")
+        let! resp = asyncGetStreams
 
         for stream in resp do yield {
             new IRemoteStreamSource with
                 member _.Name = stream.Name
-
-                member _.ProgramInformationSource = {
-                    new IProgramInformationSource with
-                        member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
-                            let id = stream.Id
-                            let local = TimeZoneInfo.ConvertTimeFromUtc(
-                                DateTime.UtcNow,
-                                tz)
-                            let time = int (local - local.Date).TotalSeconds
-                            let! resp = Async.StartAsTask(
-                                PlayerResponse.AsyncLoad("https://www.wpr.org/wp-json/wpr/v1/player?_locale=user"),
-                                cancellationToken = cancellationToken)
-                            let streamNow =
-                                resp
-                                |> Seq.where (fun s -> s.Id = id)
-                                |> Seq.tryHead
-                            let name =
-                                streamNow
-                                |> Option.map (fun s -> s.Name)
-                                |> Option.defaultValue $"{id}"
-                            let program =
-                                streamNow
-                                |> Option.map (fun s -> s.Schedule)
-                                |> Option.defaultValue Array.empty
-                                |> Seq.where (fun p -> time >= p.StartTime && time < p.EndTime)
-                                |> Seq.map (fun p -> p.ShowTitle)
-                                |> Seq.tryHead
-                                |> Option.defaultValue name
-                            return {
-                                ChannelName = name
-                                Program = Program program
-                            }
-                        }
-                }
-
+                member _.ProgramInformationSource = getProgramInformationSource stream.Id
                 member _.Url = stream.AudioUrl
         }
     }

@@ -65,69 +65,67 @@ module PBSWisconsin =
         }
       ]
     }""">
+    
+    let private tzid = "America/Chicago"
 
-    let all = asyncSeq {
-        let tzid = "America/Chicago"
-        let tz = TimeZoneInfo.FindSystemTimeZoneById(tzid)
-        let local = TimeZoneInfo.ConvertTimeFromUtc(
-            DateTime.UtcNow,
-            tz)
-        let! resp = ScheduleResponse.AsyncLoad($"""https://player.pbs.org/api/livestream-schedule/a3a25e36-3ba3-40b4-990f-7460511f0127/?date={local.Date.ToString("yyyy-MM-dd")}&timezone={Uri.EscapeDataString(tzid)}""")
+    let private getLocalTime () = TimeZoneInfo.ConvertTimeFromUtc(
+        DateTime.UtcNow,
+        TimeZoneInfo.FindSystemTimeZoneById(tzid))
 
-        let channels =
+    let private asyncGetSchedule =
+        let dateString = (getLocalTime ()).ToString("yyyy-MM-dd")
+        ScheduleResponse.AsyncLoad($"""https://player.pbs.org/api/livestream-schedule/a3a25e36-3ba3-40b4-990f-7460511f0127/?date={dateString}&timezone={Uri.EscapeDataString(tzid)}""")
+
+    let private asyncGetChannels = async {
+        let dateString = (getLocalTime ()).ToString("yyyy-MM-dd")
+        let! resp = ScheduleResponse.AsyncLoad($"""https://player.pbs.org/api/livestream-schedule/a3a25e36-3ba3-40b4-990f-7460511f0127/?date={dateString}&timezone={Uri.EscapeDataString(tzid)}""")
+
+        return
             resp.Collections
             |> Seq.collect (fun c -> c.Content)
             |> Seq.collect (fun c -> c.Channels)
+    }
+
+    let private getProgramInformationSource profile = {
+        new IProgramInformationSource with
+            member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
+                let! channels = asyncGetChannels
+                return {
+                    ChannelName =
+                        channels
+                        |> Seq.where (fun c -> c.Profile = profile)
+                        |> Seq.map (fun c -> c.FullName)
+                        |> Seq.tryHead
+                        |> Option.defaultValue $"{profile}"
+                    Program =
+                        channels
+                        |> Seq.where (fun c -> c.Profile = profile)
+                        |> Seq.collect (fun c -> c.Listings)
+                        |> Seq.where (fun p ->
+                            let now = DateTimeOffset.UtcNow
+                            let endTime = p.StartTime + TimeSpan.FromSeconds(float p.Duration)
+                            DateTimeOffset.UtcNow >= p.StartTime && DateTimeOffset.UtcNow < endTime)
+                        |> Seq.tryHead
+                        |> Option.map (fun l -> Song {
+                            Title = l.ShowTitle
+                            Artists = Option.toList l.EpisodeTitle
+                            Albums = []
+                            Images = Option.toList l.ListingImage
+                        })
+                        |> Option.defaultValue (Program "Unknown")
+                }
+            }
+    }
+
+    let all = asyncSeq {
+        let! channels = asyncGetChannels
 
         for channel in channels do
             match channel.NonDrmUrl with
             | None -> ()
             | Some url ->
-                let programInformationSource = {
-                    new IProgramInformationSource with
-                        member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
-                            let local = TimeZoneInfo.ConvertTimeFromUtc(
-                                DateTime.UtcNow,
-                                tz)
-                            let! resp = ScheduleResponse.AsyncLoad($"""https://player.pbs.org/api/livestream-schedule/a3a25e36-3ba3-40b4-990f-7460511f0127/?date={local.Date.ToString("yyyy-MM-dd")}&timezone={Uri.EscapeDataString(tzid)}""")
-                            let channels =
-                                resp.Collections
-                                |> Seq.collect (fun c -> c.Content)
-                                |> Seq.collect (fun c -> c.Channels)
-                            let channelNow =
-                                channels
-                                |> Seq.where (fun c -> c.Profile = channel.Profile)
-                                |> Seq.tryHead
-                            let name =
-                                channelNow
-                                |> Option.map (fun c -> c.FullName)
-                                |> Option.defaultValue channel.Profile
-                            let listing =
-                                channelNow
-                                |> Option.map (fun c -> c.Listings)
-                                |> Option.defaultValue Array.empty
-                                |> Seq.where (fun p ->
-                                    let now = DateTimeOffset.UtcNow
-                                    let endTime = p.StartTime + TimeSpan.FromSeconds(float p.Duration)
-                                    DateTimeOffset.UtcNow >= p.StartTime && DateTimeOffset.UtcNow < endTime)
-                                |> Seq.tryHead
-                            return {
-                                ChannelName = name
-                                Program =
-                                    match listing with
-                                    | None -> Program name
-                                    | Some l -> Song {
-                                        Title = l.ShowTitle
-                                        Artists = Option.toList l.EpisodeTitle
-                                        Albums = []
-                                        Images = Option.toList l.ListingImage
-                                    }
-                            }
-                        }
-                }
-
                 yield new UnauthenticatedHLSSourceFactory(
                     channel.FullName,
                     url,
-                    Some programInformationSource)
+                    Some (getProgramInformationSource channel.Profile))
     }

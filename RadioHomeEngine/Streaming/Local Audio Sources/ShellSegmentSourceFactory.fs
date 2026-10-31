@@ -10,8 +10,6 @@ open System.Threading.Channels
 type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inputs: ShellWrapperInput list) =
     let _ = printfn "[ShellSegmentSourceFactory] Creating"
 
-    let factoryCancellationTokenSource = new CancellationTokenSource()
-
     let hlsBitrate = 320 * 1024
 
     let quietParameters = "-nostats -hide_banner -loglevel warning"
@@ -176,7 +174,7 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
         member this.ProgramInformationSource = this
 
         member this.CreateAsync() = task {
-            factoryCancellationTokenSource.Token.ThrowIfCancellationRequested()
+            let cancellationTokenSource = new CancellationTokenSource()
 
             let tempPathDirName = $"RadioHomeEngine-ShellWrapper-{Guid.NewGuid()}"
 
@@ -231,9 +229,9 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
 
                     let mutable allSegmentsRead = false
                     
-                    let cancellationToken = factoryCancellationTokenSource.Token
+                    let cancellationToken = cancellationTokenSource.Token
 
-                    while not disposing && not allSegmentsRead && not cancellationToken.IsCancellationRequested do
+                    while not disposing && not allSegmentsRead && not cancellationTokenSource.IsCancellationRequested do
                         let! len = input.ReadAsync(buffer, cancellationToken)
                         let streamFinished = len = 0
 
@@ -314,7 +312,7 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
 
                         disposing <- true
 
-                        factoryCancellationTokenSource.Cancel()
+                        cancellationTokenSource.Cancel()
 
                         do! pipe
 
