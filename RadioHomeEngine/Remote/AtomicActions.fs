@@ -34,23 +34,20 @@ module AtomicActions =
     let performActionAsync player atomicAction = task {
         match atomicAction with
         | PlayChannel (channelNumber, position) ->
-            let! channels = SiriusXMClient.GetChannelsAsync(CancellationToken.None)
-            let channelName =
-                match channelNumber with
-                | 0 | 8000 -> "RadioHomeEngine"
-                | _ ->
-                    channels
-                    |> Seq.where (fun c -> c.channelNumber = $"{channelNumber}")
-                    |> Seq.map (fun c -> c.name)
-                    |> Seq.tryHead
-                    |> Option.defaultValue ""
-
-            let! address = Network.getAddressAsync ()
-            let url = $"http://{address}:{Config.port}/Stream/playlist-{channelNumber}.m3u8"
-            let title = $"[{channelNumber}] {channelName}"
-            match position with
-            | Now -> do! Playlist.playItemAsync player url title
-            | Last -> do! Playlist.addItemAsync player url title
+            let channel =
+                StreamRepository.getCurrentChannels ()
+                |> Seq.where (fun c -> c.ChannelListing.ChannelNumber = channelNumber)
+                |> Seq.tryHead
+            match channel with
+            | None -> ()
+            | Some ch ->
+                let channelName = ch.ChannelListing.ChannelInformation.ChannelName
+                let! address = Network.getAddressAsync ()
+                let url = $"http://{address}:{Config.port}/Stream/playlist-{channelNumber}.m3u8"
+                let title = $"[{channelNumber}] {channelName}"
+                match position with
+                | Now -> do! Playlist.playItemAsync player url title
+                | Last -> do! Playlist.addItemAsync player url title
 
         | PlayPause ->
             let! state = Playlist.getModeAsync player
