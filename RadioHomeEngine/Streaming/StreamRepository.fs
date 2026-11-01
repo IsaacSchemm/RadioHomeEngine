@@ -175,7 +175,7 @@ module StreamRepository =
                             [WWVSimulator]))
 
                     for d in DiscDrive.getAll () do
-                        add 1000 (new ShellSegmentSourceFactory(
+                        add 1101 (new ShellSegmentSourceFactory(
                             DiscDrive.getPath d,
                             10,
                             [AudioCD (SingleDrive d)]))
@@ -221,6 +221,41 @@ module StreamRepository =
                     try
                         let! converge = RadioCo.getByStationIdAsync "Converge Radio" "s5fa0df0d2" cancellationToken
                         add 10190 (new ShellSegmentSourceFactory("Converge Radio 101.9 FM", 10, [RemoteStream converge]))
+                    with ex -> Console.Error.WriteLine(ex)
+
+                    try
+                        // TODO: hardcode the media directory, and also use it for CD ripping, so that Lyrion is not required for these
+                        let! mediaDirsTask = Task.WhenAny [
+                            LyrionCLI.General.getMediaDirsAsync()
+                            task {
+                                do! Task.Delay(3000)
+                                return [| "K:/Documents/Music" |]
+                            }
+                        ]
+
+                        let! mediaDirs = mediaDirsTask
+
+                        // TODO: instead of passing a list of files to ShellSegmentSourceFactory,
+                        // make it run buildGeneratorScript for each new song, and have it grab a new file path from some other object
+                        let files =
+                            seq {
+                                for mediaDir in mediaDirs do
+                                    let subDirs = Directory.EnumerateDirectories(
+                                        mediaDir,
+                                        "*Lisa*Stansfield*",
+                                        new EnumerationOptions(RecurseSubdirectories = true))
+                                    for subDir in subDirs do
+                                        let files = Directory.EnumerateFiles(subDir, "*.flac")
+                                        yield! files
+                            }
+                            |> Seq.distinct
+                            |> Seq.randomShuffle
+                            |> Seq.map AudioFile
+                            |> Seq.toList
+
+                        try
+                            add 1000 (new ShellSegmentSourceFactory("Lisa Stansfield", 10, files))
+                        with ex -> Console.Error.WriteLine(ex)
                     with ex -> Console.Error.WriteLine(ex)
 
                 do! Task.Delay(TimeSpan.FromHours(6.0), cancellationToken)
