@@ -235,8 +235,9 @@ module StreamRepository =
 
                         let! mediaDirs = mediaDirsTask
 
-                        // TODO: instead of passing a list of files to ShellSegmentSourceFactory,
-                        // make it run buildGeneratorScript for each new song, and have it grab a new file path from some other object
+                        // TODO: find a different time to generate the random list of songs - either do it after each song plays,
+                        // or generate a very long list and somehow make sure the factory doesn't start from the beginning when
+                        // the composite is marked inactive
                         let files =
                             seq {
                                 for mediaDir in mediaDirs do

@@ -253,15 +253,22 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
 
             let realChunklistPath = Path.Combine(realTempPath, "chunklist.m3u8")
 
+            // TODO: use readrate_catchup here if the ffmpeg version is new enough
+
             let reencoder = Process.Start(new ProcessStartInfo(
                 "ffmpeg",
-                $"{quietParameters} -readrate 1 {formatParameters} -i - {hlsParameters} {realChunklistPath}",
+                $"-readrate 1 {formatParameters} -i - {hlsParameters} {realChunklistPath}",
                 RedirectStandardInput = true))
 
             let channel = Channel.CreateBounded(3)
             let mutable disposing = false
 
             let pipe = task {
+                // We manually pipe data between these two processes so that:
+                // 1. We can pause audio generation while we read generated segments into memory and delete them from the temporary folder
+                // 2. We can end the encoder's stdin when this object is disposed
+                // 3. We can add extra silence to the end of the audio data until a full segment is generated
+
                 try
                     let mutable mediaSequence = new UInt128(0UL, 500UL)
 

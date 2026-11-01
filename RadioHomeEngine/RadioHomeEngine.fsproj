@@ -42,9 +42,9 @@
     <Compile Include="Streaming\Segments\ISegmentSourceFactory.fs" />
     <Compile Include="Streaming\Remote Streams\IRemoteStreamSource.fs" />
     <Compile Include="Streaming\Remote Streams\WPR.fs" />
-    <Compile Include="streaming\remote streams\PBSWisconsin.fs" />
-    <Compile Include="streaming\remote streams\WHYS.fs" />
-    <Compile Include="streaming\remote streams\RadioCo.fs" />
+    <Compile Include="Streaming\Remote Streams\PBSWisconsin.fs" />
+    <Compile Include="Streaming\Remote Streams\WHYS.fs" />
+    <Compile Include="Streaming\Remote Streams\RadioCo.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperDuration.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperInput.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperParameters.fs" />
