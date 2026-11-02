@@ -16,7 +16,6 @@ type WeatherAlertService() =
                     if not (List.isEmpty alerts) then
                         let factory = new ShellSegmentSourceFactory(
                             "Weather",
-                            4,
                             [for a in alerts do SpeechSynthesis (a.info.screen, a.info.speech)])
                         for stream in streams do
                             do! stream.InterruptAsync(factory)

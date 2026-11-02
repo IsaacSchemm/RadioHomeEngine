@@ -13,13 +13,30 @@ module StreamRepository =
         0,
         new ShellSegmentSourceFactory(
             "Channel Not Found",
-            10,
             [Silence Infinite]))
+
+    let silence = new Composite(
+        1000,
+        new ShellSegmentSourceFactory(
+            "Silence",
+            [Silence Infinite]),
+        ClearCacheOnInactive = false)
+
+    let brownNoise = new Composite(
+        1001,
+        new ShellSegmentSourceFactory(
+            "Brown Noise",
+            [BrownNoise Infinite]),
+        ClearCacheOnInactive = false)
 
     let private ephemeral = new ResizeArray<Composite>()
 
     /// All currently tracked channels.
-    let getCurrentChannels () = ephemeral :> Composite seq
+    let getCurrentChannels () = seq {
+        silence
+        brownNoise
+        yield! ephemeral
+    }
 
     /// All active channels.
     let getActiveChannels () =
@@ -154,30 +171,26 @@ module StreamRepository =
                         | _ -> ()
 
                     add 1000 (new ShellSegmentSourceFactory(
-                        "Silence",
-                        10,
-                        [Silence Infinite]))
-
-                    add 1000 (new ShellSegmentSourceFactory(
-                        "Brown Noise",
-                        10,
-                        [BrownNoise Infinite]))
-
-                    add 1000 (new ShellSegmentSourceFactory(
                         "Forecast",
-                        10,
                         [Forecast]))
 
                     if File.Exists("/usr/bin/wwvsim") || File.Exists("/usr/local/bin/wwvsim") then
                         add 1000 (new ShellSegmentSourceFactory(
                             "Time Signal",
-                            10,
                             [WWVSimulator]))
+
+                    if Directory.Exists("C:/Windows/Media") then
+                        add 1000 (new ShellSegmentSourceFactory(
+                            "Windows Alarms",
+                            [
+                                for f in Directory.EnumerateFiles("C:/Windows/Media", "*.wav") do
+                                    if Path.GetFileName(f).StartsWith("Alarm") then
+                                        AudioFile f
+                            ]))
 
                     for d in DiscDrive.getAll () do
                         add 1101 (new ShellSegmentSourceFactory(
                             DiscDrive.getPath d,
-                            10,
                             [AudioCD (SingleDrive d)]))
 
                     add 1300 (new HLSSourceFactory(
@@ -201,7 +214,7 @@ module StreamRepository =
                                 | "PBS KIDS" -> 2804
                                 | _ -> 1000
 
-                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, 10, [RemoteStream source]))
+                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, [RemoteStream source]))
                     with ex -> Console.Error.WriteLine(ex)
 
                     try
@@ -213,14 +226,14 @@ module StreamRepository =
                                 | "WPR News" -> 8830
                                 | _ -> 1000
 
-                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, 10, [RemoteStream source]))
+                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, [RemoteStream source]))
                     with ex -> Console.Error.WriteLine(ex)
 
-                    add 9630 (new ShellSegmentSourceFactory("WHYS 96.3 FM", 10, [RemoteStream WHYS.source]))
+                    add 9630 (new ShellSegmentSourceFactory("WHYS 96.3 FM", [RemoteStream WHYS.source]))
 
                     try
                         let! converge = RadioCo.getByStationIdAsync "Converge Radio" "s5fa0df0d2" cancellationToken
-                        add 10190 (new ShellSegmentSourceFactory("Converge Radio 101.9 FM", 10, [RemoteStream converge]))
+                        add 10190 (new ShellSegmentSourceFactory("Converge Radio 101.9 FM", [RemoteStream converge]))
                     with ex -> Console.Error.WriteLine(ex)
 
                     try
@@ -235,9 +248,6 @@ module StreamRepository =
 
                         let! mediaDirs = mediaDirsTask
 
-                        // TODO: find a different time to generate the random list of songs - either do it after each song plays,
-                        // or generate a very long list and somehow make sure the factory doesn't start from the beginning when
-                        // the composite is marked inactive
                         let files =
                             seq {
                                 for mediaDir in mediaDirs do
@@ -255,7 +265,7 @@ module StreamRepository =
                             |> Seq.toList
 
                         try
-                            add 1000 (new ShellSegmentSourceFactory("Lisa Stansfield", 10, files))
+                            add 1000 (new ShellSegmentSourceFactory("Lisa Stansfield", files))
                         with ex -> Console.Error.WriteLine(ex)
                     with ex -> Console.Error.WriteLine(ex)
 
@@ -270,7 +280,7 @@ module StreamRepository =
                 // Mark composite streams as inactive if they have not been streamed recently.
                 // This will tell them to stop listening for new segments from their audio source, and - if the source is the root - to dispose of it, creating a new one later if needed.
                 for composite in getCurrentChannels () do
-                    composite.CheckForInactivity()
+                    do! composite.CheckForInactivityAsync()
 
                 do! Task.Delay(TimeSpan.FromMinutes(1.0), cancellationToken)
         }

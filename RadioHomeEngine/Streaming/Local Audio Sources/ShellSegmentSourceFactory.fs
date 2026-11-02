@@ -7,9 +7,10 @@ open System.Threading
 open System.Threading.Tasks
 open System.Threading.Channels
 
-type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inputs: ShellWrapperInput list) =
+type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput list) =
     let _ = printfn "[ShellSegmentSourceFactory] Creating"
 
+    let segmentTimeSeconds = 10
     let hlsBitrate = 320 * 1024
 
     let quietParameters = "-nostats -hide_banner -loglevel warning"
@@ -19,7 +20,20 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
     let scriptFileName = "script.sh"
     let programNameFileName = "currentIndex.txt"
 
-    let mutable currentInput = None
+    let mutable inputPointer = -1
+
+    let getInputsForNextRun () =
+        let indexed = List.indexed inputList
+
+        let remaining =
+            inputList
+            |> Seq.indexed
+            |> Seq.skipWhile (fun (i, _) -> i <= inputPointer)
+            |> Seq.toList
+
+        if List.isEmpty remaining
+        then indexed
+        else remaining
 
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
 
@@ -31,7 +45,7 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
 
         let eof = $"{Guid.NewGuid()}"
 
-        for (i, input) in Seq.indexed inputs do
+        for (i, input) in getInputsForNextRun () do
             $"echo {i} > {unixTempPath}/{programNameFileName}"
 
             match input with
@@ -168,6 +182,8 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
                     formatParameters
                     "-"
                 ]
+
+        $"echo -1 > {unixTempPath}/{programNameFileName}"
     ]
 
     interface IProgramInformationSource with
@@ -177,8 +193,9 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
                 Program = Program str
             }
 
-            match currentInput with
-            | None -> return forName "Unknown"
+            match inputList |> List.tryItem inputPointer with
+            | None ->
+                return forName "Unknown"
             | Some input ->
                 match input with
                 | AudioCD scope ->
@@ -299,12 +316,12 @@ type ShellSegmentSourceFactory(displayName: string, segmentTimeSeconds: int, inp
                             if File.Exists(programInformationFilePath) then
                                 let! contents = File.ReadAllTextAsync(programInformationFilePath, cancellationToken)
 
-                                let index =
+                                let nextIndex =
                                     match contents.Trim() with
                                     | Int32 i -> i
                                     | _ -> -1
 
-                                currentInput <- List.tryItem index inputs
+                                inputPointer <- nextIndex
 
                                 File.Delete(programInformationFilePath)
 

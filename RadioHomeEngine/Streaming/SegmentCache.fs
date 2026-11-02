@@ -75,6 +75,9 @@ type SegmentCache() =
 
         evictStale ()
 
+    member _.Clear() =
+        cache <- []
+
     member _.GetSegments() =
         cache
         |> List.truncate 3

@@ -66,10 +66,13 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
     }
 
     member _.Cache = cache
+
     member _.ChannelListing = {
         ChannelNumber = channelNumber
         ChannelInformation = rootFactory.ChannelInformation
     }
+
+    member val ClearCacheOnInactive = true with get, set
 
     member _.GetCurrentStreamInformationAsync(cancellationToken) = task {
         let programInformationSource =
@@ -106,12 +109,19 @@ type Composite(channelNumber: int, rootFactory: ISegmentSourceFactory) =
             isActive <- true
             stopWaitingForNextSegment ()
 
-    member this.CheckForInactivity() =
-        if isActive && DateTimeOffset.UtcNow - lastActive > TimeSpan.FromMinutes(1.0) && interruptions = [] then
-            // TODO: allow this to happen when interruptions <> [] without crashing
-            printfn "[Composite] Marking inactive [%d]" channelNumber
-            isActive <- false
-            stopWaitingForNextSegment ()
+    member this.CheckForInactivityAsync() = task {
+        if isActive && DateTimeOffset.UtcNow - lastActive > TimeSpan.FromMinutes(1.0) then
+            match interruptions with
+            | _ :: _ ->
+                printfn "[Composite] Clearing interruption due to inactivity [%d]" channelNumber
+                do! endInterruptionAsync ()
+            | [] ->
+                printfn "[Composite] Marking inactive [%d]" channelNumber
+                isActive <- false
+                if this.ClearCacheOnInactive then
+                    cache.Clear()
+                stopWaitingForNextSegment ()
+    }
 
     interface IAsyncDisposable with
         member this.DisposeAsync() = ValueTask (task {
