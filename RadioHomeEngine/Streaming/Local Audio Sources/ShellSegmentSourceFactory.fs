@@ -270,11 +270,9 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
 
             let realChunklistPath = Path.Combine(realTempPath, "chunklist.m3u8")
 
-            // TODO: use readrate_catchup here if the ffmpeg version is new enough
-
             let reencoder = Process.Start(new ProcessStartInfo(
                 "ffmpeg",
-                $"-readrate 1 {formatParameters} -i - {hlsParameters} {realChunklistPath}",
+                $"-readrate 1 -readrate_catchup 2 {formatParameters} -i - {hlsParameters} {realChunklistPath}",
                 RedirectStandardInput = true))
 
             let channel = Channel.CreateBounded(3)
