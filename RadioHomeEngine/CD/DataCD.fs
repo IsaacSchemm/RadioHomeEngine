@@ -42,10 +42,8 @@ module DataCD =
 
     /// Copy all audio files on data discs in the given scope to a new folder in the Lyrion music library.
     let ripAsync scope = task {
-        let! dirs = LyrionCLI.General.getMediaDirsAsync()
-
         let mediaDir =
-            dirs
+            Config.mediaDirectories
             |> Seq.tryHead
             |> Option.defaultWith (fun () -> failwith "No media_dir found to rip to")
 

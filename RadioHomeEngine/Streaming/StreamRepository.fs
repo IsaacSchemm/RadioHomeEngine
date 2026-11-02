@@ -237,36 +237,13 @@ module StreamRepository =
                     with ex -> Console.Error.WriteLine(ex)
 
                     try
-                        // TODO: hardcode the media directory, and also use it for CD ripping, so that Lyrion is not required for these
-                        let! mediaDirsTask = Task.WhenAny [
-                            LyrionCLI.General.getMediaDirsAsync()
-                            task {
-                                do! Task.Delay(3000)
-                                return [| "K:/Documents/Music" |]
-                            }
-                        ]
+                        add 1000 (new ShellSegmentSourceFactory(
+                            "Lisa Stansfield",
+                            Shuffle.byFolderNamePattern "*Lisa*Stansfield*"))
 
-                        let! mediaDirs = mediaDirsTask
-
-                        let files =
-                            seq {
-                                for mediaDir in mediaDirs do
-                                    let subDirs = Directory.EnumerateDirectories(
-                                        mediaDir,
-                                        "*Lisa*Stansfield*",
-                                        new EnumerationOptions(RecurseSubdirectories = true))
-                                    for subDir in subDirs do
-                                        let files = Directory.EnumerateFiles(subDir, "*.flac")
-                                        yield! files
-                            }
-                            |> Seq.distinct
-                            |> Seq.randomShuffle
-                            |> Seq.map AudioFile
-                            |> Seq.toList
-
-                        try
-                            add 1000 (new ShellSegmentSourceFactory("Lisa Stansfield", files))
-                        with ex -> Console.Error.WriteLine(ex)
+                        add 1000 (new ShellSegmentSourceFactory(
+                            "They Might Be Giants",
+                            Shuffle.byFolderNamePattern "*They*Might*Be*Giants*"))
                     with ex -> Console.Error.WriteLine(ex)
 
                 do! Task.Delay(TimeSpan.FromHours(6.0), cancellationToken)

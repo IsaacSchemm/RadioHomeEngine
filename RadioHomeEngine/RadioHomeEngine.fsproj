@@ -58,6 +58,7 @@
     <Compile Include="Streaming\Remote HLS Streams\SiriusXM\SiriusXMSourceFactory.fs" />
     <Compile Include="Streaming\SegmentCache.fs" />
     <Compile Include="Streaming\Composite.fs" />
+    <Compile Include="streaming\Shuffle.fs" />
     <Compile Include="Streaming\StreamRepository.fs" />
     <Compile Include="Streaming\WeatherAlertService.fs" />
     <Compile Include="Remote\AtomicActions.fs" />

@@ -37,10 +37,8 @@ module Abcde =
     /// Rips one or more audio CDs to the media directory used by Lyrion.
     let ripAsync scope = task {
         try
-            let! dirs = LyrionCLI.General.getMediaDirsAsync()
-
             let dir =
-                dirs
+                Config.mediaDirectories
                 |> Seq.tryHead
                 |> Option.defaultWith (fun () -> failwith "No media_dir found to rip to")
 
