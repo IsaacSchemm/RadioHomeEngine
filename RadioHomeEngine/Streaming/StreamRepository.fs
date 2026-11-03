@@ -237,13 +237,13 @@ module StreamRepository =
                     with ex -> Console.Error.WriteLine(ex)
 
                     try
-                        add 1000 (new ShellSegmentSourceFactory(
-                            "Lisa Stansfield",
-                            Shuffle.byFolderNamePattern "*Lisa*Stansfield*"))
-
-                        add 1000 (new ShellSegmentSourceFactory(
-                            "They Might Be Giants",
-                            Shuffle.byFolderNamePattern "*They*Might*Be*Giants*"))
+                        for artist in Shuffle.artists do
+                            let! files = Async.StartAsTask(
+                                Shuffle.asyncByArtist artist |> AsyncSeq.toListAsync,
+                                cancellationToken = cancellationToken)
+                            add 1000 (new ShellSegmentSourceFactory(
+                                artist,
+                                files))
                     with ex -> Console.Error.WriteLine(ex)
 
                 do! Task.Delay(TimeSpan.FromHours(6.0), cancellationToken)
