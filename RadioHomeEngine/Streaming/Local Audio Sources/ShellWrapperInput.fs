@@ -5,6 +5,7 @@ open System.Threading.Tasks
 
 type ShellWrapperInput =
 | AudioCD of DiscDriveScope
+| AudioCDTrack of DiscDrive * int * Song
 | AudioFile of path: string
 | BrownNoise of duration: ShellWrapperDuration
 | Forecast

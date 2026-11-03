@@ -68,6 +68,21 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
                         ]
                     | _ -> ()
 
+            | AudioCDTrack (drive, trackNumber, _) ->
+                String.concat " " [
+                    "icedax"
+                    $"-D {DiscDrive.getPath drive}"
+                    $"-t {trackNumber}"
+                    "-"
+                    "|"
+                    "ffmpeg"
+                    quietParameters
+                    "-f wav"
+                    "-i -"
+                    formatParameters
+                    "-"
+                ]
+
             | AudioFile target ->
                 let tempFileName = $"{Guid.NewGuid()}{Path.GetExtension(target)}"
                 let tempFilePath = Path.Combine(realTempPath, tempFileName)
@@ -211,6 +226,11 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
                                 | [] -> "Unknown disc"
                             ]
                     ])
+                | AudioCDTrack (_, _, song) ->
+                    return {
+                        ChannelName = displayName
+                        Program = Song song
+                    }
                 | AudioFile path ->
                     let! info = Probe.getAudioFileInfoAsync path cancellationToken
                     return {

@@ -29,12 +29,14 @@ module StreamRepository =
             [BrownNoise Infinite]),
         ClearCacheOnInactive = false)
 
+    let private disc = new ResizeArray<Composite>()
     let private ephemeral = new ResizeArray<Composite>()
 
     /// All currently tracked channels.
     let getCurrentChannels () = seq {
         silence
         brownNoise
+        yield! disc
         yield! ephemeral
     }
 
@@ -131,58 +133,53 @@ module StreamRepository =
         |}
     }
 
+    let private add (list: ResizeArray<Composite>) desiredChannelNumber factory =
+        let mutable channelNumber = desiredChannelNumber
+        while getCurrentChannels () |> Seq.exists (fun c -> c.ChannelListing.ChannelNumber = channelNumber) do
+            channelNumber <- channelNumber + 1
+
+        list.Add(
+            new Composite(
+                channelNumber,
+                factory))
+
+    let private addShell list desiredChannelNumber displayName inputs =
+        add list desiredChannelNumber (new ShellSegmentSourceFactory(displayName, inputs))
+
     type ChannelListingRefreshService() =
         inherit BackgroundService()
 
         let populateAllAsync cancellationToken = task {
-            let add desiredChannelNumber factory =
-                let mutable channelNumber = desiredChannelNumber
-                while getCurrentChannels () |> Seq.exists (fun c -> c.ChannelListing.ChannelNumber = channelNumber) do
-                    channelNumber <- channelNumber + 1
-
-                ephemeral.Add(
-                    new Composite(
-                        channelNumber,
-                        factory))
-
-            let addShell desiredChannelNumber displayName inputs =
-                add desiredChannelNumber (new ShellSegmentSourceFactory(displayName, inputs))
-
             let! sxm = SiriusXMClient.GetChannelsAsync(cancellationToken) |> Async.AwaitTask
             for c in sxm do
                 match Int32.TryParse(c.channelNumber) with
                 | (true, num) ->
-                        add num (new SiriusXMSourceFactory(c.name, c.mediumDescription, num))
+                        add ephemeral num (new SiriusXMSourceFactory(c.name, c.mediumDescription, num))
                 | _ -> ()
 
             try
                 for artist in List.sort ["Lisa Stansfield"; "Steps"; "They Might Be Giants"; "Jamie Paige"; "Dionne Warwick"] do
                     let! files = Shuffle.byArtistAsync artist cancellationToken
-                    addShell 1000 artist [for f in files do AudioFile f]
+                    addShell ephemeral 1000 artist [for f in files do AudioFile f]
             with ex -> Console.Error.WriteLine(ex)
 
-            addShell 2000 "Audio CD (All)" [AudioCD AllDrives]
-
-            for (i, d) in Seq.indexed (DiscDrive.getAll ()) do
-                addShell 2000 $"Audio CD ({DiscDrive.getPath d})" [AudioCD (SingleDrive d)]
-
-            addShell 3000 "Forecast" [Forecast]
+            addShell ephemeral 3000 "Forecast" [Forecast]
 
             if File.Exists("/usr/bin/wwvsim") || File.Exists("/usr/local/bin/wwvsim") then
-                addShell 3000 "Time Signal" [WWVSimulator]
+                addShell ephemeral 3000 "Time Signal" [WWVSimulator]
 
             if Directory.Exists("C:/Windows/Media") then
-                addShell 3000 "Windows Alarms" [
+                addShell ephemeral 3000 "Windows Alarms" [
                     for f in Directory.EnumerateFiles("C:/Windows/Media", "*.wav") do
                         if Path.GetFileName(f).StartsWith("Alarm") then
                             AudioFile f
                 ]
 
-            addShell 9630 "WHYS 96.3 FM" [RemoteStream WHYS.source]
+            addShell ephemeral 9630 "WHYS 96.3 FM" [RemoteStream WHYS.source]
 
             try
                 let! converge = RadioCo.getByStationIdAsync "Converge Radio" "s5fa0df0d2" cancellationToken
-                addShell 10190 "Converge Radio 101.9 FM" [RemoteStream converge]
+                addShell ephemeral 10190 "Converge Radio 101.9 FM" [RemoteStream converge]
             with ex -> Console.Error.WriteLine(ex)
 
             try
@@ -194,15 +191,10 @@ module StreamRepository =
                         | "WPR News" -> 20970
                         | _ -> 20000
 
-                    addShell desiredNumber source.Name [RemoteStream source]
+                    addShell ephemeral desiredNumber source.Name [RemoteStream source]
             with ex -> Console.Error.WriteLine(ex)
 
-            add 30130 (new HLSSourceFactory(
-                "WEAU 13 News",
-                "https://dai.google.com/linear/hls/pa/event/oXo4JAFUT_aIXI11n21Rtw/stream/10bfd9f3-70ce-4423-b3ec-62bf008750b1:ATL/master.m3u8",
-                None))
-
-            add 30180 (new HLSSourceFactory(
+            add ephemeral 30180 (new HLSSourceFactory(
                 "WQOW 18 News",
                 "https://streamingengineservice-prod01-v1.fuelmedia.io/play/6a60c7ae-75e2-465f-bd30-1b1506880293.m3u8",
                 None))
@@ -215,7 +207,7 @@ module StreamRepository =
                         | [| Int32 major; Int32 minor |] -> 30000 + 10 * major + minor
                         | _ -> 30000
 
-                    addShell desiredNumber source.FullName [RemoteStream source]
+                    addShell ephemeral desiredNumber source.FullName [RemoteStream source]
             with ex -> Console.Error.WriteLine(ex)
         }
 
@@ -227,12 +219,59 @@ module StreamRepository =
                     ephemeral.Clear()
 
                     for c in old do
-                        printfn "[SegmentCacheRepository] Dropping [%d]" c.ChannelListing.ChannelNumber
+                        printfn "[StreamRepository] Dropping [%d]" c.ChannelListing.ChannelNumber
                         do! (c :> IAsyncDisposable).DisposeAsync()
 
                     do! populateAllAsync cancellationToken
 
                 do! Task.Delay(TimeSpan.FromHours(6.0), cancellationToken)
+        }
+
+    module AudioCDChannelListing =
+        let repopulateAllAsync cancellationToken = task {
+            let old = List.ofSeq disc
+
+            for c in old do
+                printfn "[AudioCDChannelListing] Dropping [%d]" c.ChannelListing.ChannelNumber
+                disc.Remove(c) |> ignore
+                do! (c :> IAsyncDisposable).DisposeAsync()
+
+            try
+                let getTracks dd = [
+                    match DiscDriveStatus.tryGetAudioDiscInfo dd with
+                    | None -> ()
+                    | Some audioDiscInfo ->
+                        for t in audioDiscInfo.tracks do
+                            let song = {
+                                Title = t.title
+                                Artists = audioDiscInfo.artists
+                                Albums = audioDiscInfo.titles
+                                Images = []
+                            }
+                            AudioCDTrack (dd, t.position, song)
+                ]
+
+                let allTracks = [
+                    for dd in DiscDrive.getAll () do
+                        yield! getTracks dd
+                ]
+
+                if allTracks <> [] then
+                    addShell disc 2000 "Play CD (All)" [AudioCD AllDrives]
+                    addShell disc 2020 $"Shuffle CD (All)" (List.randomShuffle allTracks)
+
+                for dd in DiscDrive.getAll () do
+                    let title =
+                        DiscDriveStatus.tryGetAudioDiscInfo dd
+                        |> Option.bind (fun i -> List.tryHead i.titles)
+                        |> Option.defaultValue (DiscDrive.getPath dd)
+
+                    let tracks = getTracks dd
+
+                    if tracks <> [] then
+                        addShell disc 2000 $"Play CD ({title})" [AudioCD (SingleDrive dd)]
+                        addShell disc 2020 $"Shuffle CD ({title})" (List.randomShuffle tracks)
+            with ex -> Console.Error.WriteLine(ex)
         }
 
     type CleanupService() =

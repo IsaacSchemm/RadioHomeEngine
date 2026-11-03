@@ -24,7 +24,6 @@
     <Compile Include="CD\MusicBrainz.fs" />
     <Compile Include="CD\AudioCD.fs" />
     <Compile Include="CD\DiscDriveStatus.fs" />
-    <Compile Include="CD\DiscDriveChangeDetectionService.fs" />
     <Compile Include="CD\DataCD.fs" />
     <Compile Include="CD\CD.fs" />
     <Compile Include="Weather\NWS.fs" />
@@ -65,6 +64,7 @@
     <Compile Include="Remote\AtomicActions.fs" />
     <Compile Include="Remote\LyrionIR.fs" />
     <Compile Include="Remote\LyrionIRHandler.fs" />
+    <Compile Include="DiscDriveChangeDetectionService.fs" />
     <Compile Include="LyrionPlayerDetectionService.fs" />
   </ItemGroup>
 

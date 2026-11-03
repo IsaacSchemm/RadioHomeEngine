@@ -44,9 +44,6 @@ module Shuffle =
             |> Seq.randomShuffle
             |> Seq.toList
 
-        for path in paths do
-            printfn "%s" path
-
         yield! paths
 
         if paths.Length >= 4 then
