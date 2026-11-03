@@ -156,7 +156,7 @@ module StreamRepository =
                 | _ -> ()
 
             try
-                for artist in List.sort ["Lisa Stansfield"; "Steps"; "They Might Be Giants"; "Jamie Paige"] do
+                for artist in List.sort ["Lisa Stansfield"; "Steps"; "They Might Be Giants"; "Jamie Paige"; "Dionne Warwick"] do
                     let! files = Shuffle.byArtistAsync artist cancellationToken
                     addShell 1000 artist [for f in files do AudioFile f]
             with ex -> Console.Error.WriteLine(ex)
@@ -178,18 +178,6 @@ module StreamRepository =
                             AudioFile f
                 ]
 
-            try
-                let! wpr = WPR.all |> AsyncSeq.toListAsync
-                for source in wpr do
-                    let desiredNumber =
-                        match source.Name with
-                        | "WPR Music" -> 8970
-                        | "WPR News" -> 8830
-                        | _ -> 8000
-
-                    addShell desiredNumber source.Name [RemoteStream source]
-            with ex -> Console.Error.WriteLine(ex)
-
             addShell 9630 "WHYS 96.3 FM" [RemoteStream WHYS.source]
 
             try
@@ -197,12 +185,24 @@ module StreamRepository =
                 addShell 10190 "Converge Radio 101.9 FM" [RemoteStream converge]
             with ex -> Console.Error.WriteLine(ex)
 
-            add 40130 (new HLSSourceFactory(
+            try
+                let! wpr = WPR.all |> AsyncSeq.toListAsync
+                for source in wpr do
+                    let desiredNumber =
+                        match source.Name with
+                        | "WPR Music" -> 20930
+                        | "WPR News" -> 20970
+                        | _ -> 20000
+
+                    addShell desiredNumber source.Name [RemoteStream source]
+            with ex -> Console.Error.WriteLine(ex)
+
+            add 30130 (new HLSSourceFactory(
                 "WEAU 13 News",
                 "https://dai.google.com/linear/hls/pa/event/oXo4JAFUT_aIXI11n21Rtw/stream/10bfd9f3-70ce-4423-b3ec-62bf008750b1:ATL/master.m3u8",
                 None))
 
-            add 40180 (new HLSSourceFactory(
+            add 30180 (new HLSSourceFactory(
                 "WQOW 18 News",
                 "https://streamingengineservice-prod01-v1.fuelmedia.io/play/6a60c7ae-75e2-465f-bd30-1b1506880293.m3u8",
                 None))
@@ -212,8 +212,8 @@ module StreamRepository =
                 for source in pbs do
                     let desiredNumber =
                         match source.DigitalChannel.Split('.') with
-                        | [| Int32 major; Int32 minor |] -> 40000 + 10 * major + minor
-                        | _ -> 40000
+                        | [| Int32 major; Int32 minor |] -> 30000 + 10 * major + minor
+                        | _ -> 30000
 
                     addShell desiredNumber source.FullName [RemoteStream source]
             with ex -> Console.Error.WriteLine(ex)
