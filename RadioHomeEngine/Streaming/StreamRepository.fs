@@ -16,14 +16,14 @@ module StreamRepository =
             [Silence Infinite]))
 
     let silence = new Composite(
-        1000,
+        3000,
         new ShellSegmentSourceFactory(
             "Silence",
             [Silence Infinite]),
         ClearCacheOnInactive = false)
 
     let brownNoise = new Composite(
-        1001,
+        3001,
         new ShellSegmentSourceFactory(
             "Brown Noise",
             [BrownNoise Infinite]),
@@ -134,6 +134,91 @@ module StreamRepository =
     type ChannelListingRefreshService() =
         inherit BackgroundService()
 
+        let populateAllAsync cancellationToken = task {
+            let add desiredChannelNumber factory =
+                let mutable channelNumber = desiredChannelNumber
+                while getCurrentChannels () |> Seq.exists (fun c -> c.ChannelListing.ChannelNumber = channelNumber) do
+                    channelNumber <- channelNumber + 1
+
+                ephemeral.Add(
+                    new Composite(
+                        channelNumber,
+                        factory))
+
+            let addShell desiredChannelNumber displayName inputs =
+                add desiredChannelNumber (new ShellSegmentSourceFactory(displayName, inputs))
+
+            let! sxm = SiriusXMClient.GetChannelsAsync(cancellationToken) |> Async.AwaitTask
+            for c in sxm do
+                match Int32.TryParse(c.channelNumber) with
+                | (true, num) ->
+                        add num (new SiriusXMSourceFactory(c.name, c.mediumDescription, num))
+                | _ -> ()
+
+            try
+                for artist in List.sort ["Lisa Stansfield"; "Steps"; "They Might Be Giants"; "Jamie Paige"] do
+                    let! files = Shuffle.byArtistAsync artist cancellationToken
+                    addShell 1000 artist [for f in files do AudioFile f]
+            with ex -> Console.Error.WriteLine(ex)
+
+            addShell 2000 "Audio CD (All)" [AudioCD AllDrives]
+
+            for (i, d) in Seq.indexed (DiscDrive.getAll ()) do
+                addShell 2000 $"Audio CD ({DiscDrive.getPath d})" [AudioCD (SingleDrive d)]
+
+            addShell 3000 "Forecast" [Forecast]
+
+            if File.Exists("/usr/bin/wwvsim") || File.Exists("/usr/local/bin/wwvsim") then
+                addShell 3000 "Time Signal" [WWVSimulator]
+
+            if Directory.Exists("C:/Windows/Media") then
+                addShell 3000 "Windows Alarms" [
+                    for f in Directory.EnumerateFiles("C:/Windows/Media", "*.wav") do
+                        if Path.GetFileName(f).StartsWith("Alarm") then
+                            AudioFile f
+                ]
+
+            try
+                let! wpr = WPR.all |> AsyncSeq.toListAsync
+                for source in wpr do
+                    let desiredNumber =
+                        match source.Name with
+                        | "WPR Music" -> 8970
+                        | "WPR News" -> 8830
+                        | _ -> 8000
+
+                    addShell desiredNumber source.Name [RemoteStream source]
+            with ex -> Console.Error.WriteLine(ex)
+
+            addShell 9630 "WHYS 96.3 FM" [RemoteStream WHYS.source]
+
+            try
+                let! converge = RadioCo.getByStationIdAsync "Converge Radio" "s5fa0df0d2" cancellationToken
+                addShell 10190 "Converge Radio 101.9 FM" [RemoteStream converge]
+            with ex -> Console.Error.WriteLine(ex)
+
+            add 40130 (new HLSSourceFactory(
+                "WEAU 13 News",
+                "https://dai.google.com/linear/hls/pa/event/oXo4JAFUT_aIXI11n21Rtw/stream/10bfd9f3-70ce-4423-b3ec-62bf008750b1:ATL/master.m3u8",
+                None))
+
+            add 40180 (new HLSSourceFactory(
+                "WQOW 18 News",
+                "https://streamingengineservice-prod01-v1.fuelmedia.io/play/6a60c7ae-75e2-465f-bd30-1b1506880293.m3u8",
+                None))
+
+            try
+                let! pbs = PBSWisconsin.all |> AsyncSeq.toListAsync
+                for source in pbs do
+                    let desiredNumber =
+                        match source.DigitalChannel.Split('.') with
+                        | [| Int32 major; Int32 minor |] -> 40000 + 10 * major + minor
+                        | _ -> 40000
+
+                    addShell desiredNumber source.FullName [RemoteStream source]
+            with ex -> Console.Error.WriteLine(ex)
+        }
+
         override _.ExecuteAsync(cancellationToken) = task {
             while not cancellationToken.IsCancellationRequested do
                 if ephemeral |> Seq.where (fun c -> c.IsActive()) |> Seq.isEmpty then
@@ -145,106 +230,7 @@ module StreamRepository =
                         printfn "[SegmentCacheRepository] Dropping [%d]" c.ChannelListing.ChannelNumber
                         do! (c :> IAsyncDisposable).DisposeAsync()
 
-                    let add desiredChannelNumber factory =
-                        let inUse n =
-                            getCurrentChannels ()
-                            |> Seq.map (fun c -> c.ChannelListing.ChannelNumber)
-                            |> Seq.contains n
-
-                        let channelNumber = Seq.head (seq {
-                            for i in desiredChannelNumber .. 99999 do
-                                if not (inUse i) then i
-                            for i in Int32.MinValue .. -1 do
-                                if not (inUse i) then i
-                        })
-
-                        ephemeral.Add(
-                            new Composite(
-                                channelNumber,
-                                factory))
-
-                    let! sxm = SiriusXMClient.GetChannelsAsync(cancellationToken) |> Async.AwaitTask
-                    for c in sxm do
-                        match Int32.TryParse(c.channelNumber) with
-                        | (true, num) ->
-                             add num (new SiriusXMSourceFactory(c.name, c.mediumDescription, num))
-                        | _ -> ()
-
-                    add 1000 (new ShellSegmentSourceFactory(
-                        "Forecast",
-                        [Forecast]))
-
-                    if File.Exists("/usr/bin/wwvsim") || File.Exists("/usr/local/bin/wwvsim") then
-                        add 1000 (new ShellSegmentSourceFactory(
-                            "Time Signal",
-                            [WWVSimulator]))
-
-                    if Directory.Exists("C:/Windows/Media") then
-                        add 1000 (new ShellSegmentSourceFactory(
-                            "Windows Alarms",
-                            [
-                                for f in Directory.EnumerateFiles("C:/Windows/Media", "*.wav") do
-                                    if Path.GetFileName(f).StartsWith("Alarm") then
-                                        AudioFile f
-                            ]))
-
-                    for d in DiscDrive.getAll () do
-                        add 1101 (new ShellSegmentSourceFactory(
-                            DiscDrive.getPath d,
-                            [AudioCD (SingleDrive d)]))
-
-                    add 1300 (new HLSSourceFactory(
-                        "WEAU 13 News",
-                        "https://dai.google.com/linear/hls/pa/event/oXo4JAFUT_aIXI11n21Rtw/stream/10bfd9f3-70ce-4423-b3ec-62bf008750b1:ATL/master.m3u8",
-                        None))
-
-                    add 1800 (new HLSSourceFactory(
-                        "WQOW 18 News",
-                        "https://streamingengineservice-prod01-v1.fuelmedia.io/play/6a60c7ae-75e2-465f-bd30-1b1506880293.m3u8",
-                        None))
-
-                    try
-                        let! pbs = PBSWisconsin.all |> AsyncSeq.toListAsync
-                        for source in pbs do
-                            let desiredNumber =
-                                match source.Name with
-                                | "WPNE HDTV" -> 2801
-                                | "The Wisconsin Channel" -> 2802
-                                | "WPNE Create" -> 2803
-                                | "PBS KIDS" -> 2804
-                                | _ -> 1000
-
-                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, [RemoteStream source]))
-                    with ex -> Console.Error.WriteLine(ex)
-
-                    try
-                        let! wpr = WPR.all |> AsyncSeq.toListAsync
-                        for source in wpr do
-                            let desiredNumber =
-                                match source.Name with
-                                | "WPR Music" -> 8970
-                                | "WPR News" -> 8830
-                                | _ -> 1000
-
-                            add desiredNumber (new ShellSegmentSourceFactory(source.Name, [RemoteStream source]))
-                    with ex -> Console.Error.WriteLine(ex)
-
-                    add 9630 (new ShellSegmentSourceFactory("WHYS 96.3 FM", [RemoteStream WHYS.source]))
-
-                    try
-                        let! converge = RadioCo.getByStationIdAsync "Converge Radio" "s5fa0df0d2" cancellationToken
-                        add 10190 (new ShellSegmentSourceFactory("Converge Radio 101.9 FM", [RemoteStream converge]))
-                    with ex -> Console.Error.WriteLine(ex)
-
-                    try
-                        for artist in Shuffle.artists do
-                            let! files = Async.StartAsTask(
-                                Shuffle.asyncByArtist artist |> AsyncSeq.toListAsync,
-                                cancellationToken = cancellationToken)
-                            add 1000 (new ShellSegmentSourceFactory(
-                                artist,
-                                files))
-                    with ex -> Console.Error.WriteLine(ex)
+                    do! populateAllAsync cancellationToken
 
                 do! Task.Delay(TimeSpan.FromHours(6.0), cancellationToken)
         }

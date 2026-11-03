@@ -212,7 +212,11 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
                             ]
                     ])
                 | AudioFile path ->
-                    return forName (Path.GetFileNameWithoutExtension(path))
+                    let! info = Probe.getAudioFileInfoAsync path cancellationToken
+                    return {
+                        ChannelName = displayName
+                        Program = info
+                    }
                 | BrownNoise _ ->
                     return forName "Brown Noise"
                 | Forecast ->

@@ -86,10 +86,15 @@ module PBSWisconsin =
             |> Seq.collect (fun c -> c.Channels)
     }
 
-    let private getProgramInformationSource profile = {
-        new IProgramInformationSource with
+    type ChannelAdapter(channel: ScheduleResponse.Channel) =
+        member this.DigitalChannel = channel.DigitalChannel
+        member this.FullName = channel.FullName
+
+        interface IProgramInformationSource with
             member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
                 let! channels = asyncGetChannels
+                let profile = channel.Profile
+
                 return {
                     ChannelName =
                         channels
@@ -115,18 +120,16 @@ module PBSWisconsin =
                         |> Option.defaultValue (Program "Unknown")
                 }
             }
-    }
+
+        interface IRemoteStreamSource with
+            member this.Name = channel.FullName
+            member this.ProgramInformationSource = this
+            member this.Url = Option.get channel.NonDrmUrl
 
     let all = asyncSeq {
         let! channels = asyncGetChannels
 
         for channel in channels do
-            match channel.NonDrmUrl with
-            | None -> ()
-            | Some url -> yield {
-                new IRemoteStreamSource with
-                    member _.Name = channel.FullName
-                    member _.ProgramInformationSource = getProgramInformationSource channel.Profile
-                    member _.Url = url
-            }
+            if channel.NonDrmUrl <> None then
+                ChannelAdapter(channel)
     }

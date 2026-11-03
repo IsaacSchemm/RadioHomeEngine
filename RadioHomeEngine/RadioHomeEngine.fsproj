@@ -45,6 +45,7 @@
     <Compile Include="Streaming\Remote Streams\PBSWisconsin.fs" />
     <Compile Include="Streaming\Remote Streams\WHYS.fs" />
     <Compile Include="Streaming\Remote Streams\RadioCo.fs" />
+    <Compile Include="streaming\local audio sources\Probe.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperDuration.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperInput.fs" />
     <Compile Include="Streaming\Local Audio Sources\ShellWrapperParameters.fs" />
