@@ -15,6 +15,20 @@ module StreamRepository =
             "Channel Not Found",
             [Silence Infinite]))
 
+    let playCD = new Composite(
+        2000,
+        new ShellSegmentSourceFactory(
+            "Play CD (by disc)",
+            [Unresolved (PlayAudioCDs AllDrives)]),
+        ClearCacheOnInactive = false)
+
+    let shuffleCD = new Composite(
+        2020,
+        new ShellSegmentSourceFactory(
+            "Shuffle CD (by track)",
+            [Unresolved (ShuffleAudioCDTracks AllDrives)]),
+        ClearCacheOnInactive = false)
+
     let silence = new Composite(
         3000,
         new ShellSegmentSourceFactory(
@@ -29,14 +43,14 @@ module StreamRepository =
             [BrownNoise Infinite]),
         ClearCacheOnInactive = false)
 
-    let private disc = new ResizeArray<Composite>()
     let private ephemeral = new ResizeArray<Composite>()
 
     /// All currently tracked channels.
     let getCurrentChannels () = seq {
+        playCD
+        shuffleCD
         silence
         brownNoise
-        yield! disc
         yield! ephemeral
     }
 
@@ -159,21 +173,14 @@ module StreamRepository =
 
             try
                 for artist in List.sort ["Lisa Stansfield"; "Steps"; "They Might Be Giants"; "Jamie Paige"; "Dionne Warwick"] do
-                    let! files = Shuffle.byArtistAsync artist cancellationToken
-                    addShell ephemeral 1000 artist [for f in files do AudioFile f]
+                    let shuffle = ShuffleAudioFiles (MusicFiles.byArtistFolder artist)
+                    addShell ephemeral 1000 artist [Unresolved shuffle]
             with ex -> Console.Error.WriteLine(ex)
 
-            addShell ephemeral 3000 "Forecast" [Forecast]
+            addShell ephemeral 3000 "Forecast" [Unresolved Forecast]
 
             if File.Exists("/usr/bin/wwvsim") || File.Exists("/usr/local/bin/wwvsim") then
                 addShell ephemeral 3000 "Time Signal" [WWVSimulator]
-
-            if Directory.Exists("C:/Windows/Media") then
-                addShell ephemeral 3000 "Windows Alarms" [
-                    for f in Directory.EnumerateFiles("C:/Windows/Media", "*.wav") do
-                        if Path.GetFileName(f).StartsWith("Alarm") then
-                            AudioFile f
-                ]
 
             addShell ephemeral 9630 "WHYS 96.3 FM" [RemoteStream WHYS.source]
 
@@ -225,53 +232,6 @@ module StreamRepository =
                     do! populateAllAsync cancellationToken
 
                 do! Task.Delay(TimeSpan.FromHours(6.0), cancellationToken)
-        }
-
-    module AudioCDChannelListing =
-        let repopulateAllAsync cancellationToken = task {
-            let old = List.ofSeq disc
-
-            for c in old do
-                printfn "[AudioCDChannelListing] Dropping [%d]" c.ChannelListing.ChannelNumber
-                disc.Remove(c) |> ignore
-                do! (c :> IAsyncDisposable).DisposeAsync()
-
-            try
-                let getTracks dd = [
-                    match DiscDriveStatus.tryGetAudioDiscInfo dd with
-                    | None -> ()
-                    | Some audioDiscInfo ->
-                        for t in audioDiscInfo.tracks do
-                            let song = {
-                                Title = t.title
-                                Artists = audioDiscInfo.artists
-                                Albums = audioDiscInfo.titles
-                                Images = []
-                            }
-                            AudioCDTrack (dd, t.position, song)
-                ]
-
-                let allTracks = [
-                    for dd in DiscDrive.getAll () do
-                        yield! getTracks dd
-                ]
-
-                if allTracks <> [] then
-                    addShell disc 2000 "Play CD (All)" [AudioCD AllDrives]
-                    addShell disc 2020 $"Shuffle CD (All)" (List.randomShuffle allTracks)
-
-                for dd in DiscDrive.getAll () do
-                    let title =
-                        DiscDriveStatus.tryGetAudioDiscInfo dd
-                        |> Option.bind (fun i -> List.tryHead i.titles)
-                        |> Option.defaultValue (DiscDrive.getPath dd)
-
-                    let tracks = getTracks dd
-
-                    if tracks <> [] then
-                        addShell disc 2000 $"Play CD ({title})" [AudioCD (SingleDrive dd)]
-                        addShell disc 2020 $"Shuffle CD ({title})" (List.randomShuffle tracks)
-            with ex -> Console.Error.WriteLine(ex)
         }
 
     type CleanupService() =

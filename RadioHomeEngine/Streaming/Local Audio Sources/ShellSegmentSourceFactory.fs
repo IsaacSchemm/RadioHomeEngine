@@ -6,38 +6,63 @@ open System.IO
 open System.Threading
 open System.Threading.Tasks
 open System.Threading.Channels
+open FSharp.Control
 
-type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput list) =
+type ShellSegmentSourceFactory(displayName: string, initialInputs: RawAudioInput list) =
     let _ = printfn "[ShellSegmentSourceFactory] Creating"
 
-    let segmentTimeSeconds = 10
+    let segmentTimeSeconds = 5
     let hlsBitrate = 320 * 1024
 
     let quietParameters = "-nostats -hide_banner -loglevel warning"
     let formatParameters = "-f s16le -ar 44100 -ac 2"
     let hlsParameters = $"-f hls -hls_time {segmentTimeSeconds} -hls_segment_type mpegts -hls_flags program_date_time+temp_file -c:a aac -ac 2 -b:a 327680"
 
-    let scriptFileName = "script.sh"
-    let programNameFileName = "currentIndex.txt"
-
-    let mutable inputPointer = -1
-
-    let getInputsForNextRun () =
-        let indexed = List.indexed inputList
-
-        let remaining =
-            inputList
-            |> Seq.indexed
-            |> Seq.skipWhile (fun (i, _) -> i <= inputPointer)
-            |> Seq.toList
-
-        if List.isEmpty remaining
-        then indexed
-        else remaining
-
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
 
-    let buildGeneratorScript (realTempPath: string) (unixTempPath: string) = [
+    let enumerateTracks scope = [
+        for driveInfo in CD.getDriveInfo scope do
+            match driveInfo.disc.audio with
+            | None -> ()
+            | Some audioDiscInfo ->
+                for t in audioDiscInfo.tracks do
+                    let song = {
+                        Title = t.title
+                        Artists = audioDiscInfo.artists
+                        Albums = audioDiscInfo.titles
+                        Images = []
+                    }
+                    AudioCDTrack (driveInfo.device, audioDiscInfo, t.position)
+    ]
+
+    let asyncResolveInputs (inputs: RawAudioInput seq) = asyncSeq {
+        let! cancellationToken = Async.CancellationToken
+
+        for input in inputs do
+            match input with
+            | Unresolved Forecast ->
+                let! forecasts = Weather.getForecastsAsync cancellationToken |> Async.AwaitTask
+                for f in forecasts do
+                    SpeechSynthesis (f.screen, f.speech)
+
+            | Unresolved (PlayAudioCDs scope) ->
+                for drive in DiscDrive.getAll () do
+                    AudioCD drive
+
+            | Unresolved (PlayAudioCDTracks scope) ->
+                yield! enumerateTracks scope
+
+            | Unresolved (ShuffleAudioCDTracks scope) ->
+                yield! List.randomShuffle (enumerateTracks scope)
+
+            | Unresolved (ShuffleAudioFiles files) ->
+                yield! List.randomShuffle [for file in files do AudioFile file]
+
+            | other ->
+                other
+    }
+
+    let buildScript (tempFolder: RawAudioTemporaryFolder) (inputs: RawAudioInput seq) = String.concat "\n" [
         "#!/bin/sh"
         "set -e"
 
@@ -45,30 +70,33 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
 
         let eof = $"{Guid.NewGuid()}"
 
-        for (i, input) in getInputsForNextRun () do
-            $"echo {i} > {unixTempPath}/{programNameFileName}"
+        for (i, input) in Seq.indexed inputs do
+            $"echo {i} > {tempFolder.GetPath(UnixPath, CurrentIndex)}"
 
             match input with
-            | AudioCD scope ->
-                for info in CD.getDriveInfo scope do
-                    match info.disc.audio with
-                    | Some audioDisc when not (List.isEmpty audioDisc.tracks) ->
-                        String.concat " " [
-                            "icedax"
-                            $"-D {DiscDrive.getPath info.device}"
-                            $"-t 1+{List.length audioDisc.tracks}"
-                            "-"
-                            "|"
-                            "ffmpeg"
-                            quietParameters
-                            "-f wav"
-                            "-i -"
-                            formatParameters
-                            "-"
-                        ]
-                    | _ -> ()
+            | AudioCD drive ->
+                match DiscDriveStatus.tryGetAudioDiscInfo drive with
+                | Some audioDisc when not (List.isEmpty audioDisc.tracks) ->
+                    String.concat " " [
+                        "icedax"
+                        $"-D {DiscDrive.getPath drive}"
+                        $"-t 1+{List.length audioDisc.tracks}"
+                        "-"
+                        "|"
+                        "ffmpeg"
+                        quietParameters
+                        "-f wav"
+                        "-i -"
+                        formatParameters
+                        "-"
+                    ]
+                | _ -> ()
 
-            | AudioCDTrack (drive, trackNumber, _) ->
+            | AudioCDTrack (drive, _, trackNumber) ->
+                File.WriteAllBytes(
+                    tempFolder.GetPath(RealPath, DiscsOk),
+                    Array.empty)
+
                 String.concat " " [
                     "icedax"
                     $"-D {DiscDrive.getPath drive}"
@@ -83,15 +111,19 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
                     "-"
                 ]
 
+                $"if ! [ -f {tempFolder.GetPath(UnixPath, DiscsOk)} ];then exit; fi"
+
             | AudioFile target ->
                 let tempFileName = $"{Guid.NewGuid()}{Path.GetExtension(target)}"
-                let tempFilePath = Path.Combine(realTempPath, tempFileName)
-                ignore (File.CreateSymbolicLink(tempFilePath, target))
+
+                let _ = File.CreateSymbolicLink(
+                    tempFolder.GetPath(RealPath, SpecificFile tempFileName),
+                    target)
 
                 String.concat " " [
                     "ffmpeg"
                     quietParameters
-                    $"-i {unixTempPath}/{tempFileName}"
+                    $"-i {tempFolder.GetPath(UnixPath, SpecificFile tempFileName)}"
                     formatParameters
                     "-"
                 ]
@@ -111,28 +143,8 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
                     "-"
                 ]
 
-            | Forecast ->
-                if Environment.OSVersion.Platform <> PlatformID.Win32NT then
-                    let textFileName = $"{Guid.NewGuid()}.txt"
-                    File.WriteAllText(textFileName, ForecastService.getBody ())
-
-                    String.concat " " [
-                        "espeak"
-                        $"-f {textFileName}"
-                        "--stdout"
-                        "-v us-mbrola-2"
-                        "-s 140"
-                        "-a 150"
-                        "|"
-                        "ffmpeg"
-                        quietParameters
-                        "-f wav"
-                        "-i -"
-                        formatParameters
-                        "-"
-                    ]
-
-                    $"rm {textFileName}"
+            | Unresolved _ ->
+                invalidArg "inputs" "Cannot contain an resolved item; use asyncResolveInputs first"
 
             | Silence duration ->
                 String.concat " " [
@@ -198,58 +210,90 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
                     "-"
                 ]
 
-        $"echo -1 > {unixTempPath}/{programNameFileName}"
+        $"echo -1 > {tempFolder.GetPath(UnixPath, CurrentIndex)}"
     ]
 
-    interface IProgramInformationSource with
-        member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
-            let forName str = {
+    let getProgramInformationAsync input cancellationToken = task {
+        let forName str = {
+            ChannelName = displayName
+            Program = Program str
+        }
+
+        match input with
+        | AudioCD drive ->
+            return forName (String.concat " // " [
+                match DiscDriveStatus.tryGetAudioDiscInfo drive with
+                | None -> ()
+                | Some a -> String.concat " - " [
+                    if a.artists <> [] then String.concat ", " a.artists
+
+                    match a.titles with
+                    | _ :: _ -> String.concat " / " a.titles
+                    | [] -> "Unknown disc"
+                ]
+            ])
+
+        | AudioCDTrack (_, audioDiscInfo, trackNumber) ->
+            let title =
+                audioDiscInfo.tracks
+                |> Seq.where (fun t -> t.position = trackNumber)
+                |> Seq.map (fun t -> t.title)
+                |> Seq.tryHead
+                |> Option.defaultValue $"Track {trackNumber}"
+
+            return {
                 ChannelName = displayName
-                Program = Program str
+                Program = Song {
+                    Title = title
+                    Artists = audioDiscInfo.artists
+                    Albums = audioDiscInfo.titles
+                    Images = []
+                }
             }
 
-            match inputList |> List.tryItem inputPointer with
-            | None ->
-                return forName "Unknown"
-            | Some input ->
-                match input with
-                | AudioCD scope ->
-                    return forName (String.concat " // " [
-                        for i in CD.getDriveInfo scope do
-                            match i.disc.audio with
-                            | None -> ()
-                            | Some a -> String.concat " - " [
-                                if a.artists <> [] then String.concat ", " a.artists
+        | AudioFile path ->
+            let! info = Probe.getAudioFileInfoAsync path cancellationToken
+            return {
+                ChannelName = displayName
+                Program = info
+            }
 
-                                match a.titles with
-                                | _ :: _ -> String.concat " / " a.titles
-                                | [] -> "Unknown disc"
-                            ]
-                    ])
-                | AudioCDTrack (_, _, song) ->
+        | BrownNoise _ ->
+            return forName "Brown Noise"
+
+        | Unresolved _ ->
+            return invalidArg "inputs" "Cannot contain an unresolved item; use asyncResolveInputs first"
+
+        | RemoteStream source ->
+            return! source.ProgramInformationSource.GetCurrentProgramInformationAsync(cancellationToken)
+
+        | Silence _ ->
+            return forName "Silence"
+
+        | SpeechSynthesis (title, _) ->
+            return forName title
+
+        | WWVSimulator ->
+            return forName "Time Signal"
+    }
+
+    let mutable lastDriveInfo = []
+    let mutable resolvedInputs = []
+    let mutable inputPointer = -1
+
+    let programInformationSource = {
+        new IProgramInformationSource with
+            member _.GetCurrentProgramInformationAsync(cancellationToken) = task {
+                match resolvedInputs |> List.tryItem inputPointer with
+                | None ->
                     return {
                         ChannelName = displayName
-                        Program = Song song
+                        Program = Program "Unknown"
                     }
-                | AudioFile path ->
-                    let! info = Probe.getAudioFileInfoAsync path cancellationToken
-                    return {
-                        ChannelName = displayName
-                        Program = info
-                    }
-                | BrownNoise _ ->
-                    return forName "Brown Noise"
-                | Forecast ->
-                    return forName (ForecastService.getTitle ())
-                | RemoteStream source ->
-                    return! source.ProgramInformationSource.GetCurrentProgramInformationAsync(cancellationToken)
-                | Silence _ ->
-                    return forName "Silence"
-                | SpeechSynthesis (title, _) ->
-                    return forName title
-                | WWVSimulator ->
-                    return forName "Time Signal"
-        }
+                | Some input ->
+                    return! getProgramInformationAsync input cancellationToken
+            }
+    }
 
     interface ISegmentSourceFactory with
         member this.ChannelInformation = {
@@ -257,42 +301,39 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
             ChannelDescriptions = []
         }
 
-        member this.ProgramInformationSource = this
+        member this.ProgramInformationSource = programInformationSource
 
         member this.CreateAsync() = task {
             let cancellationTokenSource = new CancellationTokenSource()
 
-            let tempPathDirName = $"RadioHomeEngine-ShellWrapper-{Guid.NewGuid()}"
+            let tempFolder = RawAudioTemporaryFolder.Create()
 
-            let isWindows = Environment.OSVersion.Platform = PlatformID.Win32NT
+            lastDriveInfo <- CD.getDriveInfo AllDrives
+
+            let! resolved = Async.StartAsTask(
+                AsyncSeq.toListAsync(asyncResolveInputs initialInputs),
+                cancellationToken = cancellationTokenSource.Token)
+
+            resolvedInputs <- resolved
+
+            do! File.WriteAllTextAsync(
+                tempFolder.GetPath(RealPath, Script),
+                buildScript tempFolder resolvedInputs)
 
             let bash =
                 if Environment.OSVersion.Platform = PlatformID.Win32NT
                 then "C:/Program Files/Git/bin/bash.exe"
                 else "bash"
 
-            let unixTempPath = $"/tmp/{tempPathDirName}"
-
-            let realTempPath =
-                if isWindows
-                then Path.Combine(Path.GetTempPath(), tempPathDirName)
-                else unixTempPath
-
-            ignore (Directory.CreateDirectory(realTempPath))
-
-            do! File.WriteAllLinesAsync(
-                Path.Combine(realTempPath, scriptFileName),
-                buildGeneratorScript realTempPath unixTempPath)
-
             let generator =
                 new ProcessStartInfo(
                     bash,
-                    $"{unixTempPath}/{scriptFileName}",
+                    tempFolder.GetPath(UnixPath, Script),
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true)
                 |> Process.Start
 
-            let realChunklistPath = Path.Combine(realTempPath, "chunklist.m3u8")
+            let realChunklistPath = tempFolder.GetPath(RealPath, SpecificFile "chunklist.m3u8")
 
             let reencoder = Process.Start(new ProcessStartInfo(
                 "ffmpeg",
@@ -316,7 +357,9 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
                     use output = reencoder.StandardInput.BaseStream
 
                     let buffer = Array.zeroCreate<byte> 81920
-                    let mutable nextFileCheck = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1.0)
+
+                    let mutable nextDiscCheck = DateTimeOffset.UtcNow
+                    let mutable nextFileCheck = DateTimeOffset.UtcNow
 
                     let mutable allSegmentsRead = false
                     
@@ -331,32 +374,35 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
                         else
                             do! output.WriteAsync(buffer, 0, len, cancellationToken)
 
+                        if nextDiscCheck <= DateTimeOffset.UtcNow then
+                            nextDiscCheck <- nextDiscCheck + TimeSpan.FromSeconds(10.0)
+
+                            let signalFile = tempFolder.GetPath(RealPath, DiscsOk)
+                            if File.Exists(signalFile) then
+                                let currentDriveInfo = CD.getDriveInfo AllDrives
+                                if currentDriveInfo <> lastDriveInfo then
+                                    File.Delete(signalFile)
+
                         if nextFileCheck <= DateTimeOffset.UtcNow then
                             nextFileCheck <- nextFileCheck + TimeSpan.FromSeconds(1.0)
 
-                            let programInformationFilePath = Path.Combine(realTempPath, programNameFileName)
+                            let programInformationFilePath = tempFolder.GetPath(RealPath, CurrentIndex)
                             if File.Exists(programInformationFilePath) then
                                 let! contents = File.ReadAllTextAsync(programInformationFilePath, cancellationToken)
-
-                                let nextIndex =
-                                    match contents.Trim() with
-                                    | Int32 i -> i
-                                    | _ -> -1
-
-                                inputPointer <- nextIndex
-
+                                inputPointer <- match contents.Trim() with Int32 n -> n | _ -> -1
                                 File.Delete(programInformationFilePath)
 
-                            let mutable files = []
+                            let mutable filesRead = []
 
-                            let infos = [
-                                for file in Directory.EnumerateFiles(realTempPath, "*.ts") do
-                                    new FileInfo(file)
-                            ]
+                            let filesFound =
+                                tempFolder.EnumerateSegments()
+                                |> Seq.map FileInfo
+                                |> Seq.sortBy (fun i -> i.CreationTime)
 
-                            for info in infos |> Seq.sortBy (fun i -> i.CreationTime) do
+                            for info in filesFound do
                                 let time = new DateTimeOffset(info.CreationTime)
-                                if DateTimeOffset.UtcNow - time > TimeSpan.FromSeconds(0.25) then
+                                let age = DateTimeOffset.UtcNow - time
+                                if age > TimeSpan.FromSeconds(0.25) then
                                     let! data = File.ReadAllBytesAsync(info.FullName, cancellationToken)
                                     let segment = {
                                         dateTime = new DateTimeOffset(info.CreationTime)
@@ -367,12 +413,12 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
                                     }
                                     mediaSequence <- mediaSequence + UInt128.One
                                     do! channel.Writer.WriteAsync(segment, cancellationToken)
-                                    files <- info.FullName :: files
+                                    filesRead <- info.FullName :: filesRead
 
-                            for file in files do
+                            for file in filesRead do
                                 File.Delete(file)
 
-                            if streamFinished && files <> [] then
+                            if streamFinished && filesRead <> [] then
                                 allSegmentsRead <- true
                 with
                 | :? IOException when disposing -> ()
@@ -383,7 +429,7 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
 
             return {
                 new ISegmentSource with
-                    member _.ProgramInformationSource = this
+                    member _.ProgramInformationSource = programInformationSource
 
                     member _.ReadNextAsync(cancellationToken) = task {
                         try
@@ -413,7 +459,7 @@ type ShellSegmentSourceFactory(displayName: string, inputList: ShellWrapperInput
                         do! reencoder.WaitForExitAsync()
                         reencoder.Dispose()
 
-                        Directory.Delete(realTempPath, recursive = true)
+                        tempFolder.Delete()
                     })
             }
         }

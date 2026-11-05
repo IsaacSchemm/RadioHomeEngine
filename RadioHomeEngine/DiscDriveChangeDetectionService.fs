@@ -49,7 +49,6 @@ type DiscDriveChangeDetectionService() =
         while not cancellationToken.IsCancellationRequested do
             try
                 do! DiscDriveStatus.attachAllAsync ()
-                do! StreamRepository.AudioCDChannelListing.repopulateAllAsync cancellationToken
                 do! waitForMediaChangeAsync cancellationToken
             with ex ->
                 Console.Error.WriteLine(ex)
