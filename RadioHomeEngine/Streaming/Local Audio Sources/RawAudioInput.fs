@@ -1,22 +1,13 @@
 namespace RadioHomeEngine
 
-open System
-open System.Threading.Tasks
-
-type UnresolvedRawAudioInput =
-| Forecast
-| PlayAudioCDs of DiscDriveScope
-| PlayAudioCDTracks of DiscDriveScope
-| ShuffleAudioCDTracks of DiscDriveScope
-| ShuffleAudioFiles of files: string list
-
 type RawAudioInput =
-| AudioCD of DiscDrive
+| AudioCDs of DiscDriveScope * AudioCDPlaybackMode
 | AudioCDTrack of DiscDrive * AudioDiscInfo * trackNumber: int
 | AudioFile of path: string
 | BrownNoise of duration: RawAudioDuration
-| Unresolved of UnresolvedRawAudioInput
+| Forecast
 | RemoteStream of IRemoteStreamSource
+| Shuffle of paths: string list
 | Silence of duration: RawAudioDuration
 | SpeechSynthesis of display: string * text: string
 | WWVSimulator

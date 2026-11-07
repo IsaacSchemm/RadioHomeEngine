@@ -18,15 +18,15 @@ module StreamRepository =
     let playCD = new Composite(
         2000,
         new ShellSegmentSourceFactory(
-            "Play CD (by disc)",
-            [Unresolved (PlayAudioCDs AllDrives)]),
+            "Play CD",
+            [AudioCDs (AllDrives, EntireDisc)]),
         ClearCacheOnInactive = false)
 
     let shuffleCD = new Composite(
         2020,
         new ShellSegmentSourceFactory(
-            "Shuffle CD (by track)",
-            [Unresolved (ShuffleAudioCDTracks AllDrives)]),
+            "Shuffle CD",
+            [AudioCDs (AllDrives, ShuffleCD)]),
         ClearCacheOnInactive = false)
 
     let silence = new Composite(
@@ -43,6 +43,20 @@ module StreamRepository =
             [BrownNoise Infinite]),
         ClearCacheOnInactive = false)
 
+    let forecast = new Composite(
+        3020,
+        new ShellSegmentSourceFactory(
+            "Forecast",
+            [
+                let halfSecond = TimeSpan.FromSeconds(0.5) |> Finite
+
+                Forecast
+
+                BrownNoise halfSecond
+                Silence halfSecond
+            ]),
+        ClearCacheOnInactive = false)
+
     let private ephemeral = new ResizeArray<Composite>()
 
     /// All currently tracked channels.
@@ -51,6 +65,7 @@ module StreamRepository =
         shuffleCD
         silence
         brownNoise
+        forecast
         yield! ephemeral
     }
 
@@ -157,8 +172,8 @@ module StreamRepository =
                 channelNumber,
                 factory))
 
-    let private addShell list desiredChannelNumber displayName inputs =
-        add list desiredChannelNumber (new ShellSegmentSourceFactory(displayName, inputs))
+    let private addShell desiredChannelNumber displayName inputs =
+        add ephemeral desiredChannelNumber (new ShellSegmentSourceFactory(displayName, inputs))
 
     type ChannelListingRefreshService() =
         inherit BackgroundService()
@@ -173,20 +188,22 @@ module StreamRepository =
 
             try
                 for artist in List.sort ["Lisa Stansfield"; "Steps"; "They Might Be Giants"; "Jamie Paige"; "Dionne Warwick"] do
-                    let shuffle = ShuffleAudioFiles (MusicFiles.byArtistFolder artist)
-                    addShell ephemeral 1000 artist [Unresolved shuffle]
+                    let shuffle = Shuffle (MusicFiles.byArtistFolder artist)
+                    addShell 1000 artist [shuffle]
             with ex -> Console.Error.WriteLine(ex)
 
-            addShell ephemeral 3020 "Forecast" [Unresolved Forecast]
+            for (i, drive) in Seq.indexed (DiscDrive.getAll ()) do
+                addShell (2001 + i) (DiscDrive.getPath drive) [AudioCDs (SingleDrive drive, EntireDisc)]
+                addShell (2021 + i) (DiscDrive.getPath drive) [AudioCDs (SingleDrive drive, ShuffleCD)]
 
             if File.Exists("/usr/bin/wwvsim") || File.Exists("/usr/local/bin/wwvsim") then
-                addShell ephemeral 3030 "Time Signal" [WWVSimulator]
+                addShell 3030 "Time Signal" [WWVSimulator]
 
-            addShell ephemeral 9630 "WHYS 96.3 FM" [RemoteStream WHYS.source]
+            addShell 9630 "WHYS 96.3 FM" [RemoteStream WHYS.source]
 
             try
                 let! converge = RadioCo.getByStationIdAsync "Converge Radio" "s5fa0df0d2" cancellationToken
-                addShell ephemeral 10190 "Converge Radio 101.9 FM" [RemoteStream converge]
+                addShell 10190 "Converge Radio 101.9 FM" [RemoteStream converge]
             with ex -> Console.Error.WriteLine(ex)
 
             try
@@ -198,7 +215,7 @@ module StreamRepository =
                         | "WPR News" -> 20970
                         | _ -> 20000
 
-                    addShell ephemeral desiredNumber source.Name [RemoteStream source]
+                    addShell desiredNumber source.Name [RemoteStream source]
             with ex -> Console.Error.WriteLine(ex)
 
             add ephemeral 30180 (new HLSSourceFactory(
@@ -214,7 +231,7 @@ module StreamRepository =
                         | [| Int32 major; Int32 minor |] -> 30000 + 10 * major + minor
                         | _ -> 30000
 
-                    addShell ephemeral desiredNumber source.FullName [RemoteStream source]
+                    addShell desiredNumber source.FullName [RemoteStream source]
             with ex -> Console.Error.WriteLine(ex)
         }
 

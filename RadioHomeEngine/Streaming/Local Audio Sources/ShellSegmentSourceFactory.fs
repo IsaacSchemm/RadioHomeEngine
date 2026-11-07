@@ -7,6 +7,7 @@ open System.Threading
 open System.Threading.Tasks
 open System.Threading.Channels
 open FSharp.Control
+open System.Collections.Generic
 
 type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) =
     let segmentTimeSeconds = 5
@@ -24,8 +25,6 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
     let generateScriptAsync (tempFolder: RawAudioTemporaryFolder) = asyncSeq {
         Console.Error.WriteLine($"[ShellSegmentSourceFactory] Script generation started")
 
-        "set -e"
-
         "PATH=$PATH:$(pwd)"
 
         let waitFor (command: string) = asyncSeq {
@@ -36,7 +35,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
             use fsw = tempFolder.CreateFileSystemWatcher()
 
-            $"( {command} ) </dev/null"
+            $"( {command} ) < /dev/null"
             $"touch {unixPath}"
 
             while not (File.Exists(realPath)) do
@@ -45,6 +44,15 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
         }
 
         let! cancellationToken = Async.CancellationToken
+
+        let getTracks scope = [
+            for info in CD.getDriveInfo scope do
+                match info.disc.audio with
+                | None -> ()
+                | Some audioDisc ->
+                    for track in audioDisc.tracks do
+                        (info.device, audioDisc, track.position)
+        ]
 
         let playCD drive = asyncSeq {
             match DiscDriveStatus.tryGetAudioDiscInfo drive with
@@ -58,33 +66,30 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
                 let devicePath = DiscDrive.getPath drive
                 let trackCount = List.length audioDisc.tracks
-                yield! waitFor $"icedax -D {devicePath} -t 1+{trackCount} - | ffmpeg {quietParameters} -f wav -i {formatParameters} -"
+                yield! waitFor $"icedax -D {devicePath} -t 1+{trackCount} - | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
 
             | _ -> ()
         }
 
-        let playTrack drive trackNumber = asyncSeq {
-            match DiscDriveStatus.tryGetAudioDiscInfo drive with
+        let playTrack (drive, audioDisc, trackNumber) = asyncSeq {
+            let trackTitle =
+                audioDisc.tracks
+                |> Seq.where (fun t -> t.position = trackNumber)
+                |> Seq.map (fun t -> t.title)
+                |> Seq.tryHead
+
+            match trackTitle with
             | None -> ()
-            | Some audioDisc ->
-                let trackTitle =
-                    audioDisc.tracks
-                    |> Seq.where (fun t -> t.position = trackNumber)
-                    |> Seq.map (fun t -> t.title)
-                    |> Seq.tryHead
+            | Some title ->
+                currentProgram <- Song {
+                    Title = title
+                    Artists = audioDisc.artists
+                    Albums = audioDisc.titles
+                    Images = []
+                }
 
-                match trackTitle with
-                | None -> ()
-                | Some title ->
-                    currentProgram <- Song {
-                        Title = title
-                        Artists = audioDisc.artists
-                        Albums = audioDisc.titles
-                        Images = []
-                    }
-
-                    let devicePath = DiscDrive.getPath drive
-                    yield! waitFor $"icedax -D {devicePath} -t {trackNumber} - | ffmpeg {quietParameters} -f wav -i {formatParameters} -"
+                let devicePath = DiscDrive.getPath drive
+                yield! waitFor $"icedax -D {devicePath} -t {trackNumber} - | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
         }
 
         let playFile (target: string) = asyncSeq {
@@ -99,20 +104,54 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
             currentProgram <- info
 
-            yield! waitFor $"ffmpeg {quietParameters} -i {unixPath} {formatParameters} -"
+            yield! waitFor $"ffmpeg {quietParameters} -i {unixPath} -t 8 {formatParameters} -"
 
             File.Delete(realPath)
+        }
+
+        let shuffle (getItems: unit -> 'T seq) (play: 'T -> IAsyncEnumerable<string>) = asyncSeq {
+            let mutable active = true
+            let mutable recent = []
+
+            let isFresh x = not (List.contains x recent)
+
+            while active do
+                let selectedTrack =
+                    getItems () |> Seq.truncate 5
+                    |> Seq.where isFresh
+                    |> Seq.randomShuffle
+                    |> Seq.tryHead
+
+                match selectedTrack with
+                | None ->
+                    let halfway = List.length recent / 2
+                    recent <- recent |> List.truncate halfway
+                    if recent = [] then
+                        active <- false
+                | Some selected ->
+                    yield! play selected
+                    recent <- selected :: recent
         }
 
         for input in inputs do
             currentProgram <- defaultProgram
 
             match input with
-            | AudioCD drive ->
-                yield! playCD drive
+            | AudioCDs (scope, AllTracks) ->
+                for (drive, audioDisc, trackNumber) in getTracks scope do
+                    let currentAudioDiscInfo = DiscDriveStatus.tryGetAudioDiscInfo drive
+                    if currentAudioDiscInfo = Some audioDisc then
+                        yield! playTrack (drive, audioDisc, trackNumber)
 
-            | AudioCDTrack (drive, _, trackNumber) ->
-                yield! playTrack drive trackNumber
+            | AudioCDs (scope, EntireDisc) ->
+                for (drive, _, _) in getTracks scope do
+                    yield! playCD drive
+
+            | AudioCDs (scope, ShuffleCD) ->
+                yield! shuffle (fun () -> getTracks scope) (fun t -> playTrack t)
+
+            | AudioCDTrack (drive, audioDisc, trackNumber) ->
+                yield! playTrack (drive, audioDisc, trackNumber)
 
             | AudioFile target ->
                 yield! playFile target
@@ -127,7 +166,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
                 yield! waitFor $"ffmpeg {quietParameters} -f lavfi -i anoisesrc=sample_rate=44100:color=brown {durationStr} {formatParameters} -"
 
-            | Unresolved Forecast ->
+            | Forecast ->
                 let! forecasts = Weather.getForecastsAsync cancellationToken |> Async.AwaitTask
                 for forecast in forecasts |> Seq.take 3 do
                     currentProgram <- Program forecast.screen
@@ -141,58 +180,8 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
                     yield! waitFor $"espeak -f {unixPath} --stdout -v us-mbrola-2 -s 140 -a 150 | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
 
-            | Unresolved (PlayAudioCDs scope) ->
-                for drive in DiscDrive.getDevices scope do
-                    yield! playCD drive
-
-            | Unresolved (PlayAudioCDTracks scope) ->
-                let discs =
-                    DiscDrive.getDevices scope
-                    |> Seq.choose DiscDriveStatus.tryGetAudioDiscInfo
-
-                let tracks = [
-                    for drive in DiscDrive.getDevices scope do
-                        match DiscDriveStatus.tryGetAudioDiscInfo drive with
-                        | None -> ()
-                        | Some audioDisc ->
-                            for track in audioDisc.tracks do
-                                (drive, audioDisc, track)
-                ]
-
-                for (drive, audioDisc, track) in tracks do
-                    let currentAudioDiscInfo = DiscDriveStatus.tryGetAudioDiscInfo drive
-                    if currentAudioDiscInfo <> Some audioDisc then
-                        "exit"
-
-                    yield! playTrack drive track.position
-
-            | Unresolved (ShuffleAudioCDTracks scope) ->
-                let discs =
-                    DiscDrive.getDevices scope
-                    |> Seq.choose DiscDriveStatus.tryGetAudioDiscInfo
-
-                let tracks = [
-                    for drive in DiscDrive.getDevices scope do
-                        match DiscDriveStatus.tryGetAudioDiscInfo drive with
-                        | None -> ()
-                        | Some audioDisc ->
-                            for track in audioDisc.tracks do
-                                (drive, audioDisc, track)
-                ]
-
-                for (drive, audioDisc, track) in List.randomShuffle tracks do
-                    let currentAudioDiscInfo = DiscDriveStatus.tryGetAudioDiscInfo drive
-                    if currentAudioDiscInfo <> Some audioDisc then
-                        "exit"
-
-                    yield! playTrack drive track.position
-
-            | Unresolved (ShuffleAudioFiles files) ->
-                for file in List.randomShuffle files do
-                    if not (File.Exists(file)) then
-                        "exit"
-
-                    yield! playFile file
+            | Shuffle files ->
+                yield! shuffle (fun () -> files) (fun f -> playFile f)
 
             | Silence duration ->
                 currentProgram <- Program "Silence"
