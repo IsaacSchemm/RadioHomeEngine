@@ -9,11 +9,10 @@ open FSharp.Control
 
 /// A module which keeps track of all active radio channels.
 module StreamRepository =
-    let defaultChannel = new Composite(
+    let silence = new Composite(
         0,
-        new ShellSegmentSourceFactory(
-            "Channel Not Found",
-            [Silence Infinite]))
+        Silence.factory,
+        ClearCacheOnInactive = false)
 
     let playCD = new Composite(
         2000,
@@ -27,13 +26,6 @@ module StreamRepository =
         new ShellSegmentSourceFactory(
             "Shuffle CD",
             [AudioCDs (AllDrives, ShuffleCD)]),
-        ClearCacheOnInactive = false)
-
-    let silence = new Composite(
-        3000,
-        new ShellSegmentSourceFactory(
-            "Silence",
-            [Silence Infinite]),
         ClearCacheOnInactive = false)
 
     let brownNoise = new Composite(
@@ -61,9 +53,9 @@ module StreamRepository =
 
     /// All currently tracked channels.
     let getCurrentChannels () = seq {
+        silence
         playCD
         shuffleCD
-        silence
         brownNoise
         forecast
         yield! ephemeral
@@ -75,12 +67,11 @@ module StreamRepository =
         |> Seq.where (fun c -> c.IsActive())
         |> Seq.toList
 
-    /// Gets the tracked composite stream for the given channel number, or creates a new one pointed at the corresponding SiriusXM channel.
     let private get channelNumber =
         getCurrentChannels ()
         |> Seq.where (fun s -> s.ChannelListing.ChannelNumber = channelNumber)
         |> Seq.tryHead
-        |> Option.defaultValue defaultChannel
+        |> Option.defaultValue silence
 
     let getPlaylist channelNumber = String.concat "\n" [
         let composite = get channelNumber
