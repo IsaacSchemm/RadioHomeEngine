@@ -104,7 +104,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
             currentProgram <- info
 
-            yield! waitFor $"ffmpeg {quietParameters} -i {unixPath} -t 8 {formatParameters} -"
+            yield! waitFor $"ffmpeg {quietParameters} -i {unixPath} {formatParameters} -"
 
             File.Delete(realPath)
         }
@@ -117,7 +117,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
             while active do
                 let selectedTrack =
-                    getItems () |> Seq.truncate 5
+                    getItems ()
                     |> Seq.where isFresh
                     |> Seq.randomShuffle
                     |> Seq.tryHead
@@ -256,17 +256,13 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
                 use input = generator.StandardInput
 
-                let enumerable = generateScriptAsync tempFolder
-                let enumerator = enumerable.GetAsyncEnumerator(cancellationToken)
+                let iterationWorkflow =
+                    generateScriptAsync tempFolder
+                    |> AsyncSeq.iterAsync (fun item -> input.WriteLineAsync(item.AsMemory(), cancellationToken) |> Async.AwaitTask)
 
-                let mutable active = true
-                while active do
-                    let! more = enumerator.MoveNextAsync()
-                    active <- more && enumerator.Current <> "exit"
-
-                    if active then
-                        printfn "> %s" enumerator.Current
-                        do! input.WriteLineAsync(enumerator.Current.AsMemory(), cancellationToken)
+                do! Async.StartAsTask(
+                    iterationWorkflow,
+                    cancellationToken = cancellationToken)
 
                 printfn "[ShellSegmentSourceFactory] Ending shell pipe"
             }
