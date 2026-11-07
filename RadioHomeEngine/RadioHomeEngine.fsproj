@@ -28,7 +28,6 @@
     <Compile Include="CD\CD.fs" />
     <Compile Include="Weather\NWS.fs" />
     <Compile Include="Weather\Weather.fs" />
-    <Compile Include="Weather\ForecastService.fs" />
     <Folder Include="ALSA\" />
     <Compile Include="ALSA\ALSA.fs" />
     <Folder Include="Streaming\Channel Listing\" />

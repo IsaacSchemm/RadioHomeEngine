@@ -9,10 +9,13 @@ open System.Threading.Tasks
 
 open Microsoft.Extensions.Hosting
 
+module LyrionCLIService =
+    let port = 9090
+
 type LyrionCLIService() =
     inherit BackgroundService()
 
-    let port = 9090
+    let port = LyrionCLIService.port
     let encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier = false)
 
     override _.ExecuteAsync(cancellationToken) = task {
