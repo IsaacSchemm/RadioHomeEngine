@@ -187,8 +187,9 @@ module StreamRepository =
                 addShell (2001 + i) (DiscDrive.getPath drive) [AudioCDs (SingleDrive drive, EntireDisc)]
                 addShell (2021 + i) (DiscDrive.getPath drive) [AudioCDs (SingleDrive drive, ShuffleCD)]
 
-            if File.Exists("/usr/bin/wwvsim") || File.Exists("/usr/local/bin/wwvsim") then
-                addShell 3030 "Time Signal" [WWVSimulator]
+            for card in ALSA.getCards () do
+                for device in card.devices do
+                    addShell (2100 + card.number * 10 + device.number) device.id [ALSA (card.number, device.number)]
 
             addShell 9630 "WHYS 96.3 FM" [RemoteStream WHYS.source]
 
@@ -202,8 +203,8 @@ module StreamRepository =
                 for source in wpr do
                     let desiredNumber =
                         match source.Name with
-                        | "WPR Music" -> 20930
-                        | "WPR News" -> 20970
+                        | "WPR Music" -> 8970
+                        | "WPR News" -> 8830
                         | _ -> 20000
 
                     addShell desiredNumber source.Name [RemoteStream source]

@@ -17,7 +17,7 @@
     <Compile Include="Lyrion\LyrionCLIService.fs" />
     <Compile Include="Lyrion\PlayerConnection.fs" />
     <Compile Include="Lyrion\PlayerConnections.fs" />
-    <Compile Include="cd\DiscDrive.fs" />
+    <Compile Include="CD\DiscDrive.fs" />
     <Compile Include="CD\DriveInfo.fs" />
     <Compile Include="CD\Icedax.fs" />
     <Compile Include="CD\Abcde.fs" />
@@ -29,6 +29,8 @@
     <Compile Include="Weather\NWS.fs" />
     <Compile Include="Weather\Weather.fs" />
     <Compile Include="Weather\ForecastService.fs" />
+    <Folder Include="ALSA\" />
+    <Compile Include="ALSA\ALSA.fs" />
     <Folder Include="Streaming\Channel Listing\" />
     <Compile Include="Streaming\Channel Listing\ChannelInformation.fs" />
     <Compile Include="Streaming\Channel Listing\ChannelListing.fs" />

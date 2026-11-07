@@ -141,6 +141,9 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
             currentProgram <- defaultProgram
 
             match input with
+            | ALSA (cardNumber, deviceNumber) ->
+                do! waitFor $"ffmpeg {quietParameters} -f alsa -i hw:{cardNumber},{deviceNumber} {formatParameters} -"
+
             | AudioCDs (scope, AllTracks) ->
                 for (drive, audioDisc, trackNumber) in getTracks scope do
                     let currentAudioDiscInfo = DiscDriveStatus.tryGetAudioDiscInfo drive

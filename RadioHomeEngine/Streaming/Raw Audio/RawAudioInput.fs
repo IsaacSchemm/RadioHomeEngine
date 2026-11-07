@@ -1,6 +1,7 @@
 namespace RadioHomeEngine
 
 type RawAudioInput =
+| ALSA of card: int * device: int 
 | AudioCDs of DiscDriveScope * AudioCDPlaybackMode
 | AudioCDTrack of DiscDrive * AudioDiscInfo * trackNumber: int
 | AudioFile of path: string
