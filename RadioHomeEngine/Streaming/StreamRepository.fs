@@ -37,7 +37,7 @@ module StreamRepository =
         ClearCacheOnInactive = false)
 
     let brownNoise = new Composite(
-        3001,
+        3010,
         new ShellSegmentSourceFactory(
             "Brown Noise",
             [BrownNoise Infinite]),
@@ -177,10 +177,10 @@ module StreamRepository =
                     addShell ephemeral 1000 artist [Unresolved shuffle]
             with ex -> Console.Error.WriteLine(ex)
 
-            addShell ephemeral 3000 "Forecast" [Unresolved Forecast]
+            addShell ephemeral 3020 "Forecast" [Unresolved Forecast]
 
             if File.Exists("/usr/bin/wwvsim") || File.Exists("/usr/local/bin/wwvsim") then
-                addShell ephemeral 3000 "Time Signal" [WWVSimulator]
+                addShell ephemeral 3030 "Time Signal" [WWVSimulator]
 
             addShell ephemeral 9630 "WHYS 96.3 FM" [RemoteStream WHYS.source]
 
