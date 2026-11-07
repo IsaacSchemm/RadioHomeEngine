@@ -12,12 +12,6 @@ type RawAudioTemporaryFolderPathType =
 | RealPath
 | UnixPath
 
-type RawAudioTemporaryFolderFileType =
-| Script
-| CurrentIndex
-| DiscsOk
-| SpecificFile of string
-
 type RawAudioTemporaryFolder private (folderName: string) =
     let isWindows = Environment.OSVersion.Platform = PlatformID.Win32NT
 
@@ -30,14 +24,13 @@ type RawAudioTemporaryFolder private (folderName: string) =
 
     let _ = Directory.CreateDirectory(realTempPath)
 
-    member _.GetPath(pathType: RawAudioTemporaryFolderPathType, fileType: RawAudioTemporaryFolderFileType) =
-        let filename =
-            match fileType with
-            | Script -> "script.sh"
-            | CurrentIndex -> "currentIndex.txt"
-            | DiscsOk -> "discsok"
-            | SpecificFile name -> name
+    member _.CreateFileSystemWatcher() =
+        new FileSystemWatcher(
+            realTempPath,
+            "",
+            EnableRaisingEvents = true)
 
+    member _.GetPath(pathType: RawAudioTemporaryFolderPathType, filename: string) =
         match pathType with
         | UnixPath -> $"{unixTempPath}/{filename}"
         | RealPath -> Path.Combine(realTempPath, filename)
@@ -45,6 +38,8 @@ type RawAudioTemporaryFolder private (folderName: string) =
     member _.EnumerateSegments() =
         Directory.EnumerateFiles(realTempPath, "*.ts")
 
-    member _.Delete() = Directory.Delete(realTempPath, recursive = true)
+    static member Create() = new RawAudioTemporaryFolder($"RadioHomeEngine-{Guid.NewGuid()}")
 
-    static member Create() = new RawAudioTemporaryFolder($"{Guid.NewGuid()}")
+    interface IDisposable with
+        member this.Dispose() =
+            if File.Exists(realTempPath) then File.Delete(realTempPath)

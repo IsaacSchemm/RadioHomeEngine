@@ -31,16 +31,17 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
         let waitFor (command: string) = asyncSeq {
             let sentinel = $"{Guid.NewGuid()}"
 
-            let realPath = tempFolder.GetPath(RealPath, SpecificFile sentinel)
-            let unixPath = tempFolder.GetPath(UnixPath, SpecificFile sentinel)
+            let realPath = tempFolder.GetPath(RealPath, sentinel)
+            let unixPath = tempFolder.GetPath(UnixPath, sentinel)
 
-            ignore (File.Create(realPath))
+            use fsw = tempFolder.CreateFileSystemWatcher()
 
             $"( {command} ) </dev/null"
-            $"rm {unixPath}"
+            $"touch {unixPath}"
 
-            while File.Exists(realPath) do
-                do! Async.Sleep(500)
+            while not (File.Exists(realPath)) do
+                let! args = Async.AwaitEvent fsw.Created
+                ignore args
         }
 
         let! cancellationToken = Async.CancellationToken
@@ -89,8 +90,8 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
         let playFile (target: string) = asyncSeq {
             let tempFileName = $"{Guid.NewGuid()}{Path.GetExtension(target)}"
 
-            let realPath = tempFolder.GetPath(RealPath, SpecificFile tempFileName)
-            let unixPath = tempFolder.GetPath(UnixPath, SpecificFile tempFileName)
+            let realPath = tempFolder.GetPath(RealPath, tempFileName)
+            let unixPath = tempFolder.GetPath(UnixPath, tempFileName)
 
             ignore (File.CreateSymbolicLink(realPath, target))
 
@@ -133,8 +134,8 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
                     let tempFileName = $"{Guid.NewGuid()}.txt"
 
-                    let realPath = tempFolder.GetPath(RealPath, SpecificFile tempFileName)
-                    let unixPath = tempFolder.GetPath(UnixPath, SpecificFile tempFileName)
+                    let realPath = tempFolder.GetPath(RealPath, tempFileName)
+                    let unixPath = tempFolder.GetPath(UnixPath, tempFileName)
 
                     do! File.WriteAllTextAsync(realPath, forecast.speech, cancellationToken) |> Async.AwaitTask
 
@@ -208,8 +209,8 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
                 let tempFileName = $"{Guid.NewGuid()}.txt"
 
-                let realPath = tempFolder.GetPath(RealPath, SpecificFile tempFileName)
-                let unixPath = tempFolder.GetPath(UnixPath, SpecificFile tempFileName)
+                let realPath = tempFolder.GetPath(RealPath, tempFileName)
+                let unixPath = tempFolder.GetPath(UnixPath, tempFileName)
 
                 do! File.WriteAllTextAsync(realPath, text, cancellationToken) |> Async.AwaitTask
 
@@ -262,7 +263,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                 |> Process.Start
 
             let control = task {
-                printfn "[ShellSegmentSourceFactory] Starting control"
+                printfn "[ShellSegmentSourceFactory] Starting shell pipe"
 
                 use input = generator.StandardInput
 
@@ -278,10 +279,10 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                         printfn "> %s" enumerator.Current
                         do! input.WriteLineAsync(enumerator.Current.AsMemory(), cancellationToken)
 
-                printfn "[ShellSegmentSourceFactory] Ending control"
+                printfn "[ShellSegmentSourceFactory] Ending shell pipe"
             }
 
-            let realChunklistPath = tempFolder.GetPath(RealPath, SpecificFile "chunklist.m3u8")
+            let realChunklistPath = tempFolder.GetPath(RealPath, "chunklist.m3u8")
 
             let reencoder = Process.Start(new ProcessStartInfo(
                 "ffmpeg",
@@ -289,6 +290,9 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                 RedirectStandardInput = true))
 
             let channel = Channel.CreateBounded(3)
+
+            let mutable allDataWritten = false
+            let mutable allSegmentsRead = false
 
             let pipe = task {
                 printfn "[ShellSegmentSourceFactory] Starting pipe"
@@ -299,64 +303,67 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                 // 3. We can add extra silence to the end of the audio data until a full segment is generated
 
                 try
-                    let mutable mediaSequence = new UInt128(0UL, 500UL)
-
-                    use control = generator.StandardInput
                     use input = generator.StandardOutput.BaseStream
                     use output = reencoder.StandardInput.BaseStream
 
                     let buffer = Array.zeroCreate<byte> 81920
-
-                    let mutable nextFileCheck = DateTimeOffset.UtcNow
-
-                    let mutable allSegmentsRead = false
 
                     while not allSegmentsRead && not cancellationToken.IsCancellationRequested do
                         let! len = input.ReadAsync(buffer, cancellationToken)
                         let streamFinished = len = 0
 
                         if streamFinished then
+                            allDataWritten <- true
                             do! output.WriteAsync(zeroes, cancellationToken)
                         else
                             do! output.WriteAsync(buffer, 0, len, cancellationToken)
-
-                        if nextFileCheck <= DateTimeOffset.UtcNow then
-                            nextFileCheck <- nextFileCheck + TimeSpan.FromSeconds(1.0)
-
-                            let mutable filesRead = []
-
-                            let filesFound =
-                                tempFolder.EnumerateSegments()
-                                |> Seq.map FileInfo
-                                |> Seq.sortBy (fun i -> i.CreationTime)
-
-                            for info in filesFound do
-                                let time = new DateTimeOffset(info.CreationTime)
-                                let age = DateTimeOffset.UtcNow - time
-                                if age > TimeSpan.FromSeconds(0.25) then
-                                    let! data = File.ReadAllBytesAsync(info.FullName, cancellationToken)
-                                    let segment = {
-                                        dateTime = new DateTimeOffset(info.CreationTime)
-                                        duration = segmentTimeSeconds
-                                        data = data
-                                        mediaSequence = mediaSequence
-                                        important = true
-                                    }
-                                    mediaSequence <- mediaSequence + UInt128.One
-                                    do! channel.Writer.WriteAsync(segment, cancellationToken)
-                                    filesRead <- info.FullName :: filesRead
-
-                            for file in filesRead do
-                                File.Delete(file)
-
-                            if streamFinished && filesRead <> [] then
-                                allSegmentsRead <- true
                 with
                 | :? IOException when cancellationToken.IsCancellationRequested -> ()
                 | ex -> printfn "%A" ex
 
                 channel.Writer.Complete()
                 printfn "[ShellSegmentSourceFactory] Ending pipe"
+            }
+
+            let mutable mediaSequence = new UInt128(0UL, 500UL)
+
+            let read = task {
+                use fsw = tempFolder.CreateFileSystemWatcher()
+
+                while not allSegmentsRead do
+                    let! args = Async.StartAsTask(
+                        Async.AwaitEvent fsw.Created,
+                        cancellationToken = cancellationToken)
+                    ignore args
+
+                    do! Task.Delay(250, cancellationToken)
+
+                    let mutable filesRead = []
+
+                    let filesFound =
+                        tempFolder.EnumerateSegments()
+                        |> Seq.map FileInfo
+                        |> Seq.sortBy (fun i -> i.CreationTime)
+
+                    for info in filesFound do
+                        let time = new DateTimeOffset(info.CreationTime)
+                        let! data = File.ReadAllBytesAsync(info.FullName, cancellationToken)
+                        let segment = {
+                            dateTime = new DateTimeOffset(info.CreationTime)
+                            duration = segmentTimeSeconds
+                            data = data
+                            mediaSequence = mediaSequence
+                            important = true
+                        }
+                        mediaSequence <- mediaSequence + UInt128.One
+                        do! channel.Writer.WriteAsync(segment, cancellationToken)
+                        filesRead <- info.FullName :: filesRead
+
+                    for file in filesRead do
+                        File.Delete(file)
+
+                    if allDataWritten then
+                        allSegmentsRead <- true
             }
 
             return {
@@ -385,12 +392,17 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                         do! pipe
 
                         do! generator.WaitForExitAsync()
-                        generator.Dispose()
-
                         do! reencoder.WaitForExitAsync()
-                        reencoder.Dispose()
 
-                        tempFolder.Delete()
+                        let disposables: IDisposable list = [
+                            control
+                            pipe
+                            generator
+                            reencoder
+                            tempFolder
+                        ]
+
+                        for d in disposables do d.Dispose()
                     })
             }
     }
