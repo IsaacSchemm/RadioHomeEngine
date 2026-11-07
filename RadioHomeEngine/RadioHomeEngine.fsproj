@@ -44,12 +44,12 @@
     <Compile Include="Streaming\Remote Streams\PBSWisconsin.fs" />
     <Compile Include="Streaming\Remote Streams\WHYS.fs" />
     <Compile Include="Streaming\Remote Streams\RadioCo.fs" />
-    <Compile Include="streaming\local audio sources\Probe.fs" />
+    <Compile Include="Streaming\local audio sources\Probe.fs" />
     <Compile Include="Streaming\Local Audio Sources\RawAudioDuration.fs" />
-    <Compile Include="streaming\local audio sources\AudioCDPlaybackMode.fs" />
+    <Compile Include="Streaming\local audio sources\AudioCDPlaybackMode.fs" />
     <Compile Include="Streaming\Local Audio Sources\RawAudioInput.fs" />
-    <Compile Include="streaming\local audio sources\RawAudioTemporaryFolder.fs" />
-    <Compile Include="streaming\local audio sources\ShellSegmentSourceFactory.fs" />
+    <Compile Include="Streaming\local audio sources\RawAudioTemporaryFolder.fs" />
+    <Compile Include="Streaming\local audio sources\ShellSegmentSourceFactory.fs" />
     <Compile Include="Streaming\Remote HLS Streams\UpstreamSegment.fs" />
     <Compile Include="Streaming\Remote HLS Streams\ChunklistParser.fs" />
     <Compile Include="Streaming\Remote HLS Streams\ChunklistNormalizer.fs" />
@@ -59,7 +59,7 @@
     <Compile Include="Streaming\Remote HLS Streams\SiriusXM\SiriusXMSourceFactory.fs" />
     <Compile Include="Streaming\SegmentCache.fs" />
     <Compile Include="Streaming\Composite.fs" />
-    <Compile Include="streaming\MusicFiles.fs" />
+    <Compile Include="Streaming\MusicFiles.fs" />
     <Compile Include="Streaming\StreamRepository.fs" />
     <Compile Include="Streaming\WeatherAlertService.fs" />
     <Compile Include="Remote\AtomicActions.fs" />

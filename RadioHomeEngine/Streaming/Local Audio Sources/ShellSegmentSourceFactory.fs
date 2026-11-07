@@ -22,12 +22,14 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
     let defaultProgram = Program "Unknown"
     let mutable currentProgram = defaultProgram
 
-    let generateScriptAsync (tempFolder: RawAudioTemporaryFolder) = asyncSeq {
-        Console.Error.WriteLine($"[ShellSegmentSourceFactory] Script generation started")
+    let writeToShellAsync (tempFolder: RawAudioTemporaryFolder) (shellInput: StreamWriter) (cancellationToken: CancellationToken) = task {
+        Console.WriteLine($"[ShellSegmentSourceFactory] Script generation started")
 
-        "PATH=$PATH:$(pwd)"
+        let write (str: string) = shellInput.WriteLineAsync(str.AsMemory(), cancellationToken)
 
-        let waitFor (command: string) = asyncSeq {
+        do! write "PATH=$PATH:$(pwd)"
+
+        let waitFor (command: string) = task {
             let sentinel = $"{Guid.NewGuid()}"
 
             let realPath = tempFolder.GetPath(RealPath, sentinel)
@@ -35,11 +37,13 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
             use fsw = tempFolder.CreateFileSystemWatcher()
 
-            $"( {command} ) < /dev/null"
-            $"touch {unixPath}"
+            do! write $"( {command} ) < /dev/null"
+            do! write $"touch {unixPath}"
 
             while not (File.Exists(realPath)) do
-                let! args = Async.AwaitEvent fsw.Created
+                let! args = Async.StartAsTask(
+                    Async.AwaitEvent fsw.Created,
+                    cancellationToken = cancellationToken)
                 ignore args
         }
 
@@ -54,7 +58,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                         (info.device, audioDisc, track.position)
         ]
 
-        let playCD drive = asyncSeq {
+        let playCD drive = task {
             match DiscDriveStatus.tryGetAudioDiscInfo drive with
             | Some audioDisc when not (List.isEmpty audioDisc.tracks) ->
                 currentProgram <- Song {
@@ -66,12 +70,12 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
                 let devicePath = DiscDrive.getPath drive
                 let trackCount = List.length audioDisc.tracks
-                yield! waitFor $"icedax -D {devicePath} -t 1+{trackCount} - | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
+                do! waitFor $"icedax -D {devicePath} -t 1+{trackCount} - | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
 
             | _ -> ()
         }
 
-        let playTrack (drive, audioDisc, trackNumber) = asyncSeq {
+        let playTrack (drive, audioDisc, trackNumber) = task {
             let trackTitle =
                 audioDisc.tracks
                 |> Seq.where (fun t -> t.position = trackNumber)
@@ -89,10 +93,10 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                 }
 
                 let devicePath = DiscDrive.getPath drive
-                yield! waitFor $"icedax -D {devicePath} -t {trackNumber} - | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
+                do! waitFor $"icedax -D {devicePath} -t {trackNumber} - | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
         }
 
-        let playFile (target: string) = asyncSeq {
+        let playFile (target: string) = task {
             let tempFileName = $"{Guid.NewGuid()}{Path.GetExtension(target)}"
 
             let realPath = tempFolder.GetPath(RealPath, tempFileName)
@@ -104,12 +108,12 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
             currentProgram <- info
 
-            yield! waitFor $"ffmpeg {quietParameters} -i {unixPath} {formatParameters} -"
+            do! waitFor $"ffmpeg {quietParameters} -i {unixPath} {formatParameters} -"
 
             File.Delete(realPath)
         }
 
-        let shuffle (getItems: unit -> 'T seq) (play: 'T -> IAsyncEnumerable<string>) = asyncSeq {
+        let shuffle (getItems: unit -> 'T seq) (play: 'T -> Task) = task {
             let mutable active = true
             let mutable recent = []
 
@@ -129,7 +133,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                     if recent = [] then
                         active <- false
                 | Some selected ->
-                    yield! play selected
+                    do! play selected
                     recent <- selected :: recent
         }
 
@@ -141,20 +145,20 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                 for (drive, audioDisc, trackNumber) in getTracks scope do
                     let currentAudioDiscInfo = DiscDriveStatus.tryGetAudioDiscInfo drive
                     if currentAudioDiscInfo = Some audioDisc then
-                        yield! playTrack (drive, audioDisc, trackNumber)
+                        do! playTrack (drive, audioDisc, trackNumber)
 
             | AudioCDs (scope, EntireDisc) ->
                 for (drive, _, _) in getTracks scope do
-                    yield! playCD drive
+                    do! playCD drive
 
             | AudioCDs (scope, ShuffleCD) ->
-                yield! shuffle (fun () -> getTracks scope) (fun t -> playTrack t)
+                do! shuffle (fun () -> getTracks scope) (fun t -> playTrack t)
 
             | AudioCDTrack (drive, audioDisc, trackNumber) ->
-                yield! playTrack (drive, audioDisc, trackNumber)
+                do! playTrack (drive, audioDisc, trackNumber)
 
             | AudioFile target ->
-                yield! playFile target
+                do! playFile target
 
             | BrownNoise duration ->
                 currentProgram <- Program "Brown noise"
@@ -164,7 +168,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                     | Infinite -> ""
                     | Finite ts -> $"-t {ts.TotalSeconds}"
 
-                yield! waitFor $"ffmpeg {quietParameters} -f lavfi -i anoisesrc=sample_rate=44100:color=brown {durationStr} {formatParameters} -"
+                do! waitFor $"ffmpeg {quietParameters} -f lavfi -i anoisesrc=sample_rate=44100:color=brown {durationStr} {formatParameters} -"
 
             | Forecast ->
                 let! forecasts = Weather.getForecastsAsync cancellationToken |> Async.AwaitTask
@@ -178,10 +182,10 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
                     do! File.WriteAllTextAsync(realPath, forecast.speech, cancellationToken) |> Async.AwaitTask
 
-                    yield! waitFor $"espeak -f {unixPath} --stdout -v us-mbrola-2 -s 140 -a 150 | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
+                    do! waitFor $"espeak -f {unixPath} --stdout -v us-mbrola-2 -s 140 -a 150 | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
 
             | Shuffle files ->
-                yield! shuffle (fun () -> files) (fun f -> playFile f)
+                do! shuffle (fun () -> files) (fun f -> playFile f)
 
             | Silence duration ->
                 currentProgram <- Program "Silence"
@@ -191,7 +195,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                     | Infinite -> ""
                     | Finite ts -> $"-t {ts.TotalSeconds}"
 
-                yield! waitFor $"ffmpeg {quietParameters} -f lavfi -i anullsrc=cl=stereo:sample_rate=44100 {durationStr} {formatParameters} -"
+                do! waitFor $"ffmpeg {quietParameters} -f lavfi -i anullsrc=cl=stereo:sample_rate=44100 {durationStr} {formatParameters} -"
 
             | SpeechSynthesis (display, text) ->
                 currentProgram <- Program display
@@ -203,20 +207,20 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
                 do! File.WriteAllTextAsync(realPath, text, cancellationToken) |> Async.AwaitTask
 
-                yield! waitFor $"espeak -f {unixPath} --stdout -v us-mbrola-2 -s 140 -a 150 | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
+                do! waitFor $"espeak -f {unixPath} --stdout -v us-mbrola-2 -s 140 -a 150 | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
 
             | RemoteStream source ->
                 if source.Url.Contains('\'') then raise (new NotImplementedException())
 
-                yield! waitFor $"ffmpeg {quietParameters} -i '{source.Url}' {formatParameters} -"
+                do! waitFor $"ffmpeg {quietParameters} -i '{source.Url}' {formatParameters} -"
 
             | WWVSimulator ->
-                yield! waitFor $"wwvsim -r 44100 | ffmpeg {quietParameters} -f s16le -ar 44100 -ac 1 -i - {formatParameters} -"
+                do! waitFor $"wwvsim -r 44100 | ffmpeg {quietParameters} -f s16le -ar 44100 -ac 1 -i - {formatParameters} -"
 
-        "sleep 1"
+        do! write "sleep 1"
 
         currentProgram <- defaultProgram
-        Console.Error.WriteLine($"[ShellSegmentSourceFactory] Script generation ended")
+        Console.WriteLine($"[ShellSegmentSourceFactory] Script generation ended")
     }
 
     interface IProgramInformationSource with
@@ -256,13 +260,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
                 use input = generator.StandardInput
 
-                let iterationWorkflow =
-                    generateScriptAsync tempFolder
-                    |> AsyncSeq.iterAsync (fun item -> input.WriteLineAsync(item.AsMemory(), cancellationToken) |> Async.AwaitTask)
-
-                do! Async.StartAsTask(
-                    iterationWorkflow,
-                    cancellationToken = cancellationToken)
+                do! writeToShellAsync tempFolder input cancellationToken
 
                 printfn "[ShellSegmentSourceFactory] Ending shell pipe"
             }
