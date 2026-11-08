@@ -9,13 +9,15 @@ open System.Text.RegularExpressions
 
 module MusicFiles =
     let private extensionPatterns = [
-        "*.wav"
-        "*.flac"
-        "*.ogg"
-        "*.mp3"
-        "*.mp4"
-        "*.m4a"
         "*.aac"
+        "*.aif"
+        "*.aiff"
+        "*.flac"
+        "*.mp3"
+        "*.m4a"
+        "*.oga"
+        "*.ogg"
+        "*.wav"
         "*.wma"
     ]
 

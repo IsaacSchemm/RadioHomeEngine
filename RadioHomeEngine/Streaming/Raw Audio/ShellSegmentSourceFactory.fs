@@ -72,23 +72,6 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
             | _ ->
                 true
 
-        let playCD drive = task {
-            match DiscDriveStatus.tryGetAudioDiscInfo drive with
-            | Some audioDisc when not (List.isEmpty audioDisc.tracks) ->
-                currentProgram <- Song {
-                    Title = String.concat " / " audioDisc.titles
-                    Artists = audioDisc.artists
-                    Albums = []
-                    Images = []
-                }
-
-                let devicePath = DiscDrive.getPath drive
-                let trackCount = List.length audioDisc.tracks
-                do! waitFor $"icedax -D {devicePath} -t 1+{trackCount} - | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
-
-            | _ -> ()
-        }
-
         let playTrack (drive, audioDisc, trackNumber) = task {
             let trackTitle =
                 audioDisc.tracks
@@ -157,10 +140,6 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
             match input with
             | ALSA (cardNumber, deviceNumber) ->
                 do! waitFor $"ffmpeg {quietParameters} -f alsa -i hw:{cardNumber},{deviceNumber} {formatParameters} -"
-
-            | AudioCD scope ->
-                for drive in DiscDrive.getDevices scope do
-                    do! playCD drive
 
             | AudioFile target ->
                 do! playFile target
@@ -235,9 +214,6 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                 currentProgramSource <- Some source.ProgramInformationSource
 
                 do! waitFor $"ffmpeg {quietParameters} -i '{source.Url}' {formatParameters} -"
-
-            | WWVSimulator ->
-                do! waitFor $"wwvsim -r 44100 | ffmpeg {quietParameters} -f s16le -ar 44100 -ac 1 -i - {formatParameters} -"
         }
 
         Console.WriteLine($"[ShellSegmentSourceFactory] Script generation started")
