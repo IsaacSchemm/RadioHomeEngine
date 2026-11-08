@@ -497,13 +497,3 @@ type SiriusXMClient() =
 
     member _.GetFileAsync(uri, cancellationToken) =
         getFileAsync uri cancellationToken
-
-/// Provides access to the SiriusXM channel list and individual channels' information without affecting another active stream.
-module SiriusXMClient =
-    let private sxm = lazy new SiriusXMClient()
-
-    let GetChannelsAsync(cancellationToken) =
-        sxm.Value.GetChannelsAsync(cancellationToken)
-
-    let GetPlaylistAsync(channelNumber, cancellationToken) =
-        sxm.Value.GetPlaylistAsync(channelNumber, cancellationToken)

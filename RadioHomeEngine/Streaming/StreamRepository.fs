@@ -170,11 +170,11 @@ module StreamRepository =
         inherit BackgroundService()
 
         let populateAllAsync cancellationToken = task {
-            let! sxm = SiriusXMClient.GetChannelsAsync(cancellationToken) |> Async.AwaitTask
-            for c in sxm do
+            let sxm = new SiriusXMClient()
+            let! channels = sxm.GetChannelsAsync(cancellationToken)
+            for c in channels do
                 match Int32.TryParse(c.channelNumber) with
-                | (true, num) ->
-                        add ephemeral num (new SiriusXMSourceFactory(c.name, c.mediumDescription, num))
+                | (true, num) -> add ephemeral num (new SiriusXMSourceFactory(c.name, c.mediumDescription, num))
                 | _ -> ()
 
             try

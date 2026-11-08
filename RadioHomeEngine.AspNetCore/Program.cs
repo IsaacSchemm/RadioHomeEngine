@@ -18,8 +18,10 @@ Available arguments:
         This enables ripping (to {Config.mediaDirectories.Head}), playback via Lyrion, and HLS streaming on channel {StreamRepository.playCD.ChannelListing.ChannelNumber}.
 
     --weather-alerts
-        Enable monitoring of weather alerts from the National Weather Service, for the coordinates `latitude,longitude` in the file `location.txt`.
+        Enable monitoring of weather alerts from the National Weather Service.
         These alerts are converted into audio via `espeak` and are inserted into any active HLS streams.
+
+Weather forecasts and alerts use the coordinates `latitude,longitude` in the file `location.txt`.
 
 Additionally, if `username.txt` and `password.txt` are present, RadioHomeEngine will connect to SiriusXM and provide playable HLS streams for each live channel. (Xtra channels and on-demand content are not supported.)
 ");
