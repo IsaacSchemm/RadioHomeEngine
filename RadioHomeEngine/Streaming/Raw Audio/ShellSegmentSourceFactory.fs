@@ -23,11 +23,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
     let mutable currentProgram = defaultProgram
 
     let writeToShellAsync (tempFolder: RawAudioTemporaryFolder) (shellInput: StreamWriter) (cancellationToken: CancellationToken) = task {
-        Console.WriteLine($"[ShellSegmentSourceFactory] Script generation started")
-
         let write (str: string) = shellInput.WriteLineAsync(str.AsMemory(), cancellationToken)
-
-        do! write "PATH=$PATH:$(pwd)"
 
         let waitFor (command: string) = task {
             let sentinel = $"{Guid.NewGuid()}"
@@ -47,16 +43,33 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                 ignore args
         }
 
-        let! cancellationToken = Async.CancellationToken
-
         let getTracks scope = [
             for info in CD.getDriveInfo scope do
                 match info.disc.audio with
                 | None -> ()
                 | Some audioDisc ->
                     for track in audioDisc.tracks do
-                        (info.device, audioDisc, track.position)
+                        CDTrack (info.device, audioDisc, track.position)
+
+            for drive in DiscDrive.getDevices scope do
+                let files =
+                    Seq.singleton drive
+                    |> Seq.choose DataCD.tryGetDataDiscInfo
+                    |> Seq.collect (fun info -> info.files)
+                    |> Seq.choose (DataCD.tryGetPath drive)
+                    |> Seq.map AudioFile
+
+                yield! files
         ]
+
+        let trackStillExists input =
+            match input with
+            | CDTrack (drive, audioDisc, _) ->
+                DiscDriveStatus.tryGetAudioDiscInfo drive = Some audioDisc
+            | AudioFile file ->
+                File.Exists(file)
+            | _ ->
+                true
 
         let playCD drive = task {
             match DiscDriveStatus.tryGetAudioDiscInfo drive with
@@ -113,55 +126,58 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
             File.Delete(realPath)
         }
 
-        let shuffle (getItems: unit -> 'T seq) (play: 'T -> Task) = task {
-            let mutable active = true
-            let mutable recent = []
-
-            let isFresh x = not (List.contains x recent)
-
-            while active do
-                let selectedTrack =
-                    getItems ()
-                    |> Seq.where isFresh
-                    |> Seq.randomShuffle
-                    |> Seq.tryHead
-
-                match selectedTrack with
-                | None ->
-                    let halfway = List.length recent / 2
-                    recent <- recent |> List.truncate halfway
-                    if recent = [] then
-                        active <- false
-                | Some selected ->
-                    do! play selected
-                    recent <- selected :: recent
-        }
-
-        for input in inputs do
+        let rec play input = task {
             currentProgram <- defaultProgram
+
+            let shuffle (getItems: unit -> RawAudioInput seq) = task {
+                let mutable active = true
+                let mutable recent = []
+
+                let isFresh x = not (List.contains x recent)
+
+                while active do
+                    let selectedTrack =
+                        getItems ()
+                        |> Seq.where isFresh
+                        |> Seq.randomShuffle
+                        |> Seq.tryHead
+
+                    match selectedTrack with
+                    | None ->
+                        let halfway = List.length recent / 2
+                        recent <- recent |> List.truncate halfway
+                        if recent = [] then
+                            active <- false
+                    | Some selected ->
+                        do! play selected
+                        recent <- selected :: recent
+            }
 
             match input with
             | ALSA (cardNumber, deviceNumber) ->
                 do! waitFor $"ffmpeg {quietParameters} -f alsa -i hw:{cardNumber},{deviceNumber} {formatParameters} -"
 
-            | AudioCDs (scope, AllTracks) ->
-                for (drive, audioDisc, trackNumber) in getTracks scope do
-                    let currentAudioDiscInfo = DiscDriveStatus.tryGetAudioDiscInfo drive
-                    if currentAudioDiscInfo = Some audioDisc then
-                        do! playTrack (drive, audioDisc, trackNumber)
-
-            | AudioCDs (scope, EntireDisc) ->
-                for (drive, _, _) in getTracks scope do
+            | AudioCD scope ->
+                for drive in DiscDrive.getDevices scope do
                     do! playCD drive
-
-            | AudioCDs (scope, ShuffleCD) ->
-                do! shuffle (fun () -> getTracks scope) (fun t -> playTrack t)
-
-            | AudioCDTrack (drive, audioDisc, trackNumber) ->
-                do! playTrack (drive, audioDisc, trackNumber)
 
             | AudioFile target ->
                 do! playFile target
+
+            | CD (scope, AllTracks) ->
+                for item in getTracks scope do
+                    if trackStillExists item then
+                        do! play item
+
+            | CD (scope, ShuffleCD) ->
+                do! shuffle (fun () -> seq {
+                    for item in getTracks scope do
+                        if trackStillExists item then
+                            item
+                })
+
+            | CDTrack (drive, audioDisc, trackNumber) ->
+                do! playTrack (drive, audioDisc, trackNumber)
 
             | BrownNoise duration ->
                 currentProgram <- Program "Brown noise"
@@ -188,7 +204,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
                     do! waitFor $"espeak -f {unixPath} --stdout -v us-mbrola-2 -s 140 -a 150 | ffmpeg {quietParameters} -f wav -i - {formatParameters} -"
 
             | Shuffle files ->
-                do! shuffle (fun () -> files) (fun f -> playFile f)
+                do! shuffle (fun () -> files |> Seq.map AudioFile)
 
             | Silence duration ->
                 currentProgram <- Program "Silence"
@@ -219,7 +235,13 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
             | WWVSimulator ->
                 do! waitFor $"wwvsim -r 44100 | ffmpeg {quietParameters} -f s16le -ar 44100 -ac 1 -i - {formatParameters} -"
+        }
 
+        Console.WriteLine($"[ShellSegmentSourceFactory] Script generation started")
+
+        do! write "PATH=$PATH:$(pwd)"
+        for input in inputs do
+            do! play input
         do! write "sleep 1"
 
         currentProgram <- defaultProgram

@@ -17,15 +17,15 @@ module StreamRepository =
     let playCD = new Composite(
         2000,
         new ShellSegmentSourceFactory(
-            "Play CD",
-            [AudioCDs (AllDrives, EntireDisc)]),
+            "Audio CD",
+            [CD (AllDrives, AllTracks)]),
         ClearCacheOnInactive = false)
 
     let shuffleCD = new Composite(
         2020,
         new ShellSegmentSourceFactory(
-            "Shuffle CD",
-            [AudioCDs (AllDrives, ShuffleCD)]),
+            "Audio CD (Shuffle)",
+            [CD (AllDrives, ShuffleCD)]),
         ClearCacheOnInactive = false)
 
     let brownNoise = new Composite(
@@ -184,8 +184,8 @@ module StreamRepository =
             with ex -> Console.Error.WriteLine(ex)
 
             for (i, drive) in Seq.indexed (DiscDrive.getAll ()) do
-                addShell (2001 + i) (DiscDrive.getPath drive) [AudioCDs (SingleDrive drive, EntireDisc)]
-                addShell (2021 + i) (DiscDrive.getPath drive) [AudioCDs (SingleDrive drive, ShuffleCD)]
+                addShell (2001 + i) (DiscDrive.getPath drive) [CD (SingleDrive drive, AllTracks)]
+                addShell (2021 + i) (DiscDrive.getPath drive) [CD (SingleDrive drive, ShuffleCD)]
 
             for card in ALSA.getCards () do
                 for device in card.devices do

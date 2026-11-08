@@ -49,7 +49,7 @@
     <Compile Include="Streaming\Remote Streams\RadioCo.fs" />
     <Compile Include="Streaming\Raw Audio\Probe.fs" />
     <Compile Include="Streaming\Raw Audio\RawAudioDuration.fs" />
-    <Compile Include="Streaming\Raw Audio\AudioCDPlaybackMode.fs" />
+    <Compile Include="Streaming\Raw Audio\CDPlaybackMode.fs" />
     <Compile Include="Streaming\Raw Audio\RawAudioInput.fs" />
     <Compile Include="Streaming\Raw Audio\RawAudioTemporaryFolder.fs" />
     <Compile Include="Streaming\Raw Audio\ShellSegmentSourceFactory.fs" />

@@ -1,6 +1,5 @@
 namespace RadioHomeEngine
 
-type AudioCDPlaybackMode =
+type CDPlaybackMode =
 | AllTracks
-| EntireDisc
 | ShuffleCD

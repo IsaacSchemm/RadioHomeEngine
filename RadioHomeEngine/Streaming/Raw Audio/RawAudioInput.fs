@@ -2,9 +2,10 @@ namespace RadioHomeEngine
 
 type RawAudioInput =
 | ALSA of card: int * device: int 
-| AudioCDs of DiscDriveScope * AudioCDPlaybackMode
-| AudioCDTrack of DiscDrive * AudioDiscInfo * trackNumber: int
+| AudioCD of DiscDriveScope
 | AudioFile of path: string
+| CD of DiscDriveScope * CDPlaybackMode
+| CDTrack of DiscDrive * AudioDiscInfo * trackNumber: int
 | BrownNoise of duration: RawAudioDuration
 | Forecast
 | RemoteStream of IRemoteStreamSource
