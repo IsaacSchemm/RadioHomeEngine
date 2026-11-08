@@ -5,6 +5,8 @@ An HLS-based streaming audio server with SiriusXM, Lyrion Music Server, and audi
 RadioHomeEngine provides a variety of HLS streams which are generated essentially on demand and cached internally;
 streams that are no longer actively being streamed are stopped until they have a new listener.
 
+These streams can be played on compatible devices through Lyrion Music Server, or on a variety of other devices (including some game consoles, smart TVs, and virtually all smartphones) through the web UI.
+
 ## Features
 
 ### Integration with [Lyrion Music Server](https://lyrion.org) (`--lyrion`)
@@ -36,7 +38,7 @@ RadioHomeEngine will start a new session for each individual channel number, all
 
 ### Audio CD integration (`--cd`)
 
-RadioHomeEngine's CD integration uses `udev` to monitor connected CD drives on Linux.
+RadioHomeEngine's CD integration uses `udevadm` to monitor connected CD drives on Linux.
 Both audio CDs (leveraging `icedax` and `abcde`) and data CDs are supported.
 (Mixed-mode CDs are treated as audio CDs; this can be changed with a small edit to `DiscDriveStatus.fs`).
 
@@ -97,25 +99,5 @@ An example of this is in `StreamRepository.fs`, where a handful of radio station
 * Open the `.sln` file
 * Right-click on the project `RadioHomeEngine.AspNetCore` and click Publish
 
-If you're running LMS on an ordinary PC, you'll probably want to create a
-single-file, self-contained build for Linux-x64. (Radio Home Engine does not
-currently support LMS on Windows.) This executable can then be moved to the
-Linux computer, marked as executable, and run, perhaps from `/etc/rc.local`
-and/or through `screen`.
-
-## Configuration
-
-The user's latitude and longitude (used for weather alerts and forecasts) are stored in `location.txt`.
-Their SiriusXM username and password are stored in `username.txt` and `password.txt`, respectively.
-
-(In both cases, the software assumes the user is in the U.S.)
-
-## Other dependencies
-
-* `ip`
-* `ffmpeg`
-* `udevadm`
-* `eject`
-* `icedax`
-* `abcde`
-* `espeak`
+If you're running LMS on an ordinary PC, you'll probably want to create a single-file, self-contained build for Linux-x64.
+This executable can then be moved to the Linux computer, marked as executable, and run, perhaps from a starup script through `screen`.
