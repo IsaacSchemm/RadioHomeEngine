@@ -20,6 +20,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
     let zeroes = new ReadOnlyMemory<byte>(Array.zeroCreate<byte> 81920)
 
     let defaultProgram = Program "Unknown"
+    let mutable currentProgramSource = None
     let mutable currentProgram = defaultProgram
 
     let writeToShellAsync (tempFolder: RawAudioTemporaryFolder) (shellInput: StreamWriter) (cancellationToken: CancellationToken) = task {
@@ -231,6 +232,8 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
             | RemoteStream source ->
                 if source.Url.Contains('\'') then raise (new NotImplementedException())
 
+                currentProgramSource <- Some source.ProgramInformationSource
+
                 do! waitFor $"ffmpeg {quietParameters} -i '{source.Url}' {formatParameters} -"
 
             | WWVSimulator ->
@@ -244,6 +247,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
             do! play input
         do! write "sleep 1"
 
+        currentProgramSource <- None
         currentProgram <- defaultProgram
         Console.WriteLine($"[ShellSegmentSourceFactory] Script generation ended")
     }
@@ -260,7 +264,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
             ChannelDescriptions = []
         }
 
-        member this.ProgramInformationSource = this
+        member this.ProgramInformationSource = currentProgramSource |> Option.defaultValue this
 
         member this.CreateAsync() = task {
             let cancellationTokenSource = new CancellationTokenSource()
@@ -376,7 +380,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
             return {
                 new ISegmentSource with
-                    member _.ProgramInformationSource = this
+                    member _.ProgramInformationSource = currentProgramSource |> Option.defaultValue this
 
                     member _.ReadNextAsync(cancellationToken) = task {
                         try

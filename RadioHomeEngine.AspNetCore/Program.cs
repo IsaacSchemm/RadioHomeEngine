@@ -9,21 +9,34 @@ Starts a server, accessible over unencrypted HTTP on port {Config.port}.
 
 Available arguments:
 
+    --artist-shuffle
+        Generate HLS streams in the 1000+ range for music in {Config.mediaDirectories} whose folder names match a set of artist names hardcoded in the F# source code.
+
+    --cd
+        Use `udev` to monitor CD drives on the system.
+        This enables ripping (to {Config.mediaDirectories.Head}), playback via Lyrion, and HLS streaming on channel 2000 and 2020.
+
+    --local-radio
+        Generate HLS streams in the 8000+ and 20000+ range for a set of western Wisconsin radio and TV outlets hardcoded in the F# source code.
+
     --lyrion
         Attempt to connect to Lyrion Media Server via telnet on localhost port {LyrionCLIServiceModule.port}.
         RadioHomeEngine can issue commands and listen to IR input on connected Squeezebox devices.
 
-    --cd
-        Use `udev` to monitor CD drives on the system.
-        This enables ripping (to {Config.mediaDirectories.Head}), playback via Lyrion, and HLS streaming on channel {StreamRepository.playCD.ChannelListing.ChannelNumber}.
+    --siriusxm
+        Enable SiriusXM intergration, using the username and password in `username.txt` and `password.txt`, respectively.
+        RadioHomeEngine will connect to SiriusXM and provide playable HLS streams for each live channel.
+        (Xtra channels and on-demand content are not supported.)
+
+    --weather
+        Enable forecasts from the National Weather Service on channel 3020.
+        These alerts are converted into audio via `espeak` and are inserted into any active HLS streams.
 
     --weather-alerts
         Enable monitoring of weather alerts from the National Weather Service.
         These alerts are converted into audio via `espeak` and are inserted into any active HLS streams.
 
 Weather forecasts and alerts use the coordinates `latitude,longitude` in the file `location.txt`.
-
-Additionally, if `username.txt` and `password.txt` are present, RadioHomeEngine will connect to SiriusXM and provide playable HLS streams for each live channel. (Xtra channels and on-demand content are not supported.)
 ");
 
     return;
@@ -34,15 +47,41 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient();
 
+if (args.Contains("--artist-shuffle"))
+{
+    StreamRepository.hideArtists = false;
+    builder.Services.AddHostedService<DiscDriveChangeDetectionService>();
+}
+
+if (args.Contains("--cd"))
+{
+    StreamRepository.hideCD = false;
+    builder.Services.AddHostedService<DiscDriveChangeDetectionService>();
+}
+
+if (args.Contains("--local-radio"))
+{
+    StreamRepository.hideLocalRadio = false;
+    builder.Services.AddHostedService<DiscDriveChangeDetectionService>();
+}
+
 if (args.Contains("--lyrion"))
 {
     builder.Services.AddHostedService<LyrionCLIService>();
     builder.Services.AddHostedService<LyrionPlayerDetectionService>();
 }
 
-if (args.Contains("--cd"))
+if (args.Contains("--siriusxm"))
 {
-    builder.Services.AddHostedService<DiscDriveChangeDetectionService>();
+    StreamRepository.hideSiriusXM = false;
+    SiriusXMClientModule.username = await File.ReadAllTextAsync("username.txt");
+    SiriusXMClientModule.password = await File.ReadAllTextAsync("password.txt");
+}
+
+if (args.Contains("--weather"))
+{
+    StreamRepository.hideWeather = false;
+    builder.Services.AddHostedService<WeatherAlertService>();
 }
 
 if (args.Contains("--weather-alerts"))

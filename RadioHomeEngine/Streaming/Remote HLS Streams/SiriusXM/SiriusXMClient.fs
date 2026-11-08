@@ -12,11 +12,13 @@ open System.Threading.Tasks
 exception LoginFailedException
 exception RecievedErrorException of code: int * message: string
 
+module SiriusXMClient =
+    let mutable username = ""
+    let mutable password = ""
+
 /// A client object that provides access to live SiriusXM streams, given a username and password stored on disk.
 /// A single client object can only stream one channel at a time.
 type SiriusXMClient() =
-    let usernameFile = "username.txt"
-    let passwordFile = "password.txt"
     let region = "US"
 
     let USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/604.5.6 (KHTML, like Gecko) Version/11.0.3 Safari/604.5.6"
@@ -78,8 +80,8 @@ type SiriusXMClient() =
                             clientDeviceType = "web"
                         |}
                         standardAuth = {|
-                            username = File.ReadAllText(usernameFile).Trim('\r', '\n')
-                            password = File.ReadAllText(passwordFile).Trim('\r', '\n')
+                            username = SiriusXMClient.username
+                            password = SiriusXMClient.password
                         |}
                     |}
                 |}]
@@ -491,7 +493,7 @@ type SiriusXMClient() =
     }
 
     member _.GetChannelsAsync(cancellationToken) =
-        if File.Exists(usernameFile) && File.Exists(passwordFile)
+        if SiriusXMClient.username <> "" && SiriusXMClient.password <> ""
         then getChannelsAsync cancellationToken
         else Task.FromResult([])
 

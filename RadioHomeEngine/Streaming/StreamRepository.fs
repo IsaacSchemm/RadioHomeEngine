@@ -9,6 +9,12 @@ open FSharp.Control
 
 /// A module which keeps track of all active radio channels.
 module StreamRepository =
+    let mutable hideArtists = true
+    let mutable hideCD = true
+    let mutable hideLocalRadio = true
+    let mutable hideSiriusXM = true
+    let mutable hideWeather = true
+
     let silence = new Composite(
         0,
         Silence.factory,
@@ -54,10 +60,12 @@ module StreamRepository =
     /// All currently tracked channels.
     let getCurrentChannels () = seq {
         silence
-        playCD
-        shuffleCD
+        if not hideCD then
+            playCD
+            shuffleCD
         brownNoise
-        forecast
+        if not hideWeather then
+            forecast
         yield! ephemeral
     }
 
@@ -170,61 +178,61 @@ module StreamRepository =
         inherit BackgroundService()
 
         let populateAllAsync cancellationToken = task {
-            let sxm = new SiriusXMClient()
-            let! channels = sxm.GetChannelsAsync(cancellationToken)
-            for c in channels do
-                match Int32.TryParse(c.channelNumber) with
-                | (true, num) -> add ephemeral num (new SiriusXMSourceFactory(c.name, c.mediumDescription, num))
-                | _ -> ()
+            if not hideSiriusXM then
+                let sxm = new SiriusXMClient()
+                let! channels = sxm.GetChannelsAsync(cancellationToken)
+                for c in channels do
+                    match Int32.TryParse(c.channelNumber) with
+                    | (true, num) -> add ephemeral num (new SiriusXMSourceFactory(c.name, c.mediumDescription, num))
+                    | _ -> ()
 
-            try
-                for artist in List.sort ["Lisa Stansfield"; "Steps"; "They Might Be Giants"; "Jamie Paige"; "Dionne Warwick"] do
-                    let shuffle = Shuffle (MusicFiles.byArtistFolder artist)
-                    addShell 1000 artist [shuffle]
-            with ex -> Console.Error.WriteLine(ex)
+            if not hideArtists then
+                try
+                    for artist in List.sort ["Lisa Stansfield"; "Steps"; "They Might Be Giants"; "Jamie Paige"; "Dionne Warwick"; "qwertyuiopasdfghjklzxcvbnm"] do
+                        match MusicFiles.byArtistFolder artist with
+                        | [] -> ()
+                        | list -> addShell 1001 artist [Shuffle list]
+                with ex -> Console.Error.WriteLine(ex)
 
-            for (i, drive) in Seq.indexed (DiscDrive.getAll ()) do
-                addShell (2001 + i) (DiscDrive.getPath drive) [CD (SingleDrive drive, AllTracks)]
-                addShell (2021 + i) (DiscDrive.getPath drive) [CD (SingleDrive drive, ShuffleCD)]
+            if not hideCD then
+                for (i, drive) in Seq.indexed (DiscDrive.getAll ()) do
+                    addShell (2001 + i) (DiscDrive.getPath drive) [CD (SingleDrive drive, AllTracks)]
+                    addShell (2021 + i) (DiscDrive.getPath drive) [CD (SingleDrive drive, ShuffleCD)]
 
             for card in ALSA.getCards () do
                 for device in card.devices do
                     addShell (2100 + card.number * 10 + device.number) device.id [ALSA (card.number, device.number)]
 
-            addShell 9630 "WHYS 96.3 FM" [RemoteStream WHYS.source]
+            if not hideLocalRadio then
+                try
+                    let! wpr = WPR.all |> AsyncSeq.toListAsync
+                    for source in wpr do
+                        let desiredNumber =
+                            match source.Name with
+                            | "WPR Music" -> 8970
+                            | "WPR News" -> 8830
+                            | _ -> 0
 
-            try
-                let! converge = RadioCo.getByStationIdAsync "Converge Radio" "s5fa0df0d2" cancellationToken
-                addShell 10190 "Converge Radio 101.9 FM" [RemoteStream converge]
-            with ex -> Console.Error.WriteLine(ex)
+                        addShell desiredNumber source.Name [RemoteStream source]
+                with ex -> Console.Error.WriteLine(ex)
 
-            try
-                let! wpr = WPR.all |> AsyncSeq.toListAsync
-                for source in wpr do
-                    let desiredNumber =
-                        match source.Name with
-                        | "WPR Music" -> 8970
-                        | "WPR News" -> 8830
-                        | _ -> 20000
+                addShell 9630 "WHYS 96.3 FM" [RemoteStream WHYS.source]
 
-                    addShell desiredNumber source.Name [RemoteStream source]
-            with ex -> Console.Error.WriteLine(ex)
+                try
+                    let! converge = RadioCo.getByStationIdAsync "Converge Radio" "s5fa0df0d2" cancellationToken
+                    addShell 10190 "Converge Radio 101.9 FM" [RemoteStream converge]
+                with ex -> Console.Error.WriteLine(ex)
 
-            add ephemeral 30180 (new HLSSourceFactory(
-                "WQOW 18 News",
-                "https://streamingengineservice-prod01-v1.fuelmedia.io/play/6a60c7ae-75e2-465f-bd30-1b1506880293.m3u8",
-                None))
+                add ephemeral 20001 (new HLSSourceFactory(
+                    "WQOW 18 News",
+                    "https://streamingengineservice-prod01-v1.fuelmedia.io/play/6a60c7ae-75e2-465f-bd30-1b1506880293.m3u8",
+                    None))
 
-            try
-                let! pbs = PBSWisconsin.all |> AsyncSeq.toListAsync
-                for source in pbs do
-                    let desiredNumber =
-                        match source.DigitalChannel.Split('.') with
-                        | [| Int32 major; Int32 minor |] -> 30000 + 10 * major + minor
-                        | _ -> 30000
-
-                    addShell desiredNumber source.FullName [RemoteStream source]
-            with ex -> Console.Error.WriteLine(ex)
+                try
+                    let! pbs = PBSWisconsin.all |> AsyncSeq.toListAsync
+                    for source in pbs do
+                        addShell 20001 source.FullName [RemoteStream source]
+                with ex -> Console.Error.WriteLine(ex)
         }
 
         override _.ExecuteAsync(cancellationToken) = task {
