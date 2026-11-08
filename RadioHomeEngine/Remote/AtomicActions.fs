@@ -23,8 +23,8 @@ type AtomicAction =
 module AtomicActions =
     let tryGetAction (entry: string) = Seq.tryHead (seq {
         match entry with
-        | "0" -> PlayCD (AllDrives, Now)
-        | "00" -> Stop
+        | "00" -> PlayCD (AllDrives, Now)
+        | "000" -> Stop
         | Int32 n when n >= 0 -> PlayChannel (n, Now)
         | _ -> ()
     })
