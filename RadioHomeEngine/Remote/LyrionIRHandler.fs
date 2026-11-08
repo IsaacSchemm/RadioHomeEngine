@@ -2,6 +2,8 @@
 
 open System
 open System.Globalization
+open System.Text.RegularExpressions
+open System.Threading
 open System.Threading.Tasks
 
 open LyrionCLI
@@ -56,6 +58,30 @@ type LyrionIRHandler(player: Player) =
     let mutable lastCode = 0
     let mutable lastTime = 0m
 
+    let tryGetChannelNumberAsync player = task {
+        let! url = LyrionCLI.Playlist.getPathAsync player
+        let! address = Network.getAddressAsync ()
+        match Uri.TryCreate(url, UriKind.Absolute) with
+        | (true, uri) when uri.Host = address && uri.Port = Config.port ->
+            let m = Regex.Match(uri.AbsolutePath, "/Stream/playlist-([0-9]+).m3u8")
+            if m.Success then
+                return Some (int m.Groups[1].Value)
+            else
+                return None
+        | _ ->
+            return None
+    }
+
+    let showProgramInformationForChannelAsync channelNumber = task {
+        do! Players.setDisplayAsync player "Info" "Please wait..." (TimeSpan.FromSeconds(10.0))
+
+        let! info = StreamRepository.getChannelListingAndProgramInformationAsync channelNumber CancellationToken.None
+        let listing = info.channelListing
+        let program = info.programInformation
+
+        do! Players.setDisplayAsync player $"[{listing.ChannelNumber}] {program.ChannelName}" program.ProgramName (TimeSpan.FromSeconds(20.0))
+    }
+
     let processIRAsync ircode time = task {
         let mapping =
             Mappings
@@ -104,17 +130,20 @@ type LyrionIRHandler(player: Player) =
             | Some action ->
                 do! AtomicActions.performActionAsync player action
 
-        | Some prompt, AlternateAction ->
+        | Some prompt, Info ->
             do! clearAsync ()
 
             let entry = prompt.Substring(2)
 
-            match AtomicActions.tryGetAction entry with
-            | None -> ()
-            | Some action ->
-                do! AtomicActions.performAlternateActionAsync player action
+            match entry with
+            | Int32 i -> do! showProgramInformationForChannelAsync i
+            | _ -> ()
 
-        | None, AlternateAction -> ()
+        | None, Info ->
+            let! channelNumber = tryGetChannelNumberAsync player
+            match channelNumber with
+            | Some num -> do! showProgramInformationForChannelAsync  num
+            | None -> ()
 
         | Some _, _ ->
             do! clearAsync()
