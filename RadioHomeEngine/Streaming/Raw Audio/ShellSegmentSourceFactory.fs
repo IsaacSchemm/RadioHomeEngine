@@ -10,7 +10,7 @@ open FSharp.Control
 open System.Collections.Generic
 
 type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) =
-    let segmentTimeSeconds = 5
+    let segmentTimeSeconds = 10
     let hlsBitrate = 320 * 1024
 
     let quietParameters = "-nostats -hide_banner -loglevel warning"
@@ -274,7 +274,7 @@ type ShellSegmentSourceFactory(displayName: string, inputs: RawAudioInput list) 
 
             let reencoder = Process.Start(new ProcessStartInfo(
                 "ffmpeg",
-                $"{quietParameters} -readrate 1 -readrate_catchup 2 {formatParameters} -i - {hlsParameters} {realChunklistPath}",
+                $"{quietParameters} -readrate 1 -readrate_catchup 2 -readrate_initial_burst {segmentTimeSeconds} {formatParameters} -i - {hlsParameters} {realChunklistPath}",
                 RedirectStandardInput = true))
 
             let channel = Channel.CreateBounded(3)

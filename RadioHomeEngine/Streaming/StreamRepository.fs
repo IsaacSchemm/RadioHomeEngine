@@ -24,15 +24,13 @@ module StreamRepository =
         2000,
         new ShellSegmentSourceFactory(
             "Audio CD",
-            [CD (AllDrives, AllTracks)]),
-        ClearCacheOnInactive = false)
+            [CD (AllDrives, AllTracks)]))
 
     let shuffleCD = new Composite(
         2020,
         new ShellSegmentSourceFactory(
             "Audio CD (Shuffle)",
-            [CD (AllDrives, ShuffleCD)]),
-        ClearCacheOnInactive = false)
+            [CD (AllDrives, ShuffleCD)]))
 
     let brownNoise = new Composite(
         3010,
@@ -45,15 +43,7 @@ module StreamRepository =
         3020,
         new ShellSegmentSourceFactory(
             "Forecast",
-            [
-                let halfSecond = TimeSpan.FromSeconds(0.5) |> Finite
-
-                Forecast
-
-                BrownNoise halfSecond
-                Silence halfSecond
-            ]),
-        ClearCacheOnInactive = false)
+            [Forecast]))
 
     let private ephemeral = new ResizeArray<Composite>()
 
