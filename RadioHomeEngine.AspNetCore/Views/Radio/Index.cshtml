@@ -12,63 +12,54 @@
     <title>Radio Home Engine - Radio</title>
     @await Html.PartialAsync("_Styles")
     <style type="text/css">
-            html, body {
-                width: 100%;
-                height: 100%;
-                margin: 0;
-            }
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
 
-            body {
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        section {
+            flex: 0 0 40px;
+            margin: auto;
+            width: min(100vw, 320px);
+            display: flex;
+            flex-direction: column;
+        }
+
+            section form {
+                flex: 1 1 auto;
                 display: flex;
-                flex-direction: column;
+                flex-direction: row;
+                margin: 0.25em 0;
             }
 
-            .pad {
-                line-height: 2em;
-                margin: 0.5em;
-                padding-left: 1em;
-                padding-right: 1em;
-            }
+                section form input,
+                section form select {
+                    flex: 1 1 auto;
+                    margin-right: 0.5em;
+                }
     </style>
 </head>
 <body>
-    <section aria-label="Enter Channel" style="flex: 0 0 auto; text-align: start">
-        <form asp-action="ViewChannel" style="display: inline" target="currentChannelFrame">
-            <select name="macAddress">
-                <option></option>
-                @foreach (var playerConnection in Model.Players)
-                {
-                    <option value="@playerConnection.MacAddress">
-                        @playerConnection.Name
-                    </option>
-                }
-            </select>
-
+    <section aria-label="Enter Channel">
+        <form asp-action="ViewChannel" target="currentChannelFrame">
             <input type="number"
                    min="1"
                    max="@Model.Channels.Select(c => c.ChannelNumber).DefaultIfEmpty(1).Max()"
                    name="num"
-                   value=""
-                   class="pad" />
+                   value="" />
 
             <button type="submit" class="pad">View</button>
-
-            <button asp-action="PlayOn" type="submit" class="pad">Play on selected device</button>
         </form>
     </section>
 
-    <section aria-label="Choose Channel" style="flex: 0 0 auto; text-align: start">
-        <form asp-action="ViewChannel" style="display: inline" target="currentChannelFrame">
-            <select name="macAddress">
-                <option></option>
-                @foreach (var playerConnection in Model.Players)
-                {
-                    <option value="@playerConnection.MacAddress">
-                        @playerConnection.Name
-                    </option>
-                }
-            </select>
-
+    <section aria-label="Choose Channel">
+        <form asp-action="ViewChannel" target="currentChannelFrame">
             <select name="num">
                 @foreach (var channel in Model.Channels)
                 {
@@ -79,14 +70,12 @@
             </select>
 
             <button type="submit" class="pad">View</button>
-
-            <button asp-action="PlayOn" type="submit" class="pad">Play on selected device</button>
         </form>
     </section>
 
     <iframe aria-label="Channel Information"
             name="currentChannelFrame"
-            src="/SXM/ViewChannel"
+            src="/Radio/ViewChannel?num=0"
             style="border: 0; flex: 1 1 auto"></iframe>
 </body>
 </html>

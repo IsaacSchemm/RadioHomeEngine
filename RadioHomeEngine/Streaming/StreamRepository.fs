@@ -17,7 +17,9 @@ module StreamRepository =
 
     let silence = new Composite(
         0,
-        Silence.factory,
+        new ShellSegmentSourceFactory(
+            "Silence",
+            [Silence Infinite]),
         ClearCacheOnInactive = false)
 
     let playCD = new Composite(

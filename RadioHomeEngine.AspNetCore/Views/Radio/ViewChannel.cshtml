@@ -1,6 +1,9 @@
 ﻿@model NowPlayingModel
 @{
     Layout = null;
+
+    var ipAddress = await Network.getAddressAsync();
+    var port = Config.port;
 }
 
 <!DOCTYPE html>
@@ -32,72 +35,96 @@
 
     <hr />
 
-    <audio controls src="/SXM/PlayChannel?num=@Model.Channel.ChannelNumber">
-        HTML5 audio is not supported in this browser.
-    </audio>
+    @if (Context.Request.Headers.UserAgent.Any(str => str?.Contains("Nintendo WiiU") == true))
+    {
+        <a href="/Stream/playlist-@(Model.Channel.ChannelNumber).m3u8" target="_top">
+            Play on Wii U
+        </a>
+    }
+    else
+    {
+        <audio controls src="/Stream/playlist-@(Model.Channel.ChannelNumber).m3u8">
+            HTML5 audio is not supported in this browser.
+        </audio>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.18/hls.min.js"
-            integrity="sha512-hARxLWym80kd0Bzl5/93OuW1ujaKfvmJ90yTKak/RB67JuNIjtErU2H7H3bteyfzMuqiSK0tXarT7eK6lEWBBA=="
-            crossorigin="anonymous"
-            referrerpolicy="no-referrer"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.18/hls.min.js"
+                integrity="sha512-hARxLWym80kd0Bzl5/93OuW1ujaKfvmJ90yTKak/RB67JuNIjtErU2H7H3bteyfzMuqiSK0tXarT7eK6lEWBBA=="
+                crossorigin="anonymous"
+                referrerpolicy="no-referrer"></script>
 
-    <script type="text/javascript">
-        if ("Hls" in window && Hls.isSupported()) {
-            const audio = document.getElementsByTagName("audio")[0];
+        <script type="text/javascript">
+            if ("Hls" in window && Hls.isSupported()) {
+                const audio = document.getElementsByTagName("audio")[0];
 
-            audio.style.visibility = "hidden";
+                audio.style.visibility = "hidden";
 
-            const url = audio.src;
+                const url = audio.src;
 
-            const hls = new Hls({ startPosition: 0 });
+                const hls = new Hls({ startPosition: 0 });
 
-            hls.on(Hls.Events.ERROR, function (event, data) {
-                console.warn({ event, data });
-            });
-
-            hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    audio.style.visibility = "visible";
+                hls.on(Hls.Events.ERROR, function (event, data) {
+                    console.warn({ event, data });
                 });
 
-                hls.loadSource(url);
-            });
+                hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        audio.style.visibility = "visible";
+                    });
 
-            hls.attachMedia(audio);
-        }
-    </script>
+                    hls.loadSource(url);
+                });
+
+                hls.attachMedia(audio);
+            }
+        </script>
+    }
+
+    <div>
+        <iframe aria-label="Remote Play Errors"
+                name="playOnFrame"
+                style="border: 0; width: 240px; height: 16px"></iframe>
+    </div>
+
+    @foreach (var playerConnection in Model.Players)
+    {
+        <form asp-action="PlayOn" target="playOnFrame">
+            <input type="hidden" name="macAddress" value="@playerConnection.MacAddress" />
+            <input type="hidden" name="num" value="@Model.Channel.ChannelNumber" />
+            <input type="submit" value="Play on @playerConnection.Name" style="margin: 0.5em 0; height: 32px" />
+        </form>
+    }
 
     @if (Model.ProgramInformation is ProgramInformation programInformation)
     {
         <hr />
 
-            @if (programInformation.Program is Program.Song song)
+        @if (programInformation.Program is Program.Song song)
+        {
+            if (song.Item.Images.FirstOrDefault() is string imageUrl)
             {
-                if (song.Item.Images.FirstOrDefault() is string imageUrl)
-                {
-                    <div>
-                        <img src="@imageUrl" alt="" width="225" height="225" style="object-fit: contain" />
-                    </div>
-                }
-
-                <div style="font-size: 125%; margin: 0.5em 0">
-                    @song.Item.Title
-                </div>
-
                 <div>
-                    @string.Join(" / ", song.Item.Artists)
+                    <img src="@imageUrl" alt="" width="225" height="225" style="object-fit: contain" />
                 </div>
+            }
 
-                <div style="font-size: 75%">
-                    @string.Join(" / ", song.Item.Albums)
-                </div>
-            }
-            else
-            {
-                <div style="font-size: 125%; margin: 0.5em 0">
-                    @programInformation.ProgramName
-                </div>
-            }
+            <div style="font-size: 125%; margin: 0.5em 0">
+                @song.Item.Title
+            </div>
+
+            <div>
+                @string.Join(" / ", song.Item.Artists)
+            </div>
+
+            <div style="font-size: 75%; margin-bottom: 0.5em">
+                @string.Join(" / ", song.Item.Albums)
+            </div>
         }
+        else
+        {
+            <div style="font-size: 125%; margin: 0.5em 0">
+                @programInformation.ProgramName
+            </div>
+        }
+    }
 </body>
 </html>
